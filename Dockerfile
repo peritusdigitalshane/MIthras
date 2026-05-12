@@ -11,8 +11,17 @@ RUN npm install --legacy-peer-deps
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build args (passed via docker-compose / docker build --build-arg)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG BUILD_MODE=production
+
+# Surface them as ENV so Vite picks them up at build time
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
+# Build the application in the requested mode (production or staging)
+RUN npm run build -- --mode $BUILD_MODE
 
 # Production stage
 FROM nginx:alpine AS production
