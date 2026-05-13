@@ -110,7 +110,7 @@ function New-HmacRequestHeaders {
         [Parameter()][string]$RawBody = ''
     )
 
-    $ts = [string][long](Get-Date -UFormat '%s')
+    $ts = [string][long](([DateTimeOffset]::UtcNow).ToUnixTimeSeconds())
     $sig = Get-HmacSignature -Secret $Secret -Method $Method -Path $Path -Timestamp $ts -RawBody $RawBody
     return @{
         'X-Agent-Id'  = $AgentId

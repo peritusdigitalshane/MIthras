@@ -93,7 +93,7 @@ Describe 'New-HmacRequestHeaders' {
     It 'X-Timestamp is an integer string within 60 seconds of now' {
         $headers = New-HmacRequestHeaders -AgentId 'x' -Secret 'k' -Method 'POST' -Path '/p' -RawBody '{}'
         $ts = [long]$headers['X-Timestamp']
-        $now = [long](Get-Date -UFormat %s)
+        $now = [long]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
         [Math]::Abs($now - $ts) | Should -BeLessOrEqual 60
     }
 }
