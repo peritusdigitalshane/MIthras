@@ -138,7 +138,7 @@ risk AS (
     (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true
        AND (e.last_seen_at IS NULL OR e.last_seen_at < NOW() - INTERVAL '24 hours')) AS offline_24h,
     (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true) AS endpoints_total,
-    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true AND e.is_online=true) AS endpoints_online,
+    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true AND e.last_seen_at > NOW() - INTERVAL '5 minutes') AS endpoints_online,
     (SELECT MAX(t.initial_detection_time) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id
        WHERE e.organization_id=o.id) AS last_threat
   FROM public.organizations o
@@ -568,7 +568,10 @@ SELECT
   o.name AS "Customer",
   e.hostname AS "Hostname",
   e.os_version AS "OS",
-  CASE WHEN e.is_online THEN 'Online' ELSE 'Offline' END AS "Status",
+  -- Derived from last_seen_at, not the stored is_online flag: the legacy
+  -- agent-api writes is_online=true and never clears it when the agent stops,
+  -- so stale endpoints keep showing as Online forever.
+  CASE WHEN e.last_seen_at > NOW() - INTERVAL '5 minutes' THEN 'Online' ELSE 'Offline' END AS "Status",
   CASE
     WHEN e.last_seen_at IS NULL THEN 'Never'
     WHEN e.last_seen_at > NOW() - INTERVAL '1 hour' THEN ROUND(EXTRACT(EPOCH FROM (NOW()-e.last_seen_at))/60)::text || 'm ago'
