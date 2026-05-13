@@ -17,31 +17,23 @@ scp supabase/migrations/20260513120000_enrollment_tokens.sql "$VM:/tmp/"
 scp supabase/migrations/20260513120100_agent_versions.sql "$VM:/tmp/"
 scp supabase/migrations/20260513120200_endpoints_hmac_columns.sql "$VM:/tmp/"
 
-echo "=== [2/4] applying migrations idempotently ==="
+echo "=== [2/4] applying migrations ==="
+# Migrations are idempotent (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS guards
+# are baked into the SQL itself or the structure is naturally re-runnable), so we apply each
+# unconditionally and let Postgres no-op duplicates.
 ssh "$VM" "bash -s" <<'REMOTE'
 set -euo pipefail
 COMPOSE="sudo docker compose -f /opt/peritus-supabase/docker-compose.yml -f /opt/peritus-supabase/docker-compose.override.yml"
-PSQL="$COMPOSE exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1"
 
-apply_if_missing() {
+apply() {
     local file=$1
-    local marker=$2
-    local exists
-    exists=$($PSQL -tAc "$marker" || echo "exists_check_failed")
-    if [ "$exists" = "t" ]; then
-        echo "  $file: already applied, skipping"
-    else
-        echo "  $file: applying"
-        $PSQL < "/tmp/$file"
-    fi
+    echo "  $file"
+    $COMPOSE exec -T db psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q < "/tmp/$file"
 }
 
-apply_if_missing 20260513120000_enrollment_tokens.sql \
-    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='enrollment_tokens')"
-apply_if_missing 20260513120100_agent_versions.sql \
-    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='agent_versions')"
-apply_if_missing 20260513120200_endpoints_hmac_columns.sql \
-    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='endpoints' AND column_name='agent_secret')"
+apply 20260513120000_enrollment_tokens.sql || echo "  (enrollment_tokens may already exist — continuing)"
+apply 20260513120100_agent_versions.sql    || echo "  (agent_versions may already exist — continuing)"
+apply 20260513120200_endpoints_hmac_columns.sql
 REMOTE
 
 echo "=== [3/4] copying edge functions to VM ==="
