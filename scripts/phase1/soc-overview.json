@@ -1,0 +1,1424 @@
+{
+  "title": "Peritus SOC Overview",
+  "uid": "peritus-soc-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": [
+    "soc",
+    "peritus"
+  ],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "weekStart": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "liveNow": false,
+  "annotations": {
+    "list": []
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "org",
+        "label": "Customer",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "peritus-db"
+        },
+        "query": "SELECT name AS __text, id::text AS __value FROM public.organizations ORDER BY name",
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Active Threats (S+H)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT COUNT(*)::int AS value\nFROM public.endpoint_threats t\nJOIN public.endpoints e ON e.id = t.endpoint_id\nWHERE t.status = 'Active'\n  AND COALESCE(t.manual_resolution_active, false) = false\n  AND t.severity IN ('Severe','High')\n  AND e.organization_id::text IN (${org:singlequote})",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Critical CVEs Open",
+      "gridPos": {
+        "x": 5,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT COUNT(DISTINCT v.cve_id)::int AS value\nFROM public.vulnerability_findings v\nJOIN public.endpoints e ON e.id = v.endpoint_id\nWHERE v.status = 'open'\n  AND v.cvss_score >= 9.0\n  AND e.organization_id::text IN (${org:singlequote})",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Endpoints Offline >24h",
+      "gridPos": {
+        "x": 10,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT COUNT(*)::int AS value\nFROM public.endpoints e\nWHERE e.is_active = true\n  AND (e.last_seen_at IS NULL OR e.last_seen_at < NOW() - INTERVAL '24 hours')\n  AND e.organization_id::text IN (${org:singlequote})",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "RTP Disabled",
+      "gridPos": {
+        "x": 15,
+        "y": 0,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nWITH latest AS (\n  SELECT DISTINCT ON (es.endpoint_id) es.endpoint_id, es.realtime_protection_enabled\n  FROM public.endpoint_status es\n  ORDER BY es.endpoint_id, es.collected_at DESC\n)\nSELECT COUNT(*)::int AS value\nFROM latest\nJOIN public.endpoints e ON e.id = latest.endpoint_id\nWHERE latest.realtime_protection_enabled = false\n  AND e.is_active = true\n  AND e.organization_id::text IN (${org:singlequote})",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Customers Needing Attention",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nWITH risk AS (\n  SELECT o.id, o.name,\n    (SELECT COUNT(*) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id\n       WHERE e.organization_id=o.id AND t.status='Active' AND COALESCE(t.manual_resolution_active,false)=false AND t.severity IN ('Severe','High')) AS hi_threats,\n    (SELECT COUNT(DISTINCT v.cve_id) FROM public.vulnerability_findings v JOIN public.endpoints e ON e.id=v.endpoint_id\n       WHERE e.organization_id=o.id AND v.status='open' AND v.cvss_score>=9.0) AS crit_cves,\n    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true\n       AND (e.last_seen_at IS NULL OR e.last_seen_at < NOW() - INTERVAL '24 hours')) AS offline_24h\n  FROM public.organizations o\n  WHERE o.id::text IN (${org:singlequote})\n)\nSELECT COUNT(*)::int AS value FROM risk WHERE hi_threats > 0 OR crit_cves > 0 OR offline_24h > 0\n",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short",
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Customer Risk Ranking (sorted by score, click name \u2192 drill down)",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nWITH latest_status AS (\n  SELECT DISTINCT ON (es.endpoint_id) es.endpoint_id, es.realtime_protection_enabled\n  FROM public.endpoint_status es\n  ORDER BY es.endpoint_id, es.collected_at DESC\n),\nrisk AS (\n  SELECT\n    o.id,\n    o.name AS \"Customer\",\n    (SELECT COUNT(*) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id\n       WHERE e.organization_id=o.id AND t.status='Active' AND COALESCE(t.manual_resolution_active,false)=false AND t.severity='Severe') AS severe_n,\n    (SELECT COUNT(*) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id\n       WHERE e.organization_id=o.id AND t.status='Active' AND COALESCE(t.manual_resolution_active,false)=false AND t.severity='High') AS high_n,\n    (SELECT COUNT(*) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id\n       WHERE e.organization_id=o.id AND t.status='Active' AND COALESCE(t.manual_resolution_active,false)=false AND t.severity='Moderate') AS mod_n,\n    (SELECT COUNT(DISTINCT v.cve_id) FROM public.vulnerability_findings v JOIN public.endpoints e ON e.id=v.endpoint_id\n       WHERE e.organization_id=o.id AND v.status='open' AND v.cvss_score>=9.0) AS crit_cves,\n    (SELECT COUNT(DISTINCT v.cve_id) FROM public.vulnerability_findings v JOIN public.endpoints e ON e.id=v.endpoint_id\n       WHERE e.organization_id=o.id AND v.status='open' AND v.cvss_score>=7.0 AND v.cvss_score<9.0) AS high_cves,\n    (SELECT COUNT(*) FROM latest_status ls JOIN public.endpoints e ON e.id=ls.endpoint_id\n       WHERE e.organization_id=o.id AND ls.realtime_protection_enabled=false AND e.is_active=true) AS rtp_off,\n    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true\n       AND (e.last_seen_at IS NULL OR e.last_seen_at < NOW() - INTERVAL '24 hours')) AS offline_24h,\n    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true) AS endpoints_total,\n    (SELECT COUNT(*) FROM public.endpoints e WHERE e.organization_id=o.id AND e.is_active=true AND e.is_online=true) AS endpoints_online,\n    (SELECT MAX(t.initial_detection_time) FROM public.endpoint_threats t JOIN public.endpoints e ON e.id=t.endpoint_id\n       WHERE e.organization_id=o.id) AS last_threat\n  FROM public.organizations o\n  WHERE o.id::text IN (${org:singlequote})\n)\nSELECT\n  \"Customer\",\n  id::text AS _org_id,\n  (severe_n*20 + high_n*10 + mod_n*5 + crit_cves*5 + high_cves*2 + rtp_off*5 + offline_24h*3)::int AS \"Risk\",\n  (severe_n + high_n)::int AS \"Threats (S+H)\",\n  crit_cves::int AS \"Critical CVEs\",\n  rtp_off::int AS \"RTP Off\",\n  offline_24h::int AS \"Offline >24h\",\n  (endpoints_online::text || '/' || endpoints_total::text) AS \"Endpoints\",\n  to_char(last_threat AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS \"Last Threat\"\nFROM risk\nORDER BY \"Risk\" DESC, \"Customer\" ASC\n",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Risk",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Risk"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 5
+                    },
+                    {
+                      "color": "orange",
+                      "value": 10
+                    },
+                    {
+                      "color": "red",
+                      "value": 25
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Threats (S+H)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical CVEs"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RTP Off"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Offline >24h"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "_org_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Customer"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Drill into ${__data.fields.Customer}",
+                    "url": "/d/peritus-soc-overview?var-org=${__data.fields._org_id}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Priority Action List (strict \u2014 every row is a real action)",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nWITH actions AS (\n  -- Active Severe/High threats\n  SELECT\n    CASE t.severity WHEN 'Severe' THEN 1 WHEN 'High' THEN 2 ELSE 3 END AS priority,\n    o.name AS customer, e.hostname,\n    'Active threat' AS issue,\n    t.threat_name || COALESCE(' (' || t.category || ')', '') AS detail,\n    t.severity AS severity,\n    EXTRACT(EPOCH FROM (NOW() - t.initial_detection_time))::bigint AS age_s,\n    'Quarantine / resolve in Defender' AS recommended\n  FROM public.endpoint_threats t\n  JOIN public.endpoints e ON e.id = t.endpoint_id\n  JOIN public.organizations o ON o.id = e.organization_id\n  WHERE t.status = 'Active'\n    AND COALESCE(t.manual_resolution_active, false) = false\n    AND t.severity IN ('Severe','High')\n    AND e.organization_id::text IN (${org:singlequote})\n\n  UNION ALL\n  -- RTP disabled\n  SELECT 2 AS priority, o.name, e.hostname,\n    'RTP disabled' AS issue,\n    'Defender real-time protection turned off' AS detail,\n    'High' AS severity,\n    EXTRACT(EPOCH FROM (NOW() - ls.collected_at))::bigint AS age_s,\n    'Enable RTP via Defender policy / GPO' AS recommended\n  FROM (SELECT DISTINCT ON (endpoint_id) endpoint_id, realtime_protection_enabled, collected_at\n        FROM public.endpoint_status ORDER BY endpoint_id, collected_at DESC) ls\n  JOIN public.endpoints e ON e.id = ls.endpoint_id\n  JOIN public.organizations o ON o.id = e.organization_id\n  WHERE ls.realtime_protection_enabled = false\n    AND e.is_active = true\n    AND e.organization_id::text IN (${org:singlequote})\n\n  UNION ALL\n  -- Offline > 24h\n  SELECT 3 AS priority, o.name, e.hostname,\n    'Endpoint offline' AS issue,\n    COALESCE('Last seen ' || to_char(e.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), 'Never reported') AS detail,\n    'Medium' AS severity,\n    EXTRACT(EPOCH FROM (NOW() - COALESCE(e.last_seen_at, NOW() - INTERVAL '999 days')))::bigint AS age_s,\n    'Investigate connectivity / confirm decommissioned' AS recommended\n  FROM public.endpoints e\n  JOIN public.organizations o ON o.id = e.organization_id\n  WHERE e.is_active = true\n    AND (e.last_seen_at IS NULL OR e.last_seen_at < NOW() - INTERVAL '24 hours')\n    AND e.organization_id::text IN (${org:singlequote})\n\n  UNION ALL\n  -- Critical CVEs (>= 9)\n  SELECT 1 AS priority, o.name, NULL AS hostname,\n    'Critical CVE unpatched' AS issue,\n    v.cve_id || ' on ' || v.affected_software || ' \u2014 affects ' || COUNT(DISTINCT v.endpoint_id)::text || ' endpoint(s) (CVSS ' || MAX(v.cvss_score)::text || ')' AS detail,\n    'Severe' AS severity,\n    EXTRACT(EPOCH FROM (NOW() - MIN(v.created_at)))::bigint AS age_s,\n    'Deploy patch via WSUS / package manager' AS recommended\n  FROM public.vulnerability_findings v\n  JOIN public.endpoints e ON e.id = v.endpoint_id\n  JOIN public.organizations o ON o.id = e.organization_id\n  WHERE v.status = 'open'\n    AND v.cvss_score >= 9.0\n    AND e.organization_id::text IN (${org:singlequote})\n  GROUP BY o.name, v.cve_id, v.affected_software\n)\nSELECT\n  priority AS \"Pri\",\n  customer AS \"Customer\",\n  COALESCE(hostname, '\u2014') AS \"Endpoint\",\n  issue AS \"Issue\",\n  severity AS \"Severity\",\n  detail AS \"Detail\",\n  CASE\n    WHEN age_s < 3600 THEN ROUND(age_s/60.0)::text || 'm'\n    WHEN age_s < 86400 THEN ROUND(age_s/3600.0)::text || 'h'\n    ELSE ROUND(age_s/86400.0)::text || 'd'\n  END AS \"Age\",\n  recommended AS \"Action\"\nFROM actions\nORDER BY priority ASC, age_s DESC\nLIMIT 200\n",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Pri",
+            "desc": false
+          }
+        ],
+        "footer": {
+          "show": true,
+          "reducer": [
+            "count"
+          ],
+          "fields": [
+            "Issue"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Pri"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 2
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 3
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 50
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Severe": {
+                        "color": "red",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "High": {
+                        "color": "orange",
+                        "index": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Detail"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 480
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Action"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Threats detected over time (by severity)",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT\n  $__timeGroupAlias(t.initial_detection_time, '$__interval'),\n  t.severity AS metric,\n  COUNT(*)::int AS value\nFROM public.endpoint_threats t\nJOIN public.endpoints e ON e.id = t.endpoint_id\nWHERE $__timeFilter(t.initial_detection_time)\n  AND e.organization_id::text IN (${org:singlequote})\nGROUP BY 1, 2\nORDER BY 1\n",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 90,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severe"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Moderate"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Endpoint event log volume (by level)",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT\n  $__timeGroupAlias(el.event_time, '$__interval'),\n  el.level AS metric,\n  COUNT(*)::int AS value\nFROM public.endpoint_event_logs el\nJOIN public.endpoints e ON e.id = el.endpoint_id\nWHERE $__timeFilter(el.event_time)\n  AND e.organization_id::text IN (${org:singlequote})\nGROUP BY 1, 2\nORDER BY 1\n",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 90,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Endpoint Inventory (sorted by open threats, then most-recent)",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nWITH latest_status AS (\n  SELECT DISTINCT ON (endpoint_id) endpoint_id, realtime_protection_enabled, collected_at\n  FROM public.endpoint_status ORDER BY endpoint_id, collected_at DESC\n),\nthreats_per AS (\n  SELECT endpoint_id, COUNT(*) AS active_threats\n  FROM public.endpoint_threats\n  WHERE status='Active' AND COALESCE(manual_resolution_active,false)=false\n  GROUP BY endpoint_id\n)\nSELECT\n  o.name AS \"Customer\",\n  e.hostname AS \"Hostname\",\n  e.os_version AS \"OS\",\n  CASE WHEN e.is_online THEN 'Online' ELSE 'Offline' END AS \"Status\",\n  CASE\n    WHEN e.last_seen_at IS NULL THEN 'Never'\n    WHEN e.last_seen_at > NOW() - INTERVAL '1 hour' THEN ROUND(EXTRACT(EPOCH FROM (NOW()-e.last_seen_at))/60)::text || 'm ago'\n    WHEN e.last_seen_at > NOW() - INTERVAL '1 day' THEN ROUND(EXTRACT(EPOCH FROM (NOW()-e.last_seen_at))/3600)::text || 'h ago'\n    ELSE ROUND(EXTRACT(EPOCH FROM (NOW()-e.last_seen_at))/86400)::text || 'd ago'\n  END AS \"Last Seen\",\n  CASE WHEN ls.realtime_protection_enabled IS TRUE THEN 'On'\n       WHEN ls.realtime_protection_enabled IS FALSE THEN 'Off'\n       ELSE '?' END AS \"RTP\",\n  COALESCE(e.defender_version, '\u2014') AS \"Defender\",\n  COALESCE(e.agent_version, '\u2014') AS \"Agent\",\n  COALESCE(tp.active_threats, 0)::int AS \"Threats\"\nFROM public.endpoints e\nJOIN public.organizations o ON o.id = e.organization_id\nLEFT JOIN latest_status ls ON ls.endpoint_id = e.id\nLEFT JOIN threats_per tp ON tp.endpoint_id = e.id\nWHERE e.is_active = true\n  AND e.organization_id::text IN (${org:singlequote})\nORDER BY tp.active_threats DESC NULLS LAST, e.last_seen_at DESC NULLS LAST\n",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Threats",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Online": {
+                        "color": "green",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Offline": {
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RTP"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "On": {
+                        "color": "green",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Off": {
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "?": {
+                        "color": "yellow",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Threats"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "type": "table",
+      "title": "Top open vulnerabilities (CVSS \u00d7 prevalence)",
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT\n  v.cve_id AS \"CVE\",\n  v.affected_software AS \"Software\",\n  MAX(v.cvss_score)::numeric(4,1) AS \"CVSS\",\n  COUNT(DISTINCT v.endpoint_id)::int AS \"Endpoints\",\n  COUNT(DISTINCT e.organization_id)::int AS \"Customers\"\nFROM public.vulnerability_findings v\nJOIN public.endpoints e ON e.id = v.endpoint_id\nWHERE v.status = 'open'\n  AND e.organization_id::text IN (${org:singlequote})\nGROUP BY v.cve_id, v.affected_software\nORDER BY MAX(v.cvss_score) DESC NULLS LAST, COUNT(DISTINCT v.endpoint_id) DESC\nLIMIT 25\n",
+          "format": "table"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "CVSS",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVSS"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 4
+                    },
+                    {
+                      "color": "orange",
+                      "value": 7
+                    },
+                    {
+                      "color": "red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "type": "table",
+      "title": "Recent endpoint events (Critical/Error/Warning, last 50)",
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "peritus-db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "rawSql": "\nSELECT\n  to_char(el.event_time AT TIME ZONE 'UTC', 'MM-DD HH24:MI') AS \"Time\",\n  o.name AS \"Customer\",\n  e.hostname AS \"Endpoint\",\n  el.level AS \"Level\",\n  COALESCE(el.log_source, '\u2014') AS \"Source\",\n  LEFT(el.message, 180) AS \"Message\"\nFROM public.endpoint_event_logs el\nJOIN public.endpoints e ON e.id = el.endpoint_id\nJOIN public.organizations o ON o.id = e.organization_id\nWHERE el.level IN ('Critical','Error','Warning')\n  AND e.organization_id::text IN (${org:singlequote})\nORDER BY el.event_time DESC\nLIMIT 50\n",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Level"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "red",
+                        "index": 0
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Error": {
+                        "color": "orange",
+                        "index": 1
+                      }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": {
+                      "Warning": {
+                        "color": "yellow",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Message"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 600
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Firewall (click to expand)",
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 60,
+          "type": "timeseries",
+          "title": "Firewall events by direction",
+          "gridPos": {
+            "x": 0,
+            "y": 59,
+            "w": 24,
+            "h": 6
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "peritus-db"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "peritus-db"
+              },
+              "rawSql": "\nSELECT\n  $__timeGroupAlias(fw.event_time, '$__interval'),\n  fw.direction AS metric,\n  COUNT(*)::int AS value\nFROM public.firewall_audit_logs fw\nWHERE $__timeFilter(fw.event_time)\n  AND fw.organization_id::text IN (${org:singlequote})\nGROUP BY 1, 2\nORDER BY 1\n",
+              "format": "time_series"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "list",
+              "placement": "bottom",
+              "calcs": []
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "bars",
+                "lineWidth": 0,
+                "fillOpacity": 90,
+                "barAlignment": 0,
+                "stacking": {
+                  "mode": "normal",
+                  "group": "A"
+                },
+                "showPoints": "never",
+                "spanNulls": false
+              },
+              "mappings": []
+            },
+            "overrides": []
+          },
+          "collapsed": false
+        }
+      ]
+    }
+  ]
+}
