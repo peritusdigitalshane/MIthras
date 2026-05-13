@@ -3,18 +3,18 @@
 -- New agents (phase 2+) use agent_secret + agent-heartbeat edge function.
 
 ALTER TABLE public.endpoints
-    ADD COLUMN agent_secret      text,              -- HMAC-SHA256 shared secret (base64url, 32 bytes raw)
-    ADD COLUMN enrolled_via      text REFERENCES public.enrollment_tokens(token) ON DELETE SET NULL,
-    ADD COLUMN enrolled_at       timestamptz,
-    ADD COLUMN runtime           text CHECK (runtime IS NULL OR runtime IN ('powershell', 'dotnet')),
-    ADD COLUMN agent_version     text,
-    ADD COLUMN update_channel    text NOT NULL DEFAULT 'stable'
+    ADD COLUMN IF NOT EXISTS agent_secret      text,              -- HMAC-SHA256 shared secret (base64url, 32 bytes raw)
+    ADD COLUMN IF NOT EXISTS enrolled_via      text REFERENCES public.enrollment_tokens(token) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS enrolled_at       timestamptz,
+    ADD COLUMN IF NOT EXISTS runtime           text CHECK (runtime IS NULL OR runtime IN ('powershell', 'dotnet')),
+    ADD COLUMN IF NOT EXISTS agent_version     text,
+    ADD COLUMN IF NOT EXISTS update_channel    text NOT NULL DEFAULT 'stable'
                                   CHECK (update_channel IN ('stable', 'beta', 'canary')),
-    ADD COLUMN is_active         boolean NOT NULL DEFAULT true,
-    ADD COLUMN revoked_at        timestamptz,
-    ADD COLUMN revoked_reason    text;
+    ADD COLUMN IF NOT EXISTS is_active         boolean NOT NULL DEFAULT true,
+    ADD COLUMN IF NOT EXISTS revoked_at        timestamptz,
+    ADD COLUMN IF NOT EXISTS revoked_reason    text;
 
-CREATE INDEX idx_endpoints_active_hmac
+CREATE INDEX IF NOT EXISTS idx_endpoints_active_hmac
     ON public.endpoints(id)
     WHERE agent_secret IS NOT NULL AND is_active = true;
 
