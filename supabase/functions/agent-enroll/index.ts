@@ -10,7 +10,10 @@ import { handlePreflight, buildCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const PUBLIC_API_BASE = Deno.env.get("PUBLIC_API_BASE_URL") ?? "https://apidev.peritusdigital.com.au";
+// Default to the public HTTPS hostname. apidev.peritusdigital.com.au only has HTTP:80
+// in Caddy so it isn't usable as an agent base URL — using that as a default previously
+// persisted broken URLs into freshly-enrolled agent configs.
+const PUBLIC_API_BASE = Deno.env.get("PUBLIC_API_BASE_URL") ?? "https://api.cmwcollective.com.au";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
