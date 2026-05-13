@@ -23,21 +23,13 @@ ALTER TABLE public.enrollment_tokens ENABLE ROW LEVEL SECURITY;
 -- Only members of the org may see their tokens; only admins may create.
 CREATE POLICY enrollment_tokens_select ON public.enrollment_tokens
     FOR SELECT TO authenticated
-    USING (
-        organization_id IN (
-            SELECT organization_id FROM public.organization_members
-            WHERE user_id = auth.uid()
-        )
-    );
+    USING (public.is_member_of_org(auth.uid(), organization_id));
 
 CREATE POLICY enrollment_tokens_insert ON public.enrollment_tokens
     FOR INSERT TO authenticated
     WITH CHECK (
         created_by = auth.uid()
-        AND organization_id IN (
-            SELECT organization_id FROM public.organization_members
-            WHERE user_id = auth.uid() AND role IN ('admin', 'owner')
-        )
+        AND public.is_admin_of_org(auth.uid(), organization_id)
     );
 
 -- Service role bypasses RLS for the agent-enroll edge function which validates tokens.
