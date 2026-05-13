@@ -31,3 +31,6 @@ verify_jwt = false
 
 [functions.agent-version-check]
 verify_jwt = false
+
+[functions.agent-installer]
+verify_jwt = false
