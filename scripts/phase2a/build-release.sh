@@ -41,7 +41,17 @@ cp    "$AGENT_DIR/README.md"                "$STAGE/"
 
 ZIP="$DIST/peritus-secure-agent-$VERSION.zip"
 rm -f "$ZIP"
-(cd "$STAGE" && zip -rq "$ZIP" .)
+# Prefer the native `zip` tool; fall back to Python's stdlib zipfile so the script runs
+# unchanged on the Windows workstation (Git Bash has no `zip`) and on the VM (which does).
+if command -v zip >/dev/null 2>&1; then
+    (cd "$STAGE" && zip -rq "$ZIP" .)
+elif command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1; then
+    PY=$(command -v python3 || command -v python)
+    (cd "$STAGE" && "$PY" -m zipfile -c "$ZIP" .)
+else
+    echo "FATAL: neither 'zip' nor 'python' is available to build the archive"
+    exit 1
+fi
 echo "  $(stat -c%s "$ZIP" 2>/dev/null || stat -f%z "$ZIP") bytes"
 
 SHA=$(sha256sum "$ZIP" | awk '{print $1}')
