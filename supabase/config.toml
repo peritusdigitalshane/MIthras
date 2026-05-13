@@ -22,3 +22,12 @@ verify_jwt = false
 
 [functions.vulnerability-scan]
 verify_jwt = false
+
+[functions.agent-enroll]
+verify_jwt = false
+
+[functions.agent-heartbeat]
+verify_jwt = false
+
+[functions.agent-version-check]
+verify_jwt = false
