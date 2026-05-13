@@ -209,10 +209,13 @@ WITH actions AS (
     AND e.organization_id::text IN (${org:singlequote})
 
   UNION ALL
-  -- Critical CVEs (>= 9)
-  SELECT 1 AS priority, o.name, NULL AS hostname,
+  -- Critical CVEs (>= 9). Aggregates per (org, cve, software) but we expose the
+  -- affected hostnames in the Endpoint column so an analyst sees what to patch
+  -- without having to drill into another panel.
+  SELECT 1 AS priority, o.name,
+    string_agg(DISTINCT e.hostname, ', ' ORDER BY e.hostname) AS hostname,
     'Critical CVE unpatched' AS issue,
-    v.cve_id || ' on ' || v.affected_software || ' — affects ' || COUNT(DISTINCT v.endpoint_id)::text || ' endpoint(s) (CVSS ' || MAX(v.cvss_score)::text || ')' AS detail,
+    v.cve_id || ' on ' || v.affected_software || ' (CVSS ' || MAX(v.cvss_score)::text || ', ' || COUNT(DISTINCT v.endpoint_id)::text || ' endpoint' || CASE WHEN COUNT(DISTINCT v.endpoint_id) = 1 THEN '' ELSE 's' END || ')' AS detail,
     'Severe' AS severity,
     EXTRACT(EPOCH FROM (NOW() - MIN(v.created_at)))::bigint AS age_s,
     'Deploy patch via WSUS / package manager' AS recommended
