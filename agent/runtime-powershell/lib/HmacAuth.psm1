@@ -1,4 +1,4 @@
-# HmacAuth.psm1 — request signing for Peritus Secure Agent
+﻿# HmacAuth.psm1 — request signing for Peritus Secure Agent
 # Matches supabase/functions/_shared/hmac.ts byte-for-byte. See agent/contracts/hmac-canonicalization.md.
 
 Set-StrictMode -Version Latest

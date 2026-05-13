@@ -1,4 +1,4 @@
-# SecureConfig.psm1 — DPAPI-encrypted JSON config for the Peritus Secure Agent.
+﻿# SecureConfig.psm1 — DPAPI-encrypted JSON config for the Peritus Secure Agent.
 # Scope: LocalMachine. Encrypted blob is only decryptable on the same machine, by SYSTEM or local admins.
 
 Set-StrictMode -Version Latest

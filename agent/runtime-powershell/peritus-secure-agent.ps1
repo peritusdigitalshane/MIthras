@@ -1,4 +1,4 @@
-# peritus-secure-agent.ps1 — Phase 2a service main loop.
+﻿# peritus-secure-agent.ps1 — Phase 2a service main loop.
 # Runs as NT AUTHORITY\SYSTEM under NSSM. No interactive prompts.
 #
 # Behaviour:

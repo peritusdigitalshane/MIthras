@@ -1,4 +1,4 @@
-# ApiClient.psm1 — HTTP client for the Peritus Secure Agent API.
+﻿# ApiClient.psm1 — HTTP client for the Peritus Secure Agent API.
 # Wraps Invoke-RestMethod with HMAC signing. All non-enrol calls require an existing { agent_id, agent_secret }.
 
 Set-StrictMode -Version Latest
