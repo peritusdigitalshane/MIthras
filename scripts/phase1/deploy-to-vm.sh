@@ -37,12 +37,13 @@ apply 20260513120200_endpoints_hmac_columns.sql
 REMOTE
 
 echo "=== [3/4] copying edge functions to VM ==="
-ssh "$VM" "sudo mkdir -p $FUNCTIONS_DIR/_shared $FUNCTIONS_DIR/agent-enroll $FUNCTIONS_DIR/agent-heartbeat $FUNCTIONS_DIR/agent-version-check"
+ssh "$VM" "sudo mkdir -p $FUNCTIONS_DIR/_shared $FUNCTIONS_DIR/agent-enroll $FUNCTIONS_DIR/agent-heartbeat $FUNCTIONS_DIR/agent-version-check $FUNCTIONS_DIR/agent-installer"
 scp supabase/functions/_shared/hmac.ts "$VM:/tmp/hmac.ts"
 scp supabase/functions/_shared/cors.ts "$VM:/tmp/cors.ts"
 scp supabase/functions/agent-enroll/index.ts "$VM:/tmp/agent-enroll-index.ts"
 scp supabase/functions/agent-heartbeat/index.ts "$VM:/tmp/agent-heartbeat-index.ts"
 scp supabase/functions/agent-version-check/index.ts "$VM:/tmp/agent-version-check-index.ts"
+scp supabase/functions/agent-installer/index.ts "$VM:/tmp/agent-installer-index.ts"
 scp supabase/functions/ai-security-advisor/index.ts "$VM:/tmp/ai-security-advisor-index.ts"
 
 ssh "$VM" "bash -s" <<'REMOTE'
@@ -53,6 +54,7 @@ sudo install -m 644 /tmp/cors.ts                       "$F/_shared/cors.ts"
 sudo install -m 644 /tmp/agent-enroll-index.ts          "$F/agent-enroll/index.ts"
 sudo install -m 644 /tmp/agent-heartbeat-index.ts       "$F/agent-heartbeat/index.ts"
 sudo install -m 644 /tmp/agent-version-check-index.ts   "$F/agent-version-check/index.ts"
+sudo install -m 644 /tmp/agent-installer-index.ts       "$F/agent-installer/index.ts"
 sudo install -m 644 /tmp/ai-security-advisor-index.ts   "$F/ai-security-advisor/index.ts"
 REMOTE
 
