@@ -67,4 +67,24 @@ function Invoke-AgentVersionCheck {
     return $null
 }
 
-Export-ModuleMember -Function Invoke-AgentEnroll, Invoke-AgentHeartbeat, Invoke-AgentVersionCheck
+function Invoke-AgentAppControlObserved {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ApiBaseUrl,
+        [Parameter(Mandatory)][string]$AgentId,
+        [Parameter(Mandatory)][string]$AgentSecret,
+        [Parameter(Mandatory)][object[]]$Apps,
+        [Parameter()][string]$Since
+    )
+
+    $payload = @{ apps = $Apps }
+    if ($Since) { $payload.since = $Since }
+
+    $rawBody = ConvertTo-CanonicalJson -Value $payload
+    $path    = '/agent-app-control/observed'
+    $headers = New-HmacRequestHeaders -AgentId $AgentId -Secret $AgentSecret -Method 'POST' -Path $path -RawBody $rawBody
+    $url     = "$ApiBaseUrl/functions/v1$path"
+    return Invoke-RestMethod -Uri $url -Method Post -ContentType 'application/json' -Headers $headers -Body $rawBody -UseBasicParsing
+}
+
+Export-ModuleMember -Function Invoke-AgentEnroll, Invoke-AgentHeartbeat, Invoke-AgentVersionCheck, Invoke-AgentAppControlObserved
