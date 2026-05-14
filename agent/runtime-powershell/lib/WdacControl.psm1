@@ -179,7 +179,7 @@ function Apply-WdacPolicy {
 
     $state = Get-WdacAgentState -Path $StatePath
     if ($state.last_applied_version -eq $PolicyVersion) {
-        return @{ applied = $false; skipped = $true; error = $null }
+        return @{ applied = $false; skipped = $true; pending_reboot = $false; error = $null }
     }
 
     if (-not $state.peritus_policy_guid) {
