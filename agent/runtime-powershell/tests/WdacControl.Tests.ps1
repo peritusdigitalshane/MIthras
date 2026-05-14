@@ -171,3 +171,37 @@ Describe 'Apply-WdacPolicy' {
         Remove-Item $stateFile -Force
     }
 }
+
+Describe 'Invoke-WdacControlSync' {
+    It 'no-ops when state is null or mode=off' {
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ws-" + [guid]::NewGuid() + ".json")
+        $r = Invoke-WdacControlSync -State $null -StatePath $stateFile -OnApply ({ param($x) $false }) -OnObservedBatch ({ param($x) $false })
+        $r.applied  | Should -Be $false
+        $r.observed | Should -Be 0
+        Remove-Item $stateFile -ErrorAction SilentlyContinue
+    }
+
+    It 'calls OnApply when policy_version differs and forwards observations to OnObservedBatch' {
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ws-" + [guid]::NewGuid() + ".json")
+        $applied = $false
+        $observedCount = 0
+        $state = [pscustomobject]@{
+            mode = 'audit'
+            policy_version = 'v1'
+            rules = @()
+            audit_until = '2026-05-29T00:00:00Z'
+        }
+        # We can't easily mock Get-NewWdacObservations because of script scope, so
+        # the orchestrator accepts an -ObservationProvider script block too.
+        $r = Invoke-WdacControlSync `
+            -State $state `
+            -StatePath $stateFile `
+            -OnApply ({ param($cipPath) $script:applied = $true; $true }) `
+            -OnObservedBatch ({ param($batch) $script:observedCount = $batch.Count; $true }) `
+            -ObservationProvider ({ param($since) @([pscustomobject]@{ file_path='C:\x.exe'; file_hash='HH'; file_name='x.exe'; event_time='2026-05-15T01:00:00Z'; is_block=$false; record_id=1 }) })
+
+        $r.applied      | Should -Be $true
+        $r.observed     | Should -Be 1
+        Remove-Item $stateFile -ErrorAction SilentlyContinue
+    }
+}

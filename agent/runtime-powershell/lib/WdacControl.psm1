@@ -220,4 +220,48 @@ function Apply-WdacPolicy {
     }
 }
 
-Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState, Aggregate-WdacObservations, Get-MaxRecordId, Get-NewWdacObservations, Apply-WdacPolicy
+function Invoke-WdacControlSync {
+    [CmdletBinding()]
+    param(
+        [object]$State,                # the app_control block from heartbeat (or $null)
+        [Parameter(Mandatory)][string]$StatePath,
+        [Parameter(Mandatory)][scriptblock]$OnApply,             # invoked with .cip path; returns $true on success
+        [Parameter(Mandatory)][scriptblock]$OnObservedBatch,     # invoked with [pscustomobject[]] of aggregated apps; returns $true on success
+        [scriptblock]$ObservationProvider = $null                # production default = Get-NewWdacObservations
+    )
+
+    $result = @{ applied = $false; observed = 0; error = $null }
+
+    if ($null -eq $State -or $State.mode -eq 'off') {
+        return $result
+    }
+
+    # Apply on version change.
+    $apply = Apply-WdacPolicy `
+        -StatePath $StatePath `
+        -PolicyVersion $State.policy_version `
+        -Mode $State.mode `
+        -Rules @($State.rules) `
+        -ApplyImpl $OnApply
+    $result.applied = $apply.applied
+    if ($apply.error) { $result.error = $apply.error }
+
+    # Observe — always, in either audit or enforce mode.
+    $agentState = Get-WdacAgentState -Path $StatePath
+    $since = [long]$agentState.last_event_record_id
+    $records = if ($ObservationProvider) { & $ObservationProvider $since } else { Get-NewWdacObservations -SinceRecordId $since }
+    $records = @($records)
+    if ($records.Count -gt 0) {
+        $batch = Aggregate-WdacObservations -Records $records
+        $maxId = Get-MaxRecordId -Records $records
+        if (& $OnObservedBatch $batch) {
+            $agentState.last_event_record_id = $maxId
+            Set-WdacAgentState -Path $StatePath -State $agentState
+            $result.observed = @($batch).Count
+        }
+    }
+
+    return $result
+}
+
+Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState, Aggregate-WdacObservations, Get-MaxRecordId, Get-NewWdacObservations, Apply-WdacPolicy, Invoke-WdacControlSync
