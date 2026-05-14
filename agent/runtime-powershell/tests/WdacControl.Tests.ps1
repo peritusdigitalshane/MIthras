@@ -58,3 +58,38 @@ Describe 'ConvertTo-CIPolicyXml' {
         $xml | Should -Not -Match 'Enabled:Audit Mode'
     }
 }
+
+Describe 'WdacAgentState' {
+    BeforeEach {
+        $script:stateFile = Join-Path ([IO.Path]::GetTempPath()) ("wdac-state-" + [guid]::NewGuid() + ".json")
+    }
+
+    AfterEach {
+        Remove-Item -Path $script:stateFile -ErrorAction SilentlyContinue
+    }
+
+    It 'returns a fresh default when file is missing' {
+        $s = Get-WdacAgentState -Path $script:stateFile
+        $s.last_applied_version | Should -BeNullOrEmpty
+        $s.last_event_record_id | Should -Be 0
+    }
+
+    It 'round-trips a write then read' {
+        Set-WdacAgentState -Path $script:stateFile -State @{
+            peritus_policy_guid = '{1111-2222}'
+            last_applied_version = 'abc'
+            last_applied_at = '2026-05-15T00:00:00Z'
+            last_event_record_id = 12345
+        }
+        $r = Get-WdacAgentState -Path $script:stateFile
+        $r.peritus_policy_guid  | Should -Be '{1111-2222}'
+        $r.last_applied_version | Should -Be 'abc'
+        $r.last_event_record_id | Should -Be 12345
+    }
+
+    It 'tolerates a corrupt state file by returning default' {
+        Set-Content -Path $script:stateFile -Value 'not json' -Encoding UTF8
+        $s = Get-WdacAgentState -Path $script:stateFile
+        $s.last_event_record_id | Should -Be 0
+    }
+}

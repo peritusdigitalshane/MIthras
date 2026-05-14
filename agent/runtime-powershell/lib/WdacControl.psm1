@@ -79,4 +79,43 @@ function ConvertTo-CIPolicyXml {
     $sb.ToString()
 }
 
-Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml
+function Get-WdacAgentState {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+
+    $default = @{
+        peritus_policy_guid  = $null
+        last_applied_version = $null
+        last_applied_at      = $null
+        last_event_record_id = 0
+    }
+
+    if (-not (Test-Path $Path)) { return $default }
+    try {
+        $raw = Get-Content -Path $Path -Raw -ErrorAction Stop
+        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+        $h = @{}
+        foreach ($p in $obj.PSObject.Properties) { $h[$p.Name] = $p.Value }
+        foreach ($k in $default.Keys) { if (-not $h.ContainsKey($k)) { $h[$k] = $default[$k] } }
+        return $h
+    } catch {
+        return $default
+    }
+}
+
+function Set-WdacAgentState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][hashtable]$State
+    )
+
+    $dir = Split-Path -Parent $Path
+    if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+
+    $tmp = "$Path.tmp"
+    ($State | ConvertTo-Json -Depth 5) | Set-Content -Path $tmp -Encoding UTF8
+    Move-Item -Path $tmp -Destination $Path -Force
+}
+
+Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState
