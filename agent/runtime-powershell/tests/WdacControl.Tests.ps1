@@ -34,3 +34,27 @@ Describe 'ConvertFrom-CodeIntegrityEvent' {
         $r.parent_process | Should -Match 'cmd\.exe$'
     }
 }
+
+Describe 'ConvertTo-CIPolicyXml' {
+    It 'produces an XML with PolicyType and rule entries' {
+        $rules = @(
+            [pscustomobject]@{ action='allow'; rule_type='publisher'; publisher_name='CN=Microsoft Corp'; product_name=$null; value='CN=Microsoft Corp' },
+            [pscustomobject]@{ action='allow'; rule_type='hash';      publisher_name=$null;              product_name=$null; value='AABBCC' }
+        )
+        $xml = ConvertTo-CIPolicyXml -Rules $rules -Mode 'audit' -PolicyGuid '{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}'
+        $xml | Should -Match '<PolicyTypeID>'
+        $xml | Should -Match '<Allow ID="ID_ALLOW_0"'
+        $xml | Should -Match 'CN=Microsoft Corp'
+        $xml | Should -Match 'AABBCC'
+    }
+
+    It 'sets the Audit rule option when Mode is audit' {
+        $xml = ConvertTo-CIPolicyXml -Rules @() -Mode 'audit' -PolicyGuid '{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}'
+        $xml | Should -Match 'Enabled:Audit Mode'
+    }
+
+    It 'omits the Audit rule option when Mode is enforce' {
+        $xml = ConvertTo-CIPolicyXml -Rules @() -Mode 'enforce' -PolicyGuid '{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}'
+        $xml | Should -Not -Match 'Enabled:Audit Mode'
+    }
+}
