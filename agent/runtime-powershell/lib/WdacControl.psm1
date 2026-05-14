@@ -225,7 +225,7 @@ function Invoke-WdacControlSync {
     param(
         [object]$State,                # the app_control block from heartbeat (or $null)
         [Parameter(Mandatory)][string]$StatePath,
-        [Parameter(Mandatory)][scriptblock]$OnApply,             # invoked with .cip path; returns $true on success
+        [scriptblock]$OnApply = $null,                           # invoked with .cip path; returns $true on success
         [Parameter(Mandatory)][scriptblock]$OnObservedBatch,     # invoked with [pscustomobject[]] of aggregated apps; returns $true on success
         [scriptblock]$ObservationProvider = $null                # production default = Get-NewWdacObservations
     )

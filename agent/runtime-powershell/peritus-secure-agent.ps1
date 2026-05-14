@@ -22,12 +22,14 @@ $script:AgentRoot   = 'C:\ProgramData\PeritusSecure'
 $script:ConfigFile  = Join-Path $script:AgentRoot 'config.dat'
 $script:LogDir      = Join-Path $script:AgentRoot 'logs'
 $script:InstallRoot = Join-Path $script:AgentRoot 'install'
+$script:WdacStateFile = Join-Path $script:AgentRoot 'wdac-state.json'
 $script:AgentVersion = (Get-Content (Join-Path $PSScriptRoot 'agent.version') -Raw).Trim()
 
 # Modules
 Import-Module (Join-Path $PSScriptRoot 'lib/HmacAuth.psm1')    -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/SecureConfig.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/ApiClient.psm1')    -Force
+Import-Module (Join-Path $PSScriptRoot 'lib/WdacControl.psm1') -Force
 
 # Logging — file + Windows Event Log
 $script:EventSource = 'Peritus Secure Agent'
@@ -111,6 +113,35 @@ while ($true) {
         }
         $resp = Invoke-AgentHeartbeat -ApiBaseUrl $script:ApiBaseUrl -AgentId $script:AgentId -AgentSecret $script:AgentSecret -Payload $payload
         Write-AgentLog "Heartbeat OK — next_check_in=$($resp.next_check_in)s, commands=$($resp.commands.Count)"
+
+        # App-control sync.
+        try {
+            $appControlState = $null
+            if ($resp.PSObject.Properties.Name -contains 'app_control') { $appControlState = $resp.app_control }
+
+            $apiBase = $script:ApiBaseUrl
+            $agentId = $script:AgentId
+            $secret  = $script:AgentSecret
+            $r = Invoke-WdacControlSync `
+                -State $appControlState `
+                -StatePath $script:WdacStateFile `
+                -OnObservedBatch ({
+                    param($batch)
+                    try {
+                        Invoke-AgentAppControlObserved -ApiBaseUrl $apiBase -AgentId $agentId -AgentSecret $secret -Apps $batch | Out-Null
+                        return $true
+                    } catch {
+                        Write-AgentLog -Level Warn "agent-app-control/observed push failed: $_"
+                        return $false
+                    }
+                })
+
+            if ($r.applied)  { Write-AgentLog "WDAC policy applied (version=$($appControlState.policy_version))" }
+            if ($r.observed) { Write-AgentLog "WDAC observed $($r.observed) new app(s)" }
+            if ($r.error)    { Write-AgentLog -Level Warn "WDAC sync error: $($r.error)" }
+        } catch {
+            Write-AgentLog -Level Warn "WDAC sync failed: $_"
+        }
     } catch {
         Write-AgentLog -Level Warn "Heartbeat failed: $_"
     }

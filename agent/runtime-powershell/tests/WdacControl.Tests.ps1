@@ -175,7 +175,7 @@ Describe 'Apply-WdacPolicy' {
 Describe 'Invoke-WdacControlSync' {
     It 'no-ops when state is null or mode=off' {
         $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ws-" + [guid]::NewGuid() + ".json")
-        $r = Invoke-WdacControlSync -State $null -StatePath $stateFile -OnApply ({ param($x) $false }) -OnObservedBatch ({ param($x) $false })
+        $r = Invoke-WdacControlSync -State $null -StatePath $stateFile -OnObservedBatch ({ param($x) $false })
         $r.applied  | Should -Be $false
         $r.observed | Should -Be 0
         Remove-Item $stateFile -ErrorAction SilentlyContinue
