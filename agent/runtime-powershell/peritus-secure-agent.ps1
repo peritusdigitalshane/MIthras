@@ -136,7 +136,13 @@ while ($true) {
                     }
                 })
 
-            if ($r.applied)  { Write-AgentLog "WDAC policy applied (version=$($appControlState.policy_version))" }
+            if ($r.applied) {
+                if ($r.pending_reboot) {
+                    Write-AgentLog "WDAC policy queued (version=$($appControlState.policy_version)) — CiTool.exe absent; will activate at next boot"
+                } else {
+                    Write-AgentLog "WDAC policy applied (version=$($appControlState.policy_version))"
+                }
+            }
             if ($r.observed) { Write-AgentLog "WDAC observed $($r.observed) new app(s)" }
             if ($r.error)    { Write-AgentLog -Level Warn "WDAC sync error: $($r.error)" }
         } catch {

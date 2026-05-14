@@ -53,12 +53,15 @@ function ConvertTo-CIPolicyXml {
     }
     [void]$sb.AppendLine('  </Rules>')
 
-    # File rules — emit Allow elements with synthetic IDs.
+    # File rules — emit Allow/Deny elements. WDAC's SiPolicy schema constrains the
+    # ID attribute on AllowType/DenyType to the pattern ID_(ALLOW|DENY)_<letter>_<num>
+    # (e.g. ID_ALLOW_A_0). Plain ID_ALLOW_0 is rejected by ConvertFrom-CIPolicy.
     [void]$sb.AppendLine('  <FileRules>')
     for ($i = 0; $i -lt $Rules.Count; $i++) {
         $r = $Rules[$i]
-        $id = "ID_ALLOW_$i"
+        $verb   = if ($r.action -eq 'allow') { 'ALLOW' } else { 'DENY' }
         $action = if ($r.action -eq 'allow') { 'Allow' } else { 'Deny' }
+        $id     = "ID_${verb}_A_$i"
         switch ($r.rule_type) {
             'hash'      { [void]$sb.AppendLine("    <$action ID=`"$id`" FriendlyName=`"hash_$i`" Hash=`"$($r.value)`" />") }
             'publisher' { [void]$sb.AppendLine("    <$action ID=`"$id`" FriendlyName=`"publisher_$i`" PackageFamilyName=`"$($r.publisher_name)`" />") }
@@ -189,18 +192,30 @@ function Apply-WdacPolicy {
     Set-Content -Path $tmpXml -Value $xml -Encoding UTF8
 
     $ok = $false
+    $pendingReboot = $false
     try {
         if ($ApplyImpl) {
             $ok = & $ApplyImpl $tmpCip
         } else {
             # Production path: convert XML -> .cip with the built-in WDAC cmdlet,
-            # drop into the WDAC active-policies directory, refresh.
+            # drop into the WDAC active-policies directory, refresh if CiTool is
+            # available (Win 11 / Server 2022 22H2+); otherwise the kernel picks
+            # up the .cip at next boot.
             try {
                 ConvertFrom-CIPolicy -XmlFilePath $tmpXml -BinaryFilePath $tmpCip | Out-Null
                 $dest = "C:\Windows\System32\CodeIntegrity\CiPolicies\Active\$($state.peritus_policy_guid).cip"
                 Copy-Item -Path $tmpCip -Destination $dest -Force
-                $refresh = & "C:\Windows\System32\CiTool.exe" --refresh-policy 2>&1
-                $ok = ($LASTEXITCODE -eq 0)
+
+                $citool = "C:\Windows\System32\CiTool.exe"
+                if (Test-Path $citool) {
+                    $refresh = & $citool --refresh-policy 2>&1
+                    $ok = ($LASTEXITCODE -eq 0)
+                } else {
+                    # No CiTool — policy is dropped and will activate at next boot.
+                    # Treat as success so the version isn't re-attempted every heartbeat.
+                    $ok = $true
+                    $pendingReboot = $true
+                }
             } catch {
                 $ok = $false
             }
@@ -214,9 +229,9 @@ function Apply-WdacPolicy {
         $state.last_applied_version = $PolicyVersion
         $state.last_applied_at      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
         Set-WdacAgentState -Path $StatePath -State $state
-        return @{ applied = $true; skipped = $false; error = $null }
+        return @{ applied = $true; skipped = $false; pending_reboot = $pendingReboot; error = $null }
     } else {
-        return @{ applied = $false; skipped = $false; error = "apply failed (mode=$Mode, version=$PolicyVersion)" }
+        return @{ applied = $false; skipped = $false; pending_reboot = $false; error = "apply failed (mode=$Mode, version=$PolicyVersion)" }
     }
 }
 
@@ -230,7 +245,7 @@ function Invoke-WdacControlSync {
         [scriptblock]$ObservationProvider = $null                # production default = Get-NewWdacObservations
     )
 
-    $result = @{ applied = $false; observed = 0; error = $null }
+    $result = @{ applied = $false; observed = 0; pending_reboot = $false; error = $null }
 
     if ($null -eq $State -or $State.mode -eq 'off') {
         return $result
@@ -243,7 +258,8 @@ function Invoke-WdacControlSync {
         -Mode $State.mode `
         -Rules @($State.rules) `
         -ApplyImpl $OnApply
-    $result.applied = $apply.applied
+    $result.applied         = $apply.applied
+    $result.pending_reboot  = [bool]$apply.pending_reboot
     if ($apply.error) { $result.error = $apply.error }
 
     # Observe — always, in either audit or enforce mode.

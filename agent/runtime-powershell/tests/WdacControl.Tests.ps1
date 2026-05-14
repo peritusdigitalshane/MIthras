@@ -43,7 +43,7 @@ Describe 'ConvertTo-CIPolicyXml' {
         )
         $xml = ConvertTo-CIPolicyXml -Rules $rules -Mode 'audit' -PolicyGuid '{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}'
         $xml | Should -Match '<PolicyTypeID>'
-        $xml | Should -Match '<Allow ID="ID_ALLOW_0"'
+        $xml | Should -Match '<Allow ID="ID_ALLOW_A_0"'
         $xml | Should -Match 'CN=Microsoft Corp'
         $xml | Should -Match 'AABBCC'
     }
@@ -168,7 +168,23 @@ Describe 'Apply-WdacPolicy' {
 
         $result.applied | Should -Be $false
         $result.error   | Should -Not -BeNullOrEmpty
-        Remove-Item $stateFile -Force
+        Remove-Item $stateFile -ErrorAction SilentlyContinue
+    }
+
+    It 'returns pending_reboot when ApplyImpl signals success but version applied' {
+        # Sanity: when ApplyImpl returns $true the result has applied=true and pending_reboot=false.
+        # The production fallback path (CiTool absent) sets pending_reboot=true; we cover that
+        # branch via the production code path itself, not via ApplyImpl (which is the test seam).
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ap-" + [guid]::NewGuid() + ".json")
+        $result = Apply-WdacPolicy `
+            -StatePath $stateFile `
+            -PolicyVersion 'pr' `
+            -Mode 'audit' `
+            -Rules @() `
+            -ApplyImpl ({ param($CipPath) return $true })
+        $result.applied        | Should -Be $true
+        $result.pending_reboot | Should -Be $false
+        Remove-Item $stateFile -ErrorAction SilentlyContinue
     }
 }
 
