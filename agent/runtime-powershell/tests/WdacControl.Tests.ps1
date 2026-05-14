@@ -93,3 +93,26 @@ Describe 'WdacAgentState' {
         $s.last_event_record_id | Should -Be 0
     }
 }
+
+Describe 'Aggregate-WdacObservations' {
+    It 'collapses repeated (file_path, file_hash) into a single row with summed exec_count' {
+        $records = @(
+            [pscustomobject]@{ file_path='C:\a.exe'; file_hash='AA'; file_name='a.exe'; event_time='2026-05-15T01:00:00Z'; is_block=$false; record_id=1 },
+            [pscustomobject]@{ file_path='C:\a.exe'; file_hash='AA'; file_name='a.exe'; event_time='2026-05-15T01:01:00Z'; is_block=$false; record_id=2 },
+            [pscustomobject]@{ file_path='C:\b.exe'; file_hash='BB'; file_name='b.exe'; event_time='2026-05-15T01:02:00Z'; is_block=$false; record_id=3 }
+        )
+        $r = Aggregate-WdacObservations -Records $records
+        $r.Count | Should -Be 2
+        ($r | Where-Object { $_.file_path -eq 'C:\a.exe' }).exec_count | Should -Be 2
+        ($r | Where-Object { $_.file_path -eq 'C:\b.exe' }).exec_count | Should -Be 1
+    }
+
+    It 'returns the max record_id across the batch' {
+        $records = @(
+            [pscustomobject]@{ file_path='C:\a.exe'; file_hash='AA'; file_name='a.exe'; event_time='2026-05-15T01:00:00Z'; is_block=$false; record_id=10 },
+            [pscustomobject]@{ file_path='C:\b.exe'; file_hash='BB'; file_name='b.exe'; event_time='2026-05-15T01:01:00Z'; is_block=$false; record_id=20 }
+        )
+        $max = Get-MaxRecordId -Records $records
+        $max | Should -Be 20
+    }
+}

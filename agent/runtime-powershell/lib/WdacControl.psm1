@@ -118,4 +118,49 @@ function Set-WdacAgentState {
     Move-Item -Path $tmp -Destination $Path -Force
 }
 
-Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState
+function Aggregate-WdacObservations {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][object[]]$Records)
+
+    $groups = $Records | Group-Object -Property { "$($_.file_path)|$($_.file_hash)" }
+    $out = foreach ($g in $groups) {
+        $first = $g.Group | Sort-Object event_time | Select-Object -First 1
+        [pscustomobject]@{
+            file_path    = $first.file_path
+            file_name    = $first.file_name
+            file_hash    = $first.file_hash
+            first_seen   = $first.event_time
+            exec_count   = $g.Count
+        }
+    }
+    return @($out)
+}
+
+function Get-MaxRecordId {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][object[]]$Records)
+
+    if (-not $Records -or $Records.Count -eq 0) { return 0 }
+    return ($Records | Measure-Object -Property record_id -Maximum).Maximum
+}
+
+function Get-NewWdacObservations {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][long]$SinceRecordId)
+
+    # Live event-log read — not exercised in unit tests. Filter by record_id > $SinceRecordId.
+    $filter = @{
+        LogName    = 'Microsoft-Windows-CodeIntegrity/Operational'
+        ProviderName = 'Microsoft-Windows-CodeIntegrity'
+        Id         = 3076, 3077
+    }
+    $events = try { Get-WinEvent -FilterHashtable $filter -ErrorAction Stop } catch { @() }
+    $events = $events | Where-Object { [long]$_.RecordId -gt $SinceRecordId }
+
+    $parsed = foreach ($e in $events) {
+        try { ConvertFrom-CodeIntegrityEvent -EventXml ([xml]$e.ToXml()) } catch { $null }
+    }
+    return @($parsed | Where-Object { $_ })
+}
+
+Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState, Aggregate-WdacObservations, Get-MaxRecordId, Get-NewWdacObservations
