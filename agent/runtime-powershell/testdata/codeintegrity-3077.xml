@@ -1,0 +1,27 @@
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+  <System>
+    <Provider Name='Microsoft-Windows-CodeIntegrity' Guid='{4ee76bd8-3cf4-44a0-a0ac-3937643e37a3}'/>
+    <EventID>3077</EventID>
+    <Version>0</Version>
+    <Level>2</Level>
+    <Task>22</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8000000000000000</Keywords>
+    <TimeCreated SystemTime='2026-05-15T08:01:00.0000000Z'/>
+    <EventRecordID>12346</EventRecordID>
+    <Channel>Microsoft-Windows-CodeIntegrity/Operational</Channel>
+    <Computer>TEST-HOST</Computer>
+    <Security UserID='S-1-5-18'/>
+  </System>
+  <EventData>
+    <Data Name='File Name'>\Device\HarddiskVolume3\temp\unsigned.exe</Data>
+    <Data Name='Process Name'>\Device\HarddiskVolume3\Windows\System32\cmd.exe</Data>
+    <Data Name='Requested Signing Level'>0</Data>
+    <Data Name='Validated Signing Level'>0</Data>
+    <Data Name='Status'>0xC0E90001</Data>
+    <Data Name='SHA1 Hash'>AABBCCDDEEFF00112233445566778899AABBCCDD</Data>
+    <Data Name='SHA256 Hash'>00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF</Data>
+    <Data Name='USN'>0</Data>
+    <Data Name='User Name'>TEST-HOST\jdoe</Data>
+  </EventData>
+</Event>

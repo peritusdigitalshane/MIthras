@@ -1,0 +1,26 @@
+<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+  <System>
+    <Provider Name='Microsoft-Windows-CodeIntegrity' Guid='{4ee76bd8-3cf4-44a0-a0ac-3937643e37a3}'/>
+    <EventID>3076</EventID>
+    <Version>0</Version>
+    <Level>3</Level>
+    <Task>22</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8000000000000000</Keywords>
+    <TimeCreated SystemTime='2026-05-15T08:00:00.0000000Z'/>
+    <EventRecordID>12345</EventRecordID>
+    <Channel>Microsoft-Windows-CodeIntegrity/Operational</Channel>
+    <Computer>TEST-HOST</Computer>
+    <Security UserID='S-1-5-18'/>
+  </System>
+  <EventData>
+    <Data Name='File Name'>\Device\HarddiskVolume3\Users\test\notepad-plus-plus.exe</Data>
+    <Data Name='Process Name'>\Device\HarddiskVolume3\Users\test\notepad-plus-plus.exe</Data>
+    <Data Name='Requested Signing Level'>8</Data>
+    <Data Name='Validated Signing Level'>8</Data>
+    <Data Name='Status'>0xC000007B</Data>
+    <Data Name='SHA1 Hash'>FFEEDD0011223344556677889900AABBCCDDEEFF</Data>
+    <Data Name='SHA256 Hash'>112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00</Data>
+    <Data Name='USN'>0</Data>
+  </EventData>
+</Event>
