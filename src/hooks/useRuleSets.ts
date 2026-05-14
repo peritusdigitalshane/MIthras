@@ -14,6 +14,11 @@ export interface RuleSet {
   updated_at: string;
   created_by: string | null;
   rule_count?: number;
+  // App-Control Phase 1 columns (added 2026-05-15)
+  audit_window_days: number;
+  auto_promote: boolean;
+  policy_version: number;
+  feature_enabled: boolean;
 }
 
 export interface RuleSetRule {

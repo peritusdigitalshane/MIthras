@@ -48,6 +48,23 @@ export interface WdacRule {
   created_by: string | null;
 }
 
+// App-Control Phase 1 rule-set shape (canonical type lives in useRuleSets.ts as `RuleSet`;
+// this interface mirrors the new audit-window columns added 2026-05-15).
+export interface WdacRuleSet {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  mode: "audit" | "enforced";
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  audit_window_days: number;
+  auto_promote: boolean;
+  policy_version: number;
+  feature_enabled: boolean;
+}
+
 
 // Fetch WDAC policies
 export function useWdacPolicies() {
@@ -244,4 +261,55 @@ export function useWdacMutations() {
     createRule,
     deleteRule,
   };
+}
+
+// ---------------------------------------------------------------------------
+// App-Control Phase 1 — rule-set audit summary
+// ---------------------------------------------------------------------------
+
+export interface RuleSetAuditSummary {
+  rule_set_id: string;
+  devices_in_audit: number;
+  devices_in_enforce: number;
+  earliest_audit_until: string | null;
+  unique_apps_observed: number;
+}
+
+export function useRuleSetAuditSummary(ruleSetId: string | null) {
+  return useQuery({
+    queryKey: ["wdac-rule-set-audit-summary", ruleSetId],
+    enabled: !!ruleSetId,
+    queryFn: async (): Promise<RuleSetAuditSummary | null> => {
+      if (!ruleSetId) return null;
+
+      const [stateRes, appsRes] = await Promise.all([
+        supabase
+          .from("endpoint_app_control_state")
+          .select("current_mode, audit_until")
+          .eq("rule_set_id", ruleSetId),
+        supabase
+          .from("wdac_discovered_apps")
+          .select("id", { count: "exact", head: true })
+          .in(
+            "endpoint_id",
+            (await supabase
+              .from("endpoint_app_control_state")
+              .select("endpoint_id")
+              .eq("rule_set_id", ruleSetId)).data?.map((r: { endpoint_id: string }) => r.endpoint_id) ?? []
+          ),
+      ]);
+
+      const rows = stateRes.data ?? [];
+      return {
+        rule_set_id: ruleSetId,
+        devices_in_audit:   rows.filter((r) => r.current_mode === "audit").length,
+        devices_in_enforce: rows.filter((r) => r.current_mode === "enforce").length,
+        earliest_audit_until:
+          rows.filter((r) => r.current_mode === "audit")
+              .map((r) => r.audit_until)
+              .sort()[0] ?? null,
+        unique_apps_observed: appsRes.count ?? 0,
+      };
+    },
+  });
 }
