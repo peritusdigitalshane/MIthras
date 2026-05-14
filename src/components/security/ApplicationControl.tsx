@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useWdacDiscoveredApps, WdacDiscoveredApp } from "@/hooks/useWdac";
 import { useRuleSets, useRuleSetRules, useRuleSetMutations, useAllRuleSetRules, RuleSet, RuleSetRule } from "@/hooks/useRuleSets";
+import { RuleSetAuditCountdown } from "./RuleSetAuditCountdown";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -956,7 +957,15 @@ export function ApplicationControl() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-3">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <RuleSetAuditCountdown
+                        ruleSetId={rs.id}
+                        ruleSetName={rs.name}
+                        auditWindowDays={rs.audit_window_days ?? 14}
+                        autoPromote={rs.auto_promote ?? true}
+                      />
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Updated {format(new Date(rs.updated_at), "MMM d")}</span>
                       <div className="flex items-center gap-1">
