@@ -22,3 +22,6 @@ verify_jwt = false
 
 [functions.vulnerability-scan]
 verify_jwt = false
+
+[functions.agent-app-control]
+verify_jwt = false
