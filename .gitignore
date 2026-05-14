@@ -23,3 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 deno.lock
+
+# Env files
+.env
+.env.local
+.env.*.local
+.env.staging
+
+# Phase 1: prevent accidental commit of private signing key local copies
+agent/contracts/*-private.pem
+agent/contracts/*-private.pem.local

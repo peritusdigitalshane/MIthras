@@ -5,6 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://njdcyjxgtckgtzgzoctw.supabase.co}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZGN5anhndGNrZ3R6Z3pvY3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMDc0NzgsImV4cCI6MjA4NDU4MzQ3OH0.Dgzlv9Wk_Mxb8I8OYttjspVimEGSWswBnWBFhlt-jBw}
+        BUILD_MODE: production
     container_name: peritus-secure
     ports:
       - "9988:80"
@@ -18,6 +22,29 @@ services:
     labels:
       - "app.name=peritus-threat-defence"
       - "app.description=Peritus Threat Defence - Windows Defender Management Platform"
+
+  peritus-secure-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${STAGING_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${STAGING_SUPABASE_ANON_KEY}
+        BUILD_MODE: staging
+    container_name: peritus-secure-staging
+    profiles: ["staging"]
+    ports:
+      - "9989:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "app.name=peritus-threat-defence-staging"
+      - "app.description=Peritus Threat Defence (staging, self-hosted Supabase)"
 
   # Optional: Add Traefik for HTTPS (uncomment if needed)
   # traefik:

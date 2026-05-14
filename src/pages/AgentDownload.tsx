@@ -8,6 +8,7 @@ import { Download, Copy, CheckCircle, Shield, Terminal, Clock, Zap, AlertCircle,
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTenant } from "@/contexts/TenantContext";
+import ServiceInstallTab from "@/components/agent/ServiceInstallTab";
 
 const AGENT_SCRIPT_BASE_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co/functions/v1/agent-script";
 
@@ -313,11 +314,16 @@ const AgentDownload = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="download" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs defaultValue="service" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="service">Modern (Service)</TabsTrigger>
                 <TabsTrigger value="download">Download Script</TabsTrigger>
-                <TabsTrigger value="oneliner">One-Liner</TabsTrigger>
+                <TabsTrigger value="oneliner">Legacy One-Liner</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="service">
+                <ServiceInstallTab organizationId={orgId} />
+              </TabsContent>
 
               <TabsContent value="download" className="space-y-4 mt-4">
                 {scriptLoadError && (

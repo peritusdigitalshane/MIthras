@@ -1,73 +1,54 @@
-# Welcome to your Lovable project
+# Peritus Endpoint Guardian
 
-## Project info
+Endpoint security platform: Windows Defender management, CVE tracking, agent telemetry, AI security advisor.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+- **Frontend:** Vite + React + TypeScript + shadcn/ui + Tailwind CSS
+- **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions)
+- **Deployment:** Docker + Nginx (frontend); self-hosted Supabase on Linux (backend, in progress)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Local development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 1. Install deps
+npm install --legacy-peer-deps
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 2. Configure env
+cp .env.example .env.local
+# Edit .env.local — fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 3. Run dev server (http://localhost:8080)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Builds
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Command | Mode | Reads | Use |
+|---|---|---|---|
+| `npm run build` | production | `.env.production` | Cloud-pointed production bundle |
+| `npm run build:staging` | staging | `.env.staging` | Self-hosted-pointed bundle |
+| `npm run build:dev` | development | `.env.development` (optional) | Dev build (unminified) |
 
-**Use GitHub Codespaces**
+## Docker
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+# Production (port 9988, cloud Supabase)
+docker compose up -d peritus-secure
 
-## What technologies are used for this project?
+# Staging (port 9989, self-hosted Supabase)
+docker compose --profile staging up -d peritus-secure-staging
+```
 
-This project is built with:
+The staging service reads `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_ANON_KEY` from the host environment or a `.env` file alongside `docker-compose.yml`.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Tests
 
-## How can I deploy this project?
+- `npm run test` — unit tests (Vitest)
+- `npm run test:integration` — integration tests against `SUPABASE_TEST_URL` (added in a later plan)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Documentation
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+See [`CLAUDE.md`](./CLAUDE.md) for architecture, workflows, and development conventions.
+Design specs live under [`docs/superpowers/specs/`](./docs/superpowers/specs/).
+Implementation plans live under [`docs/superpowers/plans/`](./docs/superpowers/plans/).
