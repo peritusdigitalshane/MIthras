@@ -163,4 +163,61 @@ function Get-NewWdacObservations {
     return @($parsed | Where-Object { $_ })
 }
 
-Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState, Aggregate-WdacObservations, Get-MaxRecordId, Get-NewWdacObservations
+function Apply-WdacPolicy {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$StatePath,
+        [Parameter(Mandatory)][string]$PolicyVersion,
+        [Parameter(Mandatory)][ValidateSet('audit','enforce','off')][string]$Mode,
+        [Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Rules,
+        # Test seam — production caller leaves it default.
+        [scriptblock]$ApplyImpl = $null
+    )
+
+    $state = Get-WdacAgentState -Path $StatePath
+    if ($state.last_applied_version -eq $PolicyVersion) {
+        return @{ applied = $false; skipped = $true; error = $null }
+    }
+
+    if (-not $state.peritus_policy_guid) {
+        $state.peritus_policy_guid = "{$([guid]::NewGuid())}"
+    }
+
+    $xml      = ConvertTo-CIPolicyXml -Rules $Rules -Mode $Mode -PolicyGuid $state.peritus_policy_guid
+    $tmpXml   = Join-Path ([IO.Path]::GetTempPath()) ("peritus-wdac-" + [guid]::NewGuid() + ".xml")
+    $tmpCip   = [IO.Path]::ChangeExtension($tmpXml, '.cip')
+    Set-Content -Path $tmpXml -Value $xml -Encoding UTF8
+
+    $ok = $false
+    try {
+        if ($ApplyImpl) {
+            $ok = & $ApplyImpl $tmpCip
+        } else {
+            # Production path: convert XML -> .cip with the built-in WDAC cmdlet,
+            # drop into the WDAC active-policies directory, refresh.
+            try {
+                ConvertFrom-CIPolicy -XmlFilePath $tmpXml -BinaryFilePath $tmpCip | Out-Null
+                $dest = "C:\Windows\System32\CodeIntegrity\CiPolicies\Active\$($state.peritus_policy_guid).cip"
+                Copy-Item -Path $tmpCip -Destination $dest -Force
+                $refresh = & "C:\Windows\System32\CiTool.exe" --refresh-policy 2>&1
+                $ok = ($LASTEXITCODE -eq 0)
+            } catch {
+                $ok = $false
+            }
+        }
+    } finally {
+        Remove-Item -Path $tmpXml -ErrorAction SilentlyContinue
+        Remove-Item -Path $tmpCip -ErrorAction SilentlyContinue
+    }
+
+    if ($ok) {
+        $state.last_applied_version = $PolicyVersion
+        $state.last_applied_at      = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+        Set-WdacAgentState -Path $StatePath -State $state
+        return @{ applied = $true; skipped = $false; error = $null }
+    } else {
+        return @{ applied = $false; skipped = $false; error = "apply failed (mode=$Mode, version=$PolicyVersion)" }
+    }
+}
+
+Export-ModuleMember -Function ConvertFrom-CodeIntegrityEvent, ConvertTo-CIPolicyXml, Get-WdacAgentState, Set-WdacAgentState, Aggregate-WdacObservations, Get-MaxRecordId, Get-NewWdacObservations, Apply-WdacPolicy

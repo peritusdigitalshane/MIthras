@@ -116,3 +116,58 @@ Describe 'Aggregate-WdacObservations' {
         $max | Should -Be 20
     }
 }
+
+Describe 'Apply-WdacPolicy' {
+    It 'skips apply when policy_version matches last_applied_version' {
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ap-" + [guid]::NewGuid() + ".json")
+        Set-WdacAgentState -Path $stateFile -State @{
+            peritus_policy_guid  = '{1111}'
+            last_applied_version = 'abc'
+            last_applied_at      = '2026-05-15T00:00:00Z'
+            last_event_record_id = 0
+        }
+
+        $applyCalled = $false
+        $result = Apply-WdacPolicy `
+            -StatePath $stateFile `
+            -PolicyVersion 'abc' `
+            -Mode 'audit' `
+            -Rules @() `
+            -ApplyImpl ({ param($CipPath) $applyCalled = $true; $true })
+
+        $result.applied | Should -Be $false
+        $applyCalled    | Should -Be $false
+        Remove-Item $stateFile -Force
+    }
+
+    It 'applies and records new version when policy_version differs' {
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ap-" + [guid]::NewGuid() + ".json")
+
+        $applyArgs = @{}
+        $result = Apply-WdacPolicy `
+            -StatePath $stateFile `
+            -PolicyVersion 'newhash' `
+            -Mode 'enforce' `
+            -Rules @([pscustomobject]@{ action='allow'; rule_type='hash'; value='AA'; publisher_name=$null; product_name=$null }) `
+            -ApplyImpl ({ param($CipPath) $script:capturedPath = $CipPath; return $true })
+
+        $result.applied | Should -Be $true
+        (Get-WdacAgentState -Path $stateFile).last_applied_version | Should -Be 'newhash'
+        Remove-Item $stateFile -Force
+    }
+
+    It 'returns ok=false and increments failure on apply failure' {
+        $stateFile = Join-Path ([IO.Path]::GetTempPath()) ("ap-" + [guid]::NewGuid() + ".json")
+
+        $result = Apply-WdacPolicy `
+            -StatePath $stateFile `
+            -PolicyVersion 'x' `
+            -Mode 'audit' `
+            -Rules @() `
+            -ApplyImpl ({ param($CipPath) return $false })
+
+        $result.applied | Should -Be $false
+        $result.error   | Should -Not -BeNullOrEmpty
+        Remove-Item $stateFile -Force
+    }
+}
