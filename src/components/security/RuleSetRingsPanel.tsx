@@ -130,7 +130,7 @@ function RingRow({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={onPromote}>
+                <AlertDialogAction onClick={onPromote} disabled={isPromoting}>
                   Promote
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -167,6 +167,7 @@ function RingRow({
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={onRemove}
+                disabled={isRemoving}
               >
                 Remove
               </AlertDialogAction>
@@ -184,7 +185,7 @@ export function RuleSetRingsPanel({ ruleSetId }: RuleSetRingsPanelProps) {
   const [open, setOpen] = useState(true);
   const [addPopoverOpen, setAddPopoverOpen] = useState(false);
 
-  const { data: rings = [], isLoading: ringsLoading } = useRuleSetRings(ruleSetId);
+  const { data: rings = [], isLoading: ringsLoading, isError: ringsError } = useRuleSetRings(ruleSetId);
   const { data: allGroups = [], isLoading: groupsLoading } = useOrgEndpointGroups();
   const { addRing, removeRing, promoteRing } = useRingMutations();
 
@@ -193,7 +194,10 @@ export function RuleSetRingsPanel({ ruleSetId }: RuleSetRingsPanelProps) {
   );
 
   function handleGroupSelect(groupId: string) {
-    addRing.mutate({ ruleSetId, groupId, mode: "audit", ringOrder: 0 });
+    const nextOrder = rings.length > 0
+      ? Math.max(...rings.map((r) => r.ring_order)) + 1
+      : 0;
+    addRing.mutate({ ruleSetId, groupId, mode: "audit", ringOrder: nextOrder });
     setAddPopoverOpen(false);
   }
 
@@ -224,7 +228,9 @@ export function RuleSetRingsPanel({ ruleSetId }: RuleSetRingsPanelProps) {
 
       {/* ── Body ── */}
       <CollapsibleContent className="pt-2">
-        {ringsLoading ? (
+        {ringsError ? (
+          <p className="text-sm text-destructive py-2">Failed to load rings. Please refresh.</p>
+        ) : ringsLoading ? (
           <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading rings…
@@ -244,13 +250,11 @@ export function RuleSetRingsPanel({ ruleSetId }: RuleSetRingsPanelProps) {
                 onPromote={() => promoteRing.mutate({ ringId: ring.id, ruleSetId })}
                 isRemoving={
                   removeRing.isPending &&
-                  (removeRing.variables as { ringId: string } | undefined)
-                    ?.ringId === ring.id
+                  removeRing.variables?.ringId === ring.id
                 }
                 isPromoting={
                   promoteRing.isPending &&
-                  (promoteRing.variables as { ringId: string } | undefined)
-                    ?.ringId === ring.id
+                  promoteRing.variables?.ringId === ring.id
                 }
               />
             ))}
@@ -264,7 +268,7 @@ export function RuleSetRingsPanel({ ruleSetId }: RuleSetRingsPanelProps) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={groupsLoading || availableGroups.length === 0}
+                disabled={groupsLoading || availableGroups.length === 0 || addRing.isPending}
               >
                 <Plus className="mr-1 h-4 w-4" />
                 Add Ring

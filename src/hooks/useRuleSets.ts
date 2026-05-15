@@ -478,10 +478,11 @@ export function useRuleSetRings(ruleSetId: string | null) {
 
       const typedRings = rings as RawRingRow[];
       const groupIds = typedRings.map((r) => r.group_id);
-      const { data: memberships } = await supabase
+      const { data: memberships, error: membershipsError } = await supabase
         .from("endpoint_group_memberships")
         .select("group_id")
         .in("group_id", groupIds);
+      if (membershipsError) throw membershipsError;
 
       const countMap = new Map<string, number>();
       (memberships ?? []).forEach((m: { group_id: string }) => {
