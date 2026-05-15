@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useWdacDiscoveredApps, WdacDiscoveredApp } from "@/hooks/useWdac";
 import { useRuleSets, useRuleSetRules, useRuleSetMutations, useAllRuleSetRules, RuleSet, RuleSetRule } from "@/hooks/useRuleSets";
 import { RuleSetAuditCountdown } from "./RuleSetAuditCountdown";
+import { useWdacTemplates } from "@/hooks/useWdacTemplates";
+import { RuleSetRingsPanel } from "./RuleSetRingsPanel";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +58,7 @@ export function ApplicationControl() {
   const { data: apps, isLoading: appsLoading } = useWdacDiscoveredApps();
   const { data: ruleSets, isLoading: ruleSetsLoading } = useRuleSets();
   const { createRuleSet, addRule, addRulesBulk, deleteRule: deleteRuleSetRule, updateRuleSet, deleteRuleSet } = useRuleSetMutations();
+  const { data: templates } = useWdacTemplates();
   
   // Fetch all rules across all rule sets for status indicators
   const ruleSetIds = useMemo(() => (ruleSets || []).map(rs => rs.id), [ruleSets]);
@@ -76,6 +79,7 @@ export function ApplicationControl() {
   const [showRuleSetEditor, setShowRuleSetEditor] = useState(false);
   const [editingRuleSet, setEditingRuleSet] = useState<RuleSet | null>(null);
   const [ruleSetForm, setRuleSetForm] = useState({ name: "", description: "", mode: "audit" as "audit" | "enforced" });
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   const [showAddRule, setShowAddRule] = useState(false);
   const [ruleForm, setRuleForm] = useState({
@@ -324,13 +328,35 @@ export function ApplicationControl() {
     setShowRuleSetEditor(true);
   };
 
-  const handleSaveRuleSet = () => {
+  const handleSaveRuleSet = async () => {
     if (editingRuleSet) {
       updateRuleSet.mutate({ id: editingRuleSet.id, ...ruleSetForm });
+      setShowRuleSetEditor(false);
     } else {
-      createRuleSet.mutate(ruleSetForm);
+      try {
+        const newRuleSet = await createRuleSet.mutateAsync(ruleSetForm);
+        if (selectedTemplateId) {
+          const template = (templates ?? []).find((t) => t.id === selectedTemplateId);
+          if (template?.rules?.length) {
+            await addRulesBulk.mutateAsync(
+              template.rules.map((r) => ({
+                rule_set_id: newRuleSet.id,
+                rule_type: r.rule_type,
+                action: r.action,
+                value: r.value,
+                publisher_name: r.publisher_name,
+                product_name: r.product_name,
+                file_version_min: r.file_version_min,
+                description: r.description,
+              }))
+            );
+          }
+        }
+      } finally {
+        setShowRuleSetEditor(false);
+        setSelectedTemplateId(null);
+      }
     }
-    setShowRuleSetEditor(false);
   };
 
   const handleDeleteRuleSet = (id: string, e: React.MouseEvent) => {
@@ -509,6 +535,8 @@ export function ApplicationControl() {
             </Card>
           </div>
         )}
+
+        <RuleSetRingsPanel ruleSetId={selectedRuleSetId!} />
 
         {/* Add Rule Dialog */}
         <Dialog open={showAddRule} onOpenChange={setShowAddRule}>
@@ -983,12 +1011,41 @@ export function ApplicationControl() {
       </Tabs>
 
       {/* Rule Set Editor Dialog */}
-      <Dialog open={showRuleSetEditor} onOpenChange={setShowRuleSetEditor}>
+      <Dialog open={showRuleSetEditor} onOpenChange={(open) => {
+        setShowRuleSetEditor(open);
+        if (!open) setSelectedTemplateId(null);
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingRuleSet ? "Edit Rule Set" : "Create Rule Set"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {!editingRuleSet && (
+              <div className="space-y-2">
+                <Label>Start from template</Label>
+                <Select
+                  value={selectedTemplateId ?? "blank"}
+                  onValueChange={(v) => setSelectedTemplateId(v === "blank" ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Blank rule set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="blank">Blank rule set</SelectItem>
+                    {(templates ?? []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedTemplateId && (
+                  <p className="text-xs text-muted-foreground">
+                    {(templates ?? []).find((t) => t.id === selectedTemplateId)?.description}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Name</Label>
               <Input value={ruleSetForm.name} onChange={(e) => setRuleSetForm({ ...ruleSetForm, name: e.target.value })} placeholder="e.g., SQL Server Allowlist" />
