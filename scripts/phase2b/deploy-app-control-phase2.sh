@@ -43,7 +43,7 @@ ssh "$VM" "sudo docker compose -f /opt/peritus-supabase/docker-compose.yml -f /o
 echo "=== [5/5] building + deploying frontend ==="
 cd "$REPO_ROOT"
 # Extract ANON_KEY from VM .env
-ANON_KEY=$(ssh "$VM" "grep '^ANON_KEY=' /opt/peritus-supabase/.env | cut -d= -f2-")
+ANON_KEY=$(ssh "$VM" "sudo grep '^ANON_KEY=' /opt/peritus-supabase/.env | cut -d= -f2-")
 VITE_SUPABASE_URL=http://192.168.99.143:8000 \
 VITE_SUPABASE_ANON_KEY="$ANON_KEY" \
   npm run build 2>&1 | tail -5
