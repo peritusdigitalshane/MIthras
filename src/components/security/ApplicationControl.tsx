@@ -352,9 +352,10 @@ export function ApplicationControl() {
             );
           }
         }
-      } finally {
         setShowRuleSetEditor(false);
         setSelectedTemplateId(null);
+      } catch {
+        // Errors surfaced by mutation onError toasts — keep dialog open for retry
       }
     }
   };
@@ -536,7 +537,7 @@ export function ApplicationControl() {
           </div>
         )}
 
-        <RuleSetRingsPanel ruleSetId={selectedRuleSetId!} />
+        <RuleSetRingsPanel ruleSetId={selectedRuleSet.id} />
 
         {/* Add Rule Dialog */}
         <Dialog open={showAddRule} onOpenChange={setShowAddRule}>
@@ -1039,11 +1040,10 @@ export function ApplicationControl() {
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedTemplateId && (
-                  <p className="text-xs text-muted-foreground">
-                    {(templates ?? []).find((t) => t.id === selectedTemplateId)?.description}
-                  </p>
-                )}
+                {selectedTemplateId && (() => {
+                  const desc = (templates ?? []).find((t) => t.id === selectedTemplateId)?.description;
+                  return desc ? <p className="text-xs text-muted-foreground">{desc}</p> : null;
+                })()}
               </div>
             )}
             <div className="space-y-2">
@@ -1087,8 +1087,8 @@ export function ApplicationControl() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRuleSetEditor(false)}>Cancel</Button>
-            <Button onClick={handleSaveRuleSet} disabled={!ruleSetForm.name || createRuleSet.isPending || updateRuleSet.isPending}>
-              {(createRuleSet.isPending || updateRuleSet.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <Button onClick={handleSaveRuleSet} disabled={!ruleSetForm.name || createRuleSet.isPending || updateRuleSet.isPending || addRulesBulk.isPending}>
+              {(createRuleSet.isPending || updateRuleSet.isPending || addRulesBulk.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingRuleSet ? "Save Changes" : "Create"}
             </Button>
           </DialogFooter>
