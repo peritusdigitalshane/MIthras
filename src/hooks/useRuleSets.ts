@@ -408,3 +408,152 @@ export function useRuleSetMutations() {
     removeFromGroup,
   };
 }
+
+// ─── Endpoint groups (needed by ring panel) ────────────────────────────────
+
+export interface EndpointGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  organization_id: string;
+}
+
+export function useOrgEndpointGroups() {
+  const { currentOrganization } = useTenant();
+
+  return useQuery({
+    queryKey: ["endpoint-groups", currentOrganization?.id],
+    queryFn: async () => {
+      if (!currentOrganization?.id) return [];
+      const { data, error } = await supabase
+        .from("endpoint_groups")
+        .select("id, name, description, organization_id")
+        .eq("organization_id", currentOrganization.id)
+        .order("name");
+
+      if (error) throw error;
+      return (data ?? []) as EndpointGroup[];
+    },
+    enabled: !!currentOrganization?.id,
+  });
+}
+
+// ─── Rule set rings ─────────────────────────────────────────────────────────
+
+export interface RuleSetRing {
+  id: string;
+  rule_set_id: string;
+  group_id: string;
+  mode: "audit" | "enforce" | "off";
+  ring_order: number;
+  created_at: string;
+  group_name: string;
+  endpoint_count: number;
+}
+
+export function useRuleSetRings(ruleSetId: string | null) {
+  return useQuery({
+    queryKey: ["rule-set-rings", ruleSetId],
+    queryFn: async () => {
+      if (!ruleSetId) return [];
+
+      const { data: rings, error } = await supabase
+        .from("wdac_rule_set_rings")
+        .select("*, endpoint_groups(id, name)")
+        .eq("rule_set_id", ruleSetId)
+        .order("ring_order");
+
+      if (error) throw error;
+      if (!rings?.length) return [];
+
+      const groupIds = rings.map((r: any) => r.group_id);
+      const { data: memberships } = await supabase
+        .from("endpoint_group_memberships")
+        .select("group_id")
+        .in("group_id", groupIds);
+
+      const countMap = new Map<string, number>();
+      (memberships ?? []).forEach((m: any) => {
+        countMap.set(m.group_id, (countMap.get(m.group_id) ?? 0) + 1);
+      });
+
+      return rings.map((r: any) => ({
+        id: r.id,
+        rule_set_id: r.rule_set_id,
+        group_id: r.group_id,
+        mode: r.mode as "audit" | "enforce" | "off",
+        ring_order: r.ring_order,
+        created_at: r.created_at,
+        group_name: r.endpoint_groups?.name ?? "Unknown Group",
+        endpoint_count: countMap.get(r.group_id) ?? 0,
+      })) as RuleSetRing[];
+    },
+    enabled: !!ruleSetId,
+  });
+}
+
+export function useRingMutations() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const addRing = useMutation({
+    mutationFn: async ({ ruleSetId, groupId, mode = "audit", ringOrder = 0 }: {
+      ruleSetId: string;
+      groupId: string;
+      mode?: "audit" | "enforce" | "off";
+      ringOrder?: number;
+    }) => {
+      const { data, error } = await supabase
+        .from("wdac_rule_set_rings")
+        .insert({ rule_set_id: ruleSetId, group_id: groupId, mode, ring_order: ringOrder })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["rule-set-rings", data.rule_set_id] });
+      toast({ title: "Ring added" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add ring", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeRing = useMutation({
+    mutationFn: async ({ ringId, ruleSetId }: { ringId: string; ruleSetId: string }) => {
+      const { error } = await supabase.from("wdac_rule_set_rings").delete().eq("id", ringId);
+      if (error) throw error;
+      return ruleSetId;
+    },
+    onSuccess: (ruleSetId) => {
+      queryClient.invalidateQueries({ queryKey: ["rule-set-rings", ruleSetId] });
+      toast({ title: "Ring removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to remove ring", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const promoteRing = useMutation({
+    mutationFn: async ({ ringId, ruleSetId }: { ringId: string; ruleSetId: string }) => {
+      const { data, error } = await supabase
+        .from("wdac_rule_set_rings")
+        .update({ mode: "enforce" })
+        .eq("id", ringId)
+        .select()
+        .single();
+      if (error) throw error;
+      return { data, ruleSetId };
+    },
+    onSuccess: ({ ruleSetId }) => {
+      queryClient.invalidateQueries({ queryKey: ["rule-set-rings", ruleSetId] });
+      toast({ title: "Ring promoted to enforce — endpoints switch on next heartbeat" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to promote ring", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return { addRing, removeRing, promoteRing };
+}
