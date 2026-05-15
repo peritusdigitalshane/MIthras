@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,6 +26,12 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setManifest(null);
+    setError(null);
+    setCopied(false);
+  }, [organizationId]);
 
   const generateInstallCommand = async () => {
     if (!organizationId) {
