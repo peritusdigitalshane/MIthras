@@ -440,6 +440,16 @@ export function useOrgEndpointGroups() {
 
 // ─── Rule set rings ─────────────────────────────────────────────────────────
 
+interface RawRingRow {
+  id: string;
+  rule_set_id: string;
+  group_id: string;
+  mode: "audit" | "enforce" | "off";
+  ring_order: number;
+  created_at: string;
+  endpoint_groups: { id: string; name: string } | null;
+}
+
 export interface RuleSetRing {
   id: string;
   rule_set_id: string;
@@ -466,22 +476,23 @@ export function useRuleSetRings(ruleSetId: string | null) {
       if (error) throw error;
       if (!rings?.length) return [];
 
-      const groupIds = rings.map((r: any) => r.group_id);
+      const typedRings = rings as RawRingRow[];
+      const groupIds = typedRings.map((r) => r.group_id);
       const { data: memberships } = await supabase
         .from("endpoint_group_memberships")
         .select("group_id")
         .in("group_id", groupIds);
 
       const countMap = new Map<string, number>();
-      (memberships ?? []).forEach((m: any) => {
+      (memberships ?? []).forEach((m: { group_id: string }) => {
         countMap.set(m.group_id, (countMap.get(m.group_id) ?? 0) + 1);
       });
 
-      return rings.map((r: any) => ({
+      return typedRings.map((r) => ({
         id: r.id,
         rule_set_id: r.rule_set_id,
         group_id: r.group_id,
-        mode: r.mode as "audit" | "enforce" | "off",
+        mode: r.mode,
         ring_order: r.ring_order,
         created_at: r.created_at,
         group_name: r.endpoint_groups?.name ?? "Unknown Group",
@@ -513,6 +524,7 @@ export function useRingMutations() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["rule-set-rings", data.rule_set_id] });
+      queryClient.invalidateQueries({ queryKey: ["rule-sets"] });
       toast({ title: "Ring added" });
     },
     onError: (error: Error) => {
@@ -528,6 +540,7 @@ export function useRingMutations() {
     },
     onSuccess: (ruleSetId) => {
       queryClient.invalidateQueries({ queryKey: ["rule-set-rings", ruleSetId] });
+      queryClient.invalidateQueries({ queryKey: ["rule-sets"] });
       toast({ title: "Ring removed" });
     },
     onError: (error: Error) => {

@@ -29,6 +29,7 @@ export function useWdacTemplates() {
       if (error) throw error;
       return (data ?? []) as WdacPolicyTemplate[];
     },
+    // Templates are system-curated and rarely change — 5 min cache avoids redundant fetches.
     staleTime: 5 * 60 * 1000,
   });
 }
