@@ -28,6 +28,43 @@ type ObservedApp = {
     exec_count?: number;
 };
 
+// Maps path prefixes (uppercase) → display publisher name.
+// Checked in order; first match wins.
+const PUBLISHER_PREFIXES: [string, string][] = [
+    ["C:\\WINDOWS\\", "Windows"],
+    ["C:\\PROGRAM FILES\\MICROSOFT OFFICE\\", "Microsoft"],
+    ["C:\\PROGRAM FILES\\MICROSOFT OFFICE 16\\", "Microsoft"],
+    ["C:\\PROGRAM FILES (X86)\\MICROSOFT OFFICE\\", "Microsoft"],
+    ["C:\\PROGRAM FILES\\MICROSOFT\\", "Microsoft"],
+    ["C:\\PROGRAM FILES (X86)\\MICROSOFT\\", "Microsoft"],
+    ["C:\\PROGRAM FILES\\COMMON FILES\\MICROSOFT SHARED\\", "Microsoft"],
+    ["C:\\PROGRAM FILES\\WINDOWSAPPS\\MICROSOFT.", "Microsoft"],
+    ["C:\\PROGRAM FILES\\GOOGLE\\CHROME\\", "Google"],
+    ["C:\\PROGRAM FILES (X86)\\GOOGLE\\CHROME\\", "Google"],
+    ["C:\\PROGRAM FILES\\ADOBE\\", "Adobe"],
+    ["C:\\PROGRAM FILES (X86)\\ADOBE\\", "Adobe"],
+    ["C:\\PROGRAM FILES\\MOZILLA FIREFOX\\", "Mozilla"],
+    ["C:\\PROGRAM FILES\\VIDEOLAN\\", "VLC"],
+    ["C:\\PROGRAM FILES\\7-ZIP\\", "7-Zip"],
+    ["C:\\PROGRAM FILES\\NOTEPAD++\\", "Notepad++"],
+    ["C:\\PROGRAM FILES\\WINRAR\\", "WinRAR"],
+    ["C:\\PROGRAM FILES\\TEAMVIEWER\\", "TeamViewer"],
+    ["C:\\PROGRAM FILES\\ZOOM\\", "Zoom"],
+    ["C:\\PROGRAM FILES\\SLACK TECHNOLOGIES\\", "Slack"],
+    ["C:\\PROGRAM FILES\\DROPBOX\\", "Dropbox"],
+    ["C:\\PROGRAM FILES (X86)\\DROPBOX\\", "Dropbox"],
+    ["C:\\PROGRAM FILES\\CITRIX\\", "Citrix"],
+    ["C:\\PROGRAM FILES (X86)\\CITRIX\\", "Citrix"],
+];
+
+function inferPublisher(filePath: string): string {
+    const upper = filePath.toUpperCase();
+    for (const [prefix, pub] of PUBLISHER_PREFIXES) {
+        if (upper.startsWith(prefix)) return pub;
+    }
+    return "Unknown / Unsigned";
+}
+
 function jsonResponse(body: unknown, status: number, origin: string | null): Response {
     return new Response(JSON.stringify(body), {
         status,
@@ -92,7 +129,7 @@ Deno.serve(async (request) => {
         file_name:        a.file_name ?? a.file_path.split(/[\\/]/).pop() ?? "unknown",
         file_path:        a.file_path,
         file_hash:        a.file_hash ?? "",
-        publisher:        a.publisher ?? null,
+        publisher:        a.publisher ?? inferPublisher(a.file_path),
         product_name:     a.product_name ?? null,
         file_version:     a.file_version ?? null,
         discovery_source: "event_log",
