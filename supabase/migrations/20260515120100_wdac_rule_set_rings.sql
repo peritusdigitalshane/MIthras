@@ -33,9 +33,15 @@ CREATE POLICY "Admins manage rings"
     SELECT 1 FROM public.wdac_rule_sets rs
     WHERE rs.id = wdac_rule_set_rings.rule_set_id
       AND public.is_admin_of_org(auth.uid(), rs.organization_id)
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM public.wdac_rule_sets rs
+    WHERE rs.id = wdac_rule_set_rings.rule_set_id
+      AND public.is_admin_of_org(auth.uid(), rs.organization_id)
   ));
 
 -- Super admins have full access.
 CREATE POLICY "Super admins manage rings"
   ON public.wdac_rule_set_rings FOR ALL
-  USING (public.is_super_admin(auth.uid()));
+  USING (public.is_super_admin(auth.uid()))
+  WITH CHECK (public.is_super_admin(auth.uid()));

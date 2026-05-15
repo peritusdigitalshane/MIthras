@@ -27,7 +27,7 @@ BEGIN
     JOIN public.endpoint_group_memberships m ON m.group_id = r.group_id
     WHERE m.endpoint_id = p_endpoint_id
       AND r.rule_set_id IN (SELECT rule_set_id FROM active)
-    ORDER BY r.rule_set_id, r.ring_order ASC
+    ORDER BY r.rule_set_id, r.ring_order ASC, r.id ASC
   ),
   effective AS (
     -- Merge: ring mode overrides base mode when a ring exists.

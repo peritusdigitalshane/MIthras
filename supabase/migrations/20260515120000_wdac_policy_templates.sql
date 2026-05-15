@@ -22,7 +22,8 @@ CREATE POLICY "Authenticated users read templates"
 -- Only super_admins can write templates.
 CREATE POLICY "Super admins manage templates"
   ON public.wdac_policy_templates FOR ALL
-  USING (public.is_super_admin(auth.uid()));
+  USING (public.is_super_admin(auth.uid()))
+  WITH CHECK (public.is_super_admin(auth.uid()));
 
 -- Seed: 3 system templates.
 INSERT INTO public.wdac_policy_templates (name, description, rules, is_system) VALUES
