@@ -88,6 +88,7 @@ const navSections: NavSection[] = [
     icon: ShieldCheck,
     items: [
       { name: "SOC Console", href: "/soc", icon: Activity },
+      { name: "AI Agents", href: "/agents", icon: Sparkles },
       { name: "AI Activity", href: "/ai-activity", icon: Sparkles },
       { name: "Incidents", href: "/incidents", icon: ShieldAlert },
       { name: "Alerts", href: "/alerts", icon: Bell, badge: "alerts" as const },

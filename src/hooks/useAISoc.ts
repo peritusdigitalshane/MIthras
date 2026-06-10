@@ -44,6 +44,48 @@ export interface AiTriageDecision {
     review_notes: string | null;
     created_at: string;
     completed_at: string | null;
+
+    // Multi-agent consensus fields (phase 1 of autonomous SOC).
+    // verdict/confidence above are now specifically "Triage agent's view".
+    // final_verdict/final_confidence are the post-consensus answer that
+    // drives auto-close + auto-response.
+    final_verdict: "true_positive" | "false_positive" | "needs_human" | "inconclusive" | null;
+    final_confidence: number | null;
+    disagreement_detected: boolean;
+    adversarial_refuted: boolean | null;
+    consensus_reasoning: string | null;
+    orchestration_state: "pending" | "triaged" | "verified" | "completed" | "failed" | "budget_exceeded";
+}
+
+// Per-agent verdict row. One per (triage_decision, agent_name) — see
+// ai_agent_verdicts table.
+export interface Refutation {
+    argument: string;
+    citation: Citation;
+    strength: "weak" | "moderate" | "strong";
+}
+
+export interface AgentVerdict {
+    id: string;
+    triage_decision_id: string;
+    alert_id: string;
+    organization_id: string;
+    agent_name: "triage" | "verification" | "adversarial";
+    verdict:
+        | "true_positive" | "false_positive" | "needs_human" | "inconclusive"
+        | "refuted" | "not_refuted" | null;
+    confidence: number | null;
+    summary: string | null;
+    key_indicators: KeyIndicator[];
+    reasoning_steps: ReasoningStep[];
+    refutations: Refutation[];
+    model: string | null;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    cost_microcents: number;
+    latency_ms: number | null;
+    error_message: string | null;
+    created_at: string;
 }
 
 export interface TimelineEntry {
@@ -121,6 +163,37 @@ export function useAiTriageDecision(alertId: string | undefined) {
         refetchInterval: (q) => {
             const d = q.state.data as AiTriageDecision | null;
             return d?.status === "pending" ? 2_000 : false;
+        },
+    });
+}
+
+/**
+ * Fetch the per-agent verdict trail for a triage decision.
+ *
+ * Returns one row per agent that has run (triage, verification, adversarial).
+ * Empty array for pre-multi-agent decisions or in-flight decisions where the
+ * orchestrator hasn't kicked in yet. The MultiAgentVerdictTrail component
+ * handles both states (legacy single-agent vs full trail).
+ */
+export function useAgentVerdicts(triageDecisionId: string | undefined) {
+    const { currentOrganization } = useTenant();
+    return useQuery({
+        queryKey: ["ai-agent-verdicts", triageDecisionId, currentOrganization?.id],
+        queryFn: async () => {
+            if (!triageDecisionId) return [] as AgentVerdict[];
+            const { data, error } = await supabase
+                .from("ai_agent_verdicts").select("*")
+                .eq("triage_decision_id", triageDecisionId)
+                // Stable order so the UI columns don't reshuffle as agents complete.
+                .order("agent_name", { ascending: true });
+            if (error) throw error;
+            return (data ?? []) as AgentVerdict[];
+        },
+        enabled: !!triageDecisionId,
+        // Poll while orchestration is in flight so verdicts appear as they land.
+        refetchInterval: (q) => {
+            const list = (q.state.data ?? []) as AgentVerdict[];
+            return list.length < 3 ? 2_000 : false;
         },
     });
 }

@@ -18,6 +18,7 @@ import {
     type AiTriageDecision,
     type AiInvestigation,
 } from "@/hooks/useAISoc";
+import { MultiAgentVerdictTrail } from "@/components/ai/MultiAgentVerdictTrail";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {
@@ -62,6 +63,10 @@ export function AiDecisionDrawer({ alertId, onOpenChange }: Props) {
                     />
                 ) : (
                     <div className="mt-6 space-y-6">
+                        {/* Multi-agent trail — renders above the triage summary so the
+                            consensus story comes first. Self-hides on legacy decisions. */}
+                        <MultiAgentVerdictTrail decision={triage.data} />
+
                         <TriageSummary decision={triage.data} onReview={handleReview} reviewing={review.isPending} />
 
                         {triage.data.verdict === "true_positive" && (
