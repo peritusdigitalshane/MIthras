@@ -95,10 +95,11 @@ RULES:
 
 async function getEnrichmentModel(): Promise<string> {
     const { data } = await supabase
-        .from("platform_settings").select("value")
-        .eq("key", "ai_hunt_model").maybeSingle();
-    const v = (data?.value as string | undefined)?.trim();
-    return v || ENRICHMENT_MODEL_DEFAULT;
+        .from("platform_settings").select("key,value")
+        .in("key", ["ai_hunt_model", "openai_model"]);
+    const map: Record<string, string> = {};
+    for (const r of (data ?? [])) map[r.key as string] = String(r.value ?? "").trim();
+    return map.ai_hunt_model || map.openai_model || ENRICHMENT_MODEL_DEFAULT;
 }
 
 function buildEnrichmentPrompt(args: {

@@ -30,7 +30,10 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SOC_SECRET           = Deno.env.get("AI_SOC_POLL_SECRET") ?? "";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-const DEFAULT_ADVERSARIAL_MODEL = "gpt-4o";
+// Default falls back to the smaller model so the autonomous SOC works on
+// OpenAI projects without gpt-4o access. Override via platform_settings
+// .ai_adversarial_model when you have access to the bigger one.
+const DEFAULT_ADVERSARIAL_MODEL = "gpt-4o-mini";
 
 function jsonResponse(body: unknown, status: number, origin: string | null): Response {
     return new Response(JSON.stringify(body), {
@@ -284,10 +287,11 @@ function isAuthorised(req: Request): boolean {
 
 async function getAdversarialModel(): Promise<string> {
     const { data } = await supabase
-        .from("platform_settings").select("value")
-        .eq("key", "ai_adversarial_model").maybeSingle();
-    const v = (data?.value as string | undefined)?.trim();
-    return v || DEFAULT_ADVERSARIAL_MODEL;
+        .from("platform_settings").select("key,value")
+        .in("key", ["ai_adversarial_model", "openai_model"]);
+    const map: Record<string, string> = {};
+    for (const r of (data ?? [])) map[r.key as string] = String(r.value ?? "").trim();
+    return map.ai_adversarial_model || map.openai_model || DEFAULT_ADVERSARIAL_MODEL;
 }
 
 Deno.serve(async (req) => {

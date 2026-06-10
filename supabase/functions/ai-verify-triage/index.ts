@@ -28,7 +28,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 // Verification deliberately uses a STRONGER model than triage, on the
 // principle that the verifier should be at least as capable. Override
 // via platform_settings.ai_verification_model.
-const DEFAULT_VERIFICATION_MODEL = "gpt-4o";
+// Default falls back to the smaller model so the autonomous SOC works on
+// OpenAI projects that haven't been granted gpt-4o access. Override via
+// platform_settings.ai_verification_model to use the bigger model.
+const DEFAULT_VERIFICATION_MODEL = "gpt-4o-mini";
 
 function jsonResponse(body: unknown, status: number, origin: string | null): Response {
     return new Response(JSON.stringify(body), {
@@ -278,11 +281,15 @@ function isAuthorised(req: Request): boolean {
 }
 
 async function getVerificationModel(): Promise<string> {
+    // Lookup order: ai_verification_model -> openai_model (what Triage uses)
+    // -> baked-in default. Lets the user run multi-agent on whatever
+    // OpenAI tier they have without per-agent config.
     const { data } = await supabase
-        .from("platform_settings").select("value")
-        .eq("key", "ai_verification_model").maybeSingle();
-    const v = (data?.value as string | undefined)?.trim();
-    return v || DEFAULT_VERIFICATION_MODEL;
+        .from("platform_settings").select("key,value")
+        .in("key", ["ai_verification_model", "openai_model"]);
+    const map: Record<string, string> = {};
+    for (const r of (data ?? [])) map[r.key as string] = String(r.value ?? "").trim();
+    return map.ai_verification_model || map.openai_model || DEFAULT_VERIFICATION_MODEL;
 }
 
 Deno.serve(async (req) => {

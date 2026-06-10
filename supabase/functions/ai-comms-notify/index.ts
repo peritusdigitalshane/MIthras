@@ -169,10 +169,11 @@ function buildUserPrompt(ctx: DraftContext): string {
 
 async function getCommsModel(): Promise<string> {
     const { data } = await supabase
-        .from("platform_settings").select("value")
-        .eq("key", "ai_comms_model").maybeSingle();
-    const v = (data?.value as string | undefined)?.trim();
-    return v || COMMS_MODEL_DEFAULT;
+        .from("platform_settings").select("key,value")
+        .in("key", ["ai_comms_model", "openai_model"]);
+    const map: Record<string, string> = {};
+    for (const r of (data ?? [])) map[r.key as string] = String(r.value ?? "").trim();
+    return map.ai_comms_model || map.openai_model || COMMS_MODEL_DEFAULT;
 }
 
 // ============================================================================
