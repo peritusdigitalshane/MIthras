@@ -173,6 +173,11 @@ export function useDeleteRouter() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["routers"] });
+      // CASCADE deletes drop tunnels + firewall rules at the DB but the
+      // junction caches stay populated until invalidated.
+      queryClient.invalidateQueries({ queryKey: ["router-tunnels"] });
+      queryClient.invalidateQueries({ queryKey: ["router-fw-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["dns-zones"] });
       toast.success("Router deleted");
     },
     onError: (e: any) => toast.error(e.message),

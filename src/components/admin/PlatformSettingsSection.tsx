@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { VirusTotalSettingsCard } from "./VirusTotalSettingsCard";
+import { M365IntegrationSettingsCard } from "./M365IntegrationSettingsCard";
 
 interface OpenAIModel {
   id: string;

@@ -178,7 +178,8 @@ export function useEndpointUacStatuses() {
       const { data: endpoints, error: endpointsError } = await supabase
         .from("endpoints")
         .select(`id, hostname, uac_policy_id, uac_policies(name)`)
-        .eq("organization_id", orgId!);
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null);
 
       if (endpointsError) throw endpointsError;
       if (!endpoints?.length) return [];

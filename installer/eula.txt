@@ -1,0 +1,70 @@
+MITHRAS THREAT DEFENCE — END USER LICENCE AGREEMENT
+
+This Agreement ("Agreement") is between Peritus Digital Pty Ltd ("Peritus",
+"we", "us") and the entity or individual installing the Mithras Threat
+Defence Agent ("you", "Customer"). By installing the Agent you agree to
+the terms below.
+
+1. LICENCE
+   Peritus grants you a non-exclusive, non-transferable, revocable licence
+   to install and use the Mithras Threat Defence Agent ("Agent") on Windows
+   endpoints owned or controlled by you, solely for the purpose of detecting,
+   logging, and responding to security events on those endpoints. The licence
+   is conditional on a valid Mithras subscription with Peritus or one of its
+   authorised resellers.
+
+2. DATA COLLECTION
+   The Agent collects security telemetry from each installed endpoint,
+   including but not limited to: Microsoft Defender posture, threat
+   detections, Windows event logs, firewall traffic, installed software
+   inventory, sign-in events, and remote-access sessions you initiate. This
+   telemetry is transmitted to the Mithras platform for processing.
+   You acknowledge that you are responsible for notifying users of the
+   endpoints that this telemetry is collected, and for obtaining any
+   consents required under applicable privacy law.
+
+3. OWNERSHIP
+   Peritus retains all right, title, and interest in the Agent, the Mithras
+   platform, and all associated intellectual property. Nothing in this
+   Agreement transfers any such rights to you.
+
+4. RESTRICTIONS
+   You will not: (a) reverse engineer, decompile, or disassemble the Agent
+   except to the extent permitted by law; (b) sublicence, sell, or transfer
+   the Agent to a third party; (c) remove or alter any copyright, trademark,
+   or other proprietary notices on the Agent.
+
+5. UPDATES
+   The Agent will automatically download and apply updates from the Mithras
+   platform. You agree to permit such updates.
+
+6. WARRANTY DISCLAIMER
+   THE AGENT IS PROVIDED "AS IS". TO THE MAXIMUM EXTENT PERMITTED BY LAW,
+   PERITUS DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+   AND NON-INFRINGEMENT. Peritus does not warrant that the Agent will be
+   uninterrupted, error-free, or will detect every threat.
+
+7. LIMITATION OF LIABILITY
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, PERITUS WILL NOT BE LIABLE FOR
+   ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR
+   FOR LOST PROFITS, REVENUE, OR DATA, ARISING OUT OF OR IN CONNECTION WITH
+   THIS AGREEMENT OR YOUR USE OF THE AGENT.
+
+8. TERMINATION
+   This Agreement terminates immediately upon termination of your Mithras
+   subscription. Upon termination you must uninstall the Agent from all
+   endpoints.
+
+9. GOVERNING LAW
+   This Agreement is governed by the laws of New South Wales, Australia.
+   You submit to the exclusive jurisdiction of the courts of that
+   jurisdiction.
+
+10. CONTACT
+    Peritus Digital Pty Ltd
+    https://www.mithras.com.au
+    accounts@peritusdigital.com.au
+
+By clicking "I accept the agreement" you confirm you have read these
+terms and agree to be bound by them.

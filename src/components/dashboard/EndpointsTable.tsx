@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
-import { Monitor, Shield, Clock, ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { Monitor, Shield, Clock, ChevronRight, Loader2, Trash2, AlertTriangle, ArrowUpCircle } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useEndpoints, useDeleteEndpoint } from "@/hooks/useDashboardData";
+import { Badge } from "@/components/ui/badge";
+import { useEndpoints, useDeleteEndpoint, useLatestAgentVersion, isAgentOutdated } from "@/hooks/useDashboardData";
+import { UpgradeAgentButton } from "@/components/endpoints/UpgradeAgentButton";
 import { useAssignPolicy, usePolicyOptions } from "@/hooks/usePolicies";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
@@ -66,6 +68,7 @@ interface EndpointsTableProps {
 
 export function EndpointsTable({ limit, showHeader = true }: EndpointsTableProps) {
   const { data: endpoints, isLoading, error } = useEndpoints();
+  const { data: latestAgentVersion } = useLatestAgentVersion();
   const { data: policyOptions } = usePolicyOptions();
   const assignPolicy = useAssignPolicy();
   const deleteEndpoint = useDeleteEndpoint();
@@ -244,6 +247,12 @@ export function EndpointsTable({ limit, showHeader = true }: EndpointsTableProps
                           <p className="text-xs text-muted-foreground">
                             {getProtectionStatus(status)}
                           </p>
+                          {!endpoint.policy_id && (
+                            <Badge variant="destructive" className="mt-1 h-4 gap-1 px-1.5 text-[10px]" title="No Defender policy assigned — settings won't apply">
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                              No Defender policy
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -253,9 +262,28 @@ export function EndpointsTable({ limit, showHeader = true }: EndpointsTableProps
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <code className="rounded bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                        {endpoint.agent_version ? `v${endpoint.agent_version}` : "Unknown"}
-                      </code>
+                      <div className="flex items-center gap-1.5">
+                        <code className="rounded bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                          {endpoint.agent_version ? `v${endpoint.agent_version}` : "Unknown"}
+                        </code>
+                        {isAgentOutdated(endpoint.agent_version, latestAgentVersion) && (
+                          <span className="inline-flex items-center gap-1">
+                            <Badge
+                              variant="outline"
+                              className="h-5 gap-1 border-amber-500 px-1.5 text-[10px] text-amber-600 dark:text-amber-400"
+                              title={`Latest stable is v${latestAgentVersion}`}
+                            >
+                              <ArrowUpCircle className="h-2.5 w-2.5" />
+                              Outdated
+                            </Badge>
+                            <UpgradeAgentButton
+                              endpointId={endpoint.id}
+                              hostname={endpoint.hostname}
+                              currentVersion={endpoint.agent_version}
+                            />
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4">
                       <code className="rounded bg-secondary px-2 py-1 text-xs text-muted-foreground">

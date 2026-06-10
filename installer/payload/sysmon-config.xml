@@ -1,0 +1,133 @@
+<!--
+Mithras Sysmon baseline config (v0.4.7).
+
+Captures the high-signal events without log explosion. The four events
+turned on here are the ones the platform's UI knows how to parse today.
+The "filtered-out" sections below intentionally suppress chatty signed
+Microsoft processes so the agent doesn't spend its bandwidth shipping
+benign telemetry.
+
+References:
+  - Olaf Hartong's sysmon-modular (inspired the structure)
+  - SwiftOnSecurity/sysmon-config (filter heuristics)
+  - Sysmon schema 4.90+
+
+Note: HashAlgorithms="SHA256,IMPHASH" matters — IMPHASH is used by Mandiant
+APT reports + VirusTotal Yara feeds and is cheap to compute.
+-->
+<Sysmon schemaversion="4.90">
+    <HashAlgorithms>SHA256,IMPHASH</HashAlgorithms>
+    <CheckRevocation/>
+    <DnsLookup>True</DnsLookup>
+
+    <EventFiltering>
+
+        <!-- ====================================================== -->
+        <!-- Event ID 1: Process Create                              -->
+        <!-- ====================================================== -->
+        <RuleGroup name="process create" groupRelation="or">
+            <ProcessCreate onmatch="exclude">
+                <!-- Drop benign Microsoft signed processes (the worst noise) -->
+                <Image condition="is">C:\Windows\System32\svchost.exe</Image>
+                <Image condition="is">C:\Windows\System32\conhost.exe</Image>
+                <Image condition="is">C:\Windows\System32\dllhost.exe</Image>
+                <Image condition="is">C:\Windows\System32\backgroundTaskHost.exe</Image>
+                <Image condition="is">C:\Windows\System32\SearchProtocolHost.exe</Image>
+                <Image condition="is">C:\Windows\System32\SearchFilterHost.exe</Image>
+                <Image condition="is">C:\Windows\System32\SearchIndexer.exe</Image>
+                <Image condition="is">C:\Windows\System32\smartscreen.exe</Image>
+                <!-- Defender's own scanning (loud during scans) -->
+                <Image condition="is">C:\ProgramData\Microsoft\Windows Defender\Platform\*\MpCmdRun.exe</Image>
+                <Image condition="is">C:\ProgramData\Microsoft\Windows Defender\Platform\*\MsMpEng.exe</Image>
+                <!-- Sysmon itself & our agent (we don't want to monitor ourselves) -->
+                <Image condition="contains">\Sysmon</Image>
+                <Image condition="contains">\PeritusSecureAgent</Image>
+                <ParentImage condition="contains">\PeritusSecureAgent</ParentImage>
+            </ProcessCreate>
+        </RuleGroup>
+
+        <!-- ====================================================== -->
+        <!-- Event ID 3: Network Connection                          -->
+        <!-- ====================================================== -->
+        <RuleGroup name="network connect" groupRelation="or">
+            <NetworkConnect onmatch="exclude">
+                <!-- Sysmon's own enrichment lookups generate connect events -->
+                <Image condition="contains">\Sysmon</Image>
+                <!-- Drop link-local + loopback noise -->
+                <DestinationIp condition="begin with">127.</DestinationIp>
+                <DestinationIp condition="begin with">169.254.</DestinationIp>
+                <DestinationIp condition="is">::1</DestinationIp>
+                <!-- DNS lookups are captured by ID 22 separately -->
+                <DestinationPort condition="is">53</DestinationPort>
+                <!-- mDNS / LLMNR / NetBIOS broadcasts on the LAN -->
+                <DestinationPort condition="is">5353</DestinationPort>
+                <DestinationPort condition="is">5355</DestinationPort>
+                <DestinationPort condition="is">137</DestinationPort>
+                <DestinationPort condition="is">138</DestinationPort>
+                <!-- Defender / Windows telemetry sinks -->
+                <Image condition="is">C:\ProgramData\Microsoft\Windows Defender\Platform\*\MsMpEng.exe</Image>
+                <!-- Our own agent's outbound traffic — would be circular -->
+                <Image condition="contains">\PeritusSecureAgent</Image>
+            </NetworkConnect>
+        </RuleGroup>
+
+        <!-- ====================================================== -->
+        <!-- Event ID 11: File Create                                -->
+        <!-- ====================================================== -->
+        <!-- File create can be VERY noisy. Use an include-only filter:    -->
+        <!-- ship file creates ONLY in security-relevant locations.        -->
+        <RuleGroup name="file create" groupRelation="or">
+            <FileCreate onmatch="include">
+                <!-- Startup folders -->
+                <TargetFilename condition="contains">\Start Menu\Programs\Startup\</TargetFilename>
+                <!-- Scheduled tasks -->
+                <TargetFilename condition="begin with">C:\Windows\System32\Tasks\</TargetFilename>
+                <TargetFilename condition="begin with">C:\Windows\Tasks\</TargetFilename>
+                <!-- Common drop locations for malware -->
+                <TargetFilename condition="contains">\Temp\</TargetFilename>
+                <TargetFilename condition="contains">\AppData\Local\Temp\</TargetFilename>
+                <TargetFilename condition="contains">\AppData\Roaming\</TargetFilename>
+                <TargetFilename condition="contains">\ProgramData\</TargetFilename>
+                <!-- Executables, scripts, archives anywhere -->
+                <TargetFilename condition="end with">.exe</TargetFilename>
+                <TargetFilename condition="end with">.dll</TargetFilename>
+                <TargetFilename condition="end with">.ps1</TargetFilename>
+                <TargetFilename condition="end with">.bat</TargetFilename>
+                <TargetFilename condition="end with">.vbs</TargetFilename>
+                <TargetFilename condition="end with">.js</TargetFilename>
+                <TargetFilename condition="end with">.lnk</TargetFilename>
+                <TargetFilename condition="end with">.scr</TargetFilename>
+                <!-- Office macros / scripts -->
+                <TargetFilename condition="end with">.docm</TargetFilename>
+                <TargetFilename condition="end with">.xlsm</TargetFilename>
+                <TargetFilename condition="end with">.pptm</TargetFilename>
+            </FileCreate>
+        </RuleGroup>
+
+        <!-- ====================================================== -->
+        <!-- Event ID 22: DNS Query (lightweight; useful for IOC)    -->
+        <!-- ====================================================== -->
+        <RuleGroup name="dns query" groupRelation="or">
+            <DnsQuery onmatch="exclude">
+                <!-- Drop top-talker MS / chromium / browser noise -->
+                <QueryName condition="end with">.in-addr.arpa</QueryName>
+                <QueryName condition="end with">.local</QueryName>
+                <QueryName condition="end with">.localdomain</QueryName>
+                <QueryName condition="end with">.windowsupdate.com</QueryName>
+                <QueryName condition="end with">.microsoft.com</QueryName>
+                <QueryName condition="end with">.bing.com</QueryName>
+                <QueryName condition="end with">.live.com</QueryName>
+                <QueryName condition="end with">.office.net</QueryName>
+                <QueryName condition="end with">.office.com</QueryName>
+                <QueryName condition="end with">.cloudapp.net</QueryName>
+                <QueryName condition="end with">.azure.com</QueryName>
+                <QueryName condition="end with">.googleapis.com</QueryName>
+                <QueryName condition="end with">.gstatic.com</QueryName>
+                <QueryName condition="end with">.gvt1.com</QueryName>
+                <QueryName condition="end with">.gvt2.com</QueryName>
+                <Image condition="contains">\PeritusSecureAgent</Image>
+            </DnsQuery>
+        </RuleGroup>
+
+    </EventFiltering>
+</Sysmon>

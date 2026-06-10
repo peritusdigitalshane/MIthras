@@ -6,10 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SUPABASE_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+function unauthorized(msg = "Unauthorized") {
+  return new Response(JSON.stringify({ error: msg }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+function forbidden(msg = "Forbidden") {
+  return new Response(JSON.stringify({ error: msg }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
 
 /**
  * Data retention cleanup function
@@ -27,6 +35,15 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // --- auth guard: super-admin only (cleanup is destructive) ---
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return unauthorized("Missing bearer token");
+  const authRes = await supabase.auth.getUser(token);
+  if (authRes.error || !authRes.data.user) return unauthorized("Invalid token");
+  const sa = await supabase.from("super_admins").select("user_id").eq("user_id", authRes.data.user.id).maybeSingle();
+  if (sa.error || !sa.data) return forbidden("Super-admin only");
+
   try {
     const startTime = Date.now();
     const MAX_RUNTIME_MS = 50_000; // 50 seconds max to stay within edge function timeout
@@ -42,51 +59,62 @@ Deno.serve(async (req) => {
     // 1. Clean up old endpoint_status records
     // Keep last 24 hours of status records, but always keep at least the latest per endpoint
     try {
-      // First, get the latest status record ID per endpoint (to preserve)
-      const { data: latestRecords } = await supabase
-        .from("endpoint_status")
-        .select("id, endpoint_id, collected_at")
-        .order("endpoint_id")
-        .order("collected_at", { ascending: false });
+      // DB-side DISTINCT ON via RPC. The old approach selected every row in
+      // endpoint_status (millions on a real fleet) into edge-fn memory and
+      // computed latest-per-endpoint in JS — OOM at scale, cleanup silently
+      // failed, retention violated.
+      const { data: preserveRows, error: preserveErr } = await supabase
+        .rpc("get_latest_endpoint_status_ids");
+      if (preserveErr) throw preserveErr;
+      const preserveIds = (preserveRows as Array<{ get_latest_endpoint_status_ids: string }> | string[] | null)
+        ?.map((r) => typeof r === "string" ? r : r.get_latest_endpoint_status_ids)
+        ?? [];
 
-      const latestPerEndpoint = new Map<string, string>();
-      for (const record of latestRecords || []) {
-        if (!latestPerEndpoint.has(record.endpoint_id)) {
-          latestPerEndpoint.set(record.endpoint_id, record.id);
-        }
-      }
-      const preserveIds = Array.from(latestPerEndpoint.values());
+      // Empty preserve list (e.g. brand new instance with no endpoints, or
+      // a wipe-and-reseed) would build .not('id','in','()'), which PostgREST
+      // returns 400 on. Without an explicit error check downstream, toDelete
+      // came back null, hasMore went false, retention silently stopped.
+      // Skip the delete pass entirely when there is nothing to preserve -
+      // there can't be anything to clean up either.
+      if (preserveIds.length === 0) {
+        console.log("[cleanup-old-data] no endpoint_status rows to preserve - skipping pass");
+      } else {
+        const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-      const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      
-      let hasMore = true;
-      while (hasMore && shouldContinue()) {
-        const { data: toDelete } = await supabase
-          .from("endpoint_status")
-          .select("id")
-          .lt("collected_at", cutoffTime)
-          .not("id", "in", `(${preserveIds.join(",")})`)
-          .limit(500);
-
-        if (!toDelete || toDelete.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        const deleteIds = toDelete.map((r) => r.id);
-        for (let i = 0; i < deleteIds.length; i += 100) {
-          const batch = deleteIds.slice(i, i + 100);
-          const { error } = await supabase
+        let hasMore = true;
+        while (hasMore && shouldContinue()) {
+          const { data: toDelete, error: selectErr } = await supabase
             .from("endpoint_status")
-            .delete()
-            .in("id", batch);
+            .select("id")
+            .lt("collected_at", cutoffTime)
+            .not("id", "in", `(${preserveIds.join(",")})`)
+            .limit(500);
 
-          if (error) {
-            results.errors.push(`endpoint_status batch delete error: ${error.message}`);
+          // Bubble the PostgREST error up so the outer try{} captures it
+          // and pushes a useful diagnostic into results.errors instead of
+          // silently exiting the loop.
+          if (selectErr) throw selectErr;
+
+          if (!toDelete || toDelete.length === 0) {
             hasMore = false;
             break;
-          } else {
-            results.endpoint_status_deleted += batch.length;
+          }
+
+          const deleteIds = toDelete.map((r) => r.id);
+          for (let i = 0; i < deleteIds.length; i += 100) {
+            const batch = deleteIds.slice(i, i + 100);
+            const { error } = await supabase
+              .from("endpoint_status")
+              .delete()
+              .in("id", batch);
+
+            if (error) {
+              results.errors.push(`endpoint_status batch delete error: ${error.message}`);
+              hasMore = false;
+              break;
+            } else {
+              results.endpoint_status_deleted += batch.length;
+            }
           }
         }
       }

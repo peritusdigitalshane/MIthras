@@ -72,6 +72,7 @@ export function EndpointWdacList() {
           )
         `)
         .eq("organization_id", currentOrganization.id)
+        .is("deleted_at", null)
         .order("hostname");
 
       if (error) throw error;

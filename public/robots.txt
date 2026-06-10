@@ -1,14 +1,36 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+
+# Don't index authenticated app pages — they 401 to crawlers anyway, but
+# this saves the crawl budget for the marketing surface.
+Disallow: /dashboard
+Disallow: /endpoints
+Disallow: /threats
+Disallow: /policies
+Disallow: /logs
+Disallow: /activity
+Disallow: /admin
+Disallow: /settings
+Disallow: /alerts
+Disallow: /incidents
+Disallow: /telemetry
+Disallow: /threat-hunting
+Disallow: /microsegmentation
+Disallow: /dns-filtering
+Disallow: /vulnerabilities
+Disallow: /recommendations
+Disallow: /network
+Disallow: /routers
+Disallow: /reports
+Disallow: /customer-reports
+Disallow: /users
+Disallow: /groups
+Disallow: /sites
+Disallow: /my-customers
+Disallow: /group-policy
+Disallow: /deploy
+Disallow: /legacy-hardening
+Disallow: /help
+Disallow: /reset-password
+
+Sitemap: https://www.mithras.com.au/sitemap.xml

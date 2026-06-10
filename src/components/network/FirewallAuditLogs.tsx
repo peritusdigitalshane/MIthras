@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useFirewallAuditLogs, COMMON_SERVICES } from "@/hooks/useFirewall";
+import { useAllowSource } from "@/hooks/useMicrosegmentation";
 import { useEndpointGroups } from "@/hooks/useEndpointGroups";
+import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
-import { ScrollText, Plus, RefreshCw, Search, Info } from "lucide-react";
+import { ScrollText, Plus, RefreshCw, Search, Info, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function FirewallAuditLogs() {
@@ -30,10 +32,22 @@ export function FirewallAuditLogs() {
     limit: 100,
   });
   const { data: groups } = useEndpointGroups();
+  const allowSource = useAllowSource();
+  const { toast } = useToast();
 
-  const handleAddException = (log: typeof logs extends (infer T)[] ? T : never) => {
-    // TODO: Open dialog to add this IP/source to allowlist
-    console.log("Add exception for:", log);
+  const handleAddException = (
+    log: { rule_id: string | null; remote_address: string; service_name: string },
+  ) => {
+    if (!log.rule_id) {
+      toast({
+        title: "No matching rule",
+        description:
+          "This connection didn't match any tracked policy rule, so there's nothing to attach an exception to. Add a rule for this service first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    allowSource.mutate({ ruleId: log.rule_id, ip: log.remote_address });
   };
 
   if (isLoading) {
@@ -150,8 +164,13 @@ export function FirewallAuditLogs() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleAddException(log)}
+                        disabled={allowSource.isPending}
                       >
-                        <Plus className="h-3 w-3 mr-1" />
+                        {allowSource.isPending ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Plus className="h-3 w-3 mr-1" />
+                        )}
                         Add Exception
                       </Button>
                     </TableCell>

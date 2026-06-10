@@ -6,8 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-https://njdcyjxgtckgtzgzoctw.supabase.co}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZGN5anhndGNrZ3R6Z3pvY3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMDc0NzgsImV4cCI6MjA4NDU4MzQ3OH0.Dgzlv9Wk_Mxb8I8OYttjspVimEGSWswBnWBFhlt-jBw}
+        # No defaults — fail-fast if env vars aren't set. Use .env.production
+        # (gitignored) or pass them via the build command. NEVER hardcode the
+        # JWT here; that committed key would land in every clone of the repo.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?VITE_SUPABASE_URL must be set}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?VITE_SUPABASE_ANON_KEY must be set}
         BUILD_MODE: production
     container_name: peritus-secure
     ports:

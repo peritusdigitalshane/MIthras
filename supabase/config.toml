@@ -26,6 +26,12 @@ verify_jwt = false
 [functions.agent-enroll]
 verify_jwt = false
 
+[functions.agent-legacy-upgrade]
+verify_jwt = false
+
+[functions.cve-auto-scan]
+verify_jwt = false
+
 [functions.agent-heartbeat]
 verify_jwt = false
 
@@ -36,4 +42,81 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.agent-app-control]
+verify_jwt = false
+
+[functions.site-enroll]
+verify_jwt = false
+
+[functions.site-heartbeat]
+verify_jwt = false
+
+[functions.soc-bridge]
+verify_jwt = false
+
+[functions.admin-reset-password]
+verify_jwt = false
+
+[functions.smtp-settings]
+verify_jwt = false
+
+[functions.mesh-session-start]
+verify_jwt = false
+
+# Super-admin Health Dashboard. Auth is enforced in the function body
+# (JWT → super_admins membership check). Returns 401 for anything else.
+
+[functions.health-check]
+verify_jwt = false
+
+# AI SOC — triage + investigation. Triggered by DB triggers, cron, and
+# user actions; each function does its own JWT or shared-secret auth.
+
+[functions.ai-triage-alert]
+verify_jwt = false
+
+[functions.ai-investigate-alert]
+verify_jwt = false
+
+[functions.ai-triage-incident]
+verify_jwt = false
+
+# CVE workflow — advisor (user-driven) + auto-protect (cron).
+
+[functions.cve-mitigation-advisor]
+verify_jwt = false
+
+[functions.cve-auto-protect]
+verify_jwt = false
+
+# Customer reports — generate (user/cron) + send (cron with SMTP).
+
+[functions.generate-customer-report]
+verify_jwt = false
+
+[functions.send-customer-report]
+verify_jwt = false
+
+# Alert notification — called by a DB trigger over pg_net with a shared
+# secret. MUST stay verify_jwt = false; the function does constant-time
+# bearer compare in body (see notify-alert backlog item for upgrading
+# from service-role-key to a dedicated NOTIFY_ALERT_SECRET).
+
+[functions.notify-alert]
+verify_jwt = false
+
+# M365 ITDR — settings (user) + OAuth start (user redirect to Microsoft)
+# + OAuth callback (Microsoft redirects back, no JWT) + poll tenants
+# (cron). m365-oauth-callback in particular MUST stay verify_jwt = false
+# because Microsoft's redirect has no Authorization header.
+
+[functions.m365-settings]
+verify_jwt = false
+
+[functions.m365-oauth-start]
+verify_jwt = false
+
+[functions.m365-oauth-callback]
+verify_jwt = false
+
+[functions.m365-poll-tenants]
 verify_jwt = false

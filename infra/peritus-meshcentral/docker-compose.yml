@@ -1,0 +1,57 @@
+# /opt/peritus-meshcentral/docker-compose.yml
+#
+# MeshCentral 1.x for Phase A remote desktop. Replaces the Guacamole+chisel
+# path I started earlier -- MeshCentral is what Tactical RMM uses for the
+# same outcome and bundles tunneling + auth + recording + file transfer.
+#
+# Architecture:
+#   Browser → https://remote.mithras.com.au → NPM → docker02:9200 → here.
+#   MeshAgent on endpoints → wss://remote.mithras.com.au → same path → here.
+#
+# Storage backend: NeDB (built-in, single-file). Fine for thousands of
+# endpoints; migrate to Postgres later if we outgrow it.
+#
+# Config (config.json) is rendered from env vars by the entrypoint. The
+# settings below mirror what Tactical RMM ships out of the box: NPM-mode
+# (we're behind a reverse proxy), agent invitation enabled, session
+# recording on.
+
+services:
+  peritus-meshcentral:
+    image: typhonragewind/meshcentral:1.1.32
+    container_name: peritus-meshcentral
+    restart: unless-stopped
+    environment:
+      # Public hostname operators + agents use. MUST match the NPM proxy host.
+      HOSTNAME:           remote.mithras.com.au
+
+      # Tell MeshCentral it's behind a reverse proxy that does TLS termination.
+      # Internal listener is plain HTTP on 80 -> exposed as 9200 on the host.
+      REVERSE_PROXY:      "true"
+      REVERSE_PROXY_TLS_PORT: "443"
+      ALLOW_NEW_ACCOUNTS: "false"
+      IFRAME:             "true"   # allow embedding inside Mithras UI later
+      # Session recording on by default; stored in /opt/peritus-meshcentral/data
+      WEBRTC:             "true"
+      # Trusted certificate is handled by NPM upstream; MeshCentral generates
+      # a self-signed for the internal :443 if we ever need it.
+      SELFUPDATE:         "false"
+
+    ports:
+      # NPM forwards remote.mithras.com.au -> docker02:9200 -> 80 here.
+      - "9200:80"
+      # Some MeshCentral integrations want a separate "agent port" -- keep
+      # it on the same hostname/path for now (works through one connection).
+
+    volumes:
+      - /opt/peritus-meshcentral/data:/opt/meshcentral/meshcentral-data
+      - /opt/peritus-meshcentral/files:/opt/meshcentral/meshcentral-files
+      - /opt/peritus-meshcentral/backups:/opt/meshcentral/meshcentral-backups
+      - /opt/peritus-meshcentral/web-public:/opt/meshcentral/meshcentral-web-public
+
+    networks:
+      - meshnet
+
+networks:
+  meshnet:
+    driver: bridge

@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Trash2, Copy, Key, Terminal, Loader2, Check, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-const CHECKIN_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co/functions/v1/router-checkin";
+const CHECKIN_URL = `${((import.meta.env.VITE_SUPABASE_URL as string) ?? "").replace(/\/$/, "")}/functions/v1/router-checkin`;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);

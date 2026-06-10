@@ -159,20 +159,21 @@ export function usePatchDevice() {
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
-        .from("endpoint_commands")
+        .from("agent_commands")
         .insert({
           endpoint_id: endpointId,
           organization_id: organizationId,
           command_type: "install_updates",
-          parameters: { triggered_by_cve: cveId },
+          params: { triggered_by_cve: cveId },
           issued_by: user?.id,
+          status: "queued",
         });
       if (error) throw error;
     },
     onSuccess: () => {
       toast({
         title: "Patch command queued",
-        description: "The device will install updates on its next check-in.",
+        description: "The device will install Security + Critical updates on its next check-in (within ~60s). Reboot may be required.",
       });
     },
     onError: (err: any) => {
@@ -206,11 +207,12 @@ export function useBulkPatchDevices() {
         endpoint_id: ep.endpointId,
         organization_id: ep.organizationId,
         command_type: "install_updates",
-        parameters: { triggered_by_cves: ep.cveIds },
+        params: { triggered_by_cves: ep.cveIds },
         issued_by: user?.id,
+        status: "queued",
       }));
 
-      const { error } = await supabase.from("endpoint_commands").insert(commands);
+      const { error } = await supabase.from("agent_commands").insert(commands);
       if (error) throw error;
       return commands.length;
     },

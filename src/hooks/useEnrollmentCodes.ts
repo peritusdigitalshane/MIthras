@@ -121,6 +121,45 @@ export function useDeactivateEnrollmentCode() {
   });
 }
 
+// ---- Pending enrolment invites ------------------------------------------
+// "Pending" = an org the caller created (as parent), with an active enrolment
+// code that nobody has signed up against yet. The disty uses this on
+// /distributor/resellers to find resellers they invited but haven't joined;
+// the partner uses it on /my-customers for the same on customers.
+
+export interface PendingEnrolmentInvite {
+  org_id:           string;
+  org_name:         string;
+  org_slug:         string;
+  org_type:         string;
+  org_created_at:   string;
+  code_id:          string;
+  code:             string;
+  code_role:        "owner" | "admin" | "member";
+  code_created_at:  string;
+  code_expires_at:  string | null;
+  code_use_count:   number;
+  code_max_uses:    number | null;
+  code_is_active:   boolean;
+}
+
+export function usePendingEnrolmentInvites(parentOrgId: string | null | undefined, childOrgType?: "partner" | "customer") {
+  return useQuery({
+    queryKey: ["pending-invites", parentOrgId, childOrgType ?? null],
+    enabled: !!parentOrgId,
+    queryFn: async () => {
+      if (!parentOrgId) return [];
+      const { data, error } = await supabase.rpc("get_pending_enrolment_invites" as any, {
+        _parent_org_id:  parentOrgId,
+        _child_org_type: childOrgType ?? null,
+      });
+      if (error) throw error;
+      return (data ?? []) as PendingEnrolmentInvite[];
+    },
+    staleTime: 30_000,
+  });
+}
+
 export function useValidateEnrollmentCode() {
   return useMutation({
     mutationFn: async (code: string): Promise<CodeValidationResult> => {
@@ -147,12 +186,21 @@ export function useValidateEnrollmentCode() {
   });
 }
 
-// Generate a readable 8-character code
+// Generate a 12-character enrolment code (excludes 0/O/1/I for readability).
+//
+// CSPRNG via crypto.getRandomValues, NOT Math.random — these codes grant
+// admin-level access to whichever org they're attached to, so predictability
+// would be an auth-bypass class bug. 12 chars × 32-char alphabet ≈ 60 bits
+// of entropy.
+//
+// Ideally the value would be generated server-side (Postgres default on the
+// `code` column) so a compromised browser couldn't influence it; left as a
+// follow-up because it requires schema + insert-path changes.
 function generateCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excluded similar chars like 0/O, 1/I
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
   let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  for (const b of bytes) code += chars.charAt(b % chars.length);
   return code;
 }

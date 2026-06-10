@@ -1,0 +1,348 @@
+{
+  "title": "Peritus SOC Overview — All Customers",
+  "uid": "peritus-soc-overview",
+  "schemaVersion": 39,
+  "version": 2,
+  "tags": ["soc", "peritus", "ai", "msp"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "liveNow": false,
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "type": "row", "id": 100,
+      "title": "Customer Fleet",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat", "id": 1, "title": "Customers",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int AS \"Active customers\" FROM organizations WHERE organization_type = 'customer';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 2, "title": "Endpoints online (24h)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 3, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FILTER (WHERE last_seen_at >= now() - interval '24 hours') AS \"Online / Total\" FROM endpoints;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 3, "title": "Open alerts",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 6, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 10 }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM alerts WHERE acknowledged = false;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 4, "title": "Critical alerts",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 9, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM alerts WHERE acknowledged = false AND severity = 'critical';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 5, "title": "Active threats",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 12, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM endpoint_threats WHERE status = 'active';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 6, "title": "M365 tenants connected",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 15, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM m365_tenants WHERE consent_state = 'active';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 7, "title": "AI SOC orgs enabled",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM organizations WHERE ai_triage_enabled = true OR ai_investigation_enabled = true;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 8, "title": "AI spend today",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "currencyUSD" } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COALESCE(SUM(cost_cents), 0)::float / 100 AS \"USD\" FROM (SELECT cost_cents FROM ai_triage_decisions WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' UNION ALL SELECT cost_cents FROM ai_investigations WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') t;",
+        "format": "table"
+      }]
+    },
+
+    {
+      "type": "row", "id": 200,
+      "title": "Per-Customer Health",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "table", "id": 9,
+      "title": "Per-customer posture (sorted by criticality)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 10 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Critical alerts" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-background-solid", "mode": "gradient" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "red", "value": 1 }] } }] },
+          { "matcher": { "id": "byName", "options": "Open alerts" },     "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-background-solid" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 20 }] } }] },
+          { "matcher": { "id": "byName", "options": "Active threats" },  "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-background-solid" } }, { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "red", "value": 1 }] } }] },
+          { "matcher": { "id": "byName", "options": "AI" },               "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [{ "type": "value", "options": { "off": { "text": "off", "color": "gray" }, "triage": { "text": "Triage", "color": "blue" }, "triage+inv": { "text": "T + Investigate", "color": "green" } } }] }] }
+        ]
+      },
+      "options": { "showHeader": true, "footer": { "show": false }, "sortBy": [{ "displayName": "Critical alerts", "desc": true }] },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    o.name                                                                AS \"Customer\",\n    COALESCE(o.organization_type, '')                                     AS \"Type\",\n    (SELECT COUNT(*)::int FROM endpoints e WHERE e.organization_id = o.id) AS \"Endpoints\",\n    (SELECT COUNT(*)::int FROM endpoints e WHERE e.organization_id = o.id AND e.last_seen_at >= now() - interval '24 hours') AS \"Online 24h\",\n    (SELECT COUNT(*)::int FROM alerts a WHERE a.organization_id = o.id AND a.acknowledged = false) AS \"Open alerts\",\n    (SELECT COUNT(*)::int FROM alerts a WHERE a.organization_id = o.id AND a.acknowledged = false AND a.severity = 'critical') AS \"Critical alerts\",\n    (SELECT COUNT(*)::int FROM endpoint_threats t WHERE t.organization_id = o.id AND t.status = 'active') AS \"Active threats\",\n    CASE\n        WHEN o.ai_triage_enabled AND o.ai_investigation_enabled THEN 'triage+inv'\n        WHEN o.ai_triage_enabled                                  THEN 'triage'\n        ELSE 'off'\n    END                                                                   AS \"AI\",\n    (SELECT COUNT(*)::int FROM ai_triage_decisions d WHERE d.organization_id = o.id AND d.created_at >= now() - interval '24 hours') AS \"AI triages 24h\",\n    (SELECT COUNT(*)::int FROM m365_tenants m WHERE m.organization_id = o.id AND m.consent_state = 'active') AS \"M365\",\n    (SELECT MAX(a.created_at) FROM alerts a WHERE a.organization_id = o.id) AS \"Last activity\"\nFROM organizations o\nORDER BY \"Critical alerts\" DESC, \"Open alerts\" DESC, o.name ASC;",
+        "format": "table"
+      }]
+    },
+
+    {
+      "type": "row", "id": 300,
+      "title": "AI Agent Activity",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat", "id": 10, "title": "Triages today",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } },
+      "options": { "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM ai_triage_decisions WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 11, "title": "Auto-closed",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 4, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM ai_triage_decisions WHERE auto_closed = true AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 12, "title": "True positives (7d)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 8, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] } } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM ai_triage_decisions WHERE verdict = 'true_positive' AND created_at >= now() - interval '7 days';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 13, "title": "Investigations (7d)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 12, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } },
+      "options": { "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COUNT(*)::int FROM ai_investigations WHERE created_at >= now() - interval '7 days';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 14, "title": "Avg AI latency",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 16, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "ms" } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COALESCE(AVG(latency_ms), 0)::int AS \"ms\" FROM ai_triage_decisions WHERE status = 'completed' AND created_at >= now() - interval '7 days';",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "stat", "id": 15, "title": "7d AI spend",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 20, "y": 17, "w": 4, "h": 4 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }, "unit": "currencyUSD" } },
+      "options": { "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT COALESCE(SUM(cost_cents), 0)::float / 100 AS \"USD\" FROM (SELECT cost_cents FROM ai_triage_decisions WHERE created_at >= now() - interval '7 days' UNION ALL SELECT cost_cents FROM ai_investigations WHERE created_at >= now() - interval '7 days') t;",
+        "format": "table"
+      }]
+    },
+
+    {
+      "type": "piechart", "id": 16, "title": "AI verdict breakdown (7d)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 21, "w": 8, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "True positive" },  "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "False positive" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "Needs human" },    "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "Inconclusive" },   "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value"] }, "displayLabels": ["percent"] },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    CASE verdict\n        WHEN 'true_positive'  THEN 'True positive'\n        WHEN 'false_positive' THEN 'False positive'\n        WHEN 'needs_human'    THEN 'Needs human'\n        WHEN 'inconclusive'   THEN 'Inconclusive'\n        ELSE COALESCE(verdict, 'Other')\n    END                AS \"Verdict\",\n    COUNT(*)::int      AS \"Count\"\nFROM ai_triage_decisions\nWHERE status = 'completed' AND created_at >= now() - interval '7 days'\nGROUP BY 1\nORDER BY 2 DESC;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "table", "id": 17, "title": "Recent AI decisions (cross-customer)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 8, "y": 21, "w": 16, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Verdict" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [{ "type": "value", "options": { "true_positive": { "text": "true positive", "color": "red" }, "false_positive": { "text": "false positive", "color": "green" }, "needs_human": { "text": "needs human", "color": "orange" }, "inconclusive": { "text": "inconclusive", "color": "blue" } } }] }] },
+          { "matcher": { "id": "byName", "options": "Conf" }, "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "decimals", "value": 0 }] }
+        ]
+      },
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    d.created_at                        AS \"When\",\n    o.name                              AS \"Customer\",\n    LEFT(a.title, 60)                   AS \"Alert\",\n    d.verdict                           AS \"Verdict\",\n    d.confidence                        AS \"Conf\",\n    d.auto_closed                       AS \"Auto-closed\",\n    d.escalated_to_investigation        AS \"Escalated\"\nFROM ai_triage_decisions d\nJOIN alerts a        ON a.id = d.alert_id\nJOIN organizations o ON o.id = d.organization_id\nWHERE d.status = 'completed'\nORDER BY d.created_at DESC\nLIMIT 25;",
+        "format": "table"
+      }]
+    },
+
+    {
+      "type": "row", "id": 400,
+      "title": "Alerts & Threats",
+      "gridPos": { "x": 0, "y": 29, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "table", "id": 18, "title": "Live alerts feed",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 30, "w": 14, "h": 10 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Severity" }, "properties": [{ "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [{ "type": "value", "options": { "critical": { "color": "red" }, "high": { "color": "orange" }, "medium": { "color": "yellow" }, "low": { "color": "blue" }, "info": { "color": "gray" } } }] }] }
+        ]
+      },
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    a.created_at        AS \"When\",\n    o.name              AS \"Customer\",\n    a.severity          AS \"Severity\",\n    a.alert_type        AS \"Type\",\n    LEFT(a.title, 80)   AS \"Title\",\n    e.hostname          AS \"Endpoint\",\n    a.acknowledged      AS \"Ack\"\nFROM alerts a\nJOIN organizations o ON o.id = a.organization_id\nLEFT JOIN endpoints e ON e.id = a.endpoint_id\nORDER BY a.created_at DESC\nLIMIT 40;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "barchart", "id": 19, "title": "Top alert types (7d)",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 14, "y": 30, "w": 10, "h": 10 },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } },
+      "options": { "orientation": "horizontal", "xTickLabelRotation": 0, "legend": { "displayMode": "hidden" }, "tooltip": { "mode": "single" } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT alert_type AS \"type\", COUNT(*)::int AS \"count\" FROM alerts WHERE created_at >= now() - interval '7 days' GROUP BY alert_type ORDER BY 2 DESC LIMIT 12;",
+        "format": "table"
+      }]
+    },
+
+    {
+      "type": "row", "id": 500,
+      "title": "Microsoft 365 ITDR",
+      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "table", "id": 20, "title": "Recent M365 audit events",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 41, "w": 12, "h": 8 },
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    e.occurred_at                              AS \"When\",\n    o.name                                     AS \"Customer\",\n    e.activity_display_name                    AS \"Activity\",\n    e.category                                 AS \"Category\",\n    e.initiated_by_user_upn                    AS \"Actor\",\n    e.result                                   AS \"Result\"\nFROM m365_audit_events e\nJOIN organizations o ON o.id = e.organization_id\nORDER BY e.occurred_at DESC\nLIMIT 20;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "table", "id": 21, "title": "High-risk OAuth grants",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 12, "y": 41, "w": 12, "h": 8 },
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    o.name                                     AS \"Customer\",\n    COALESCE(g.client_display_name, g.client_id) AS \"App\",\n    g.consent_type                             AS \"Consent type\",\n    g.principal_upn                            AS \"Granted by\",\n    array_to_string(g.high_risk_scopes_matched, ', ') AS \"High-risk scopes\",\n    g.last_seen_at                             AS \"Last seen\"\nFROM m365_oauth_grants g\nJOIN organizations o ON o.id = g.organization_id\nWHERE g.has_high_risk_scope = true AND g.is_active = true\nORDER BY g.last_seen_at DESC\nLIMIT 20;",
+        "format": "table"
+      }]
+    },
+    {
+      "type": "table", "id": 22, "title": "External mailbox forwarding rules",
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "peritus-db" },
+      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 6 },
+      "options": { "showHeader": true, "footer": { "show": false } },
+      "targets": [{
+        "refId": "A",
+        "rawSql": "SELECT\n    o.name                                     AS \"Customer\",\n    r.user_principal_name                      AS \"Mailbox\",\n    r.rule_name                                AS \"Rule\",\n    array_to_string(r.forward_to_addresses, ', ') AS \"Forwarding to\",\n    r.last_seen_at                             AS \"Last seen\"\nFROM m365_mailbox_rules r\nJOIN organizations o ON o.id = r.organization_id\nWHERE r.forwards_externally = true AND r.is_active = true\nORDER BY r.last_seen_at DESC;",
+        "format": "table"
+      }]
+    }
+  ]
+}

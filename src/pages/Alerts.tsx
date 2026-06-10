@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Bell, CheckCircle, Clock, Filter } from "lucide-react";
+import { Bell, CheckCircle, Clock, Filter, Brain } from "lucide-react";
+import { EmptyState } from "@/components/help/EmptyState";
 import { useAlerts, useAcknowledgeAlert, useBulkAcknowledgeAlerts } from "@/hooks/useAlerts";
+import { QueryError } from "@/components/ui/query-error";
+import { AlertRecipientsCard } from "@/components/alerts/AlertRecipientsCard";
+import { AiTriageBadge } from "@/components/ai/AiTriageBadge";
+import { AiDecisionDrawer } from "@/components/ai/AiDecisionDrawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,12 +23,13 @@ const severityColors: Record<string, string> = {
 };
 
 export default function Alerts() {
-  const { data: alerts, isLoading } = useAlerts();
+  const { data: alerts, isLoading, error } = useAlerts();
   const acknowledge = useAcknowledgeAlert();
   const bulkAcknowledge = useBulkAcknowledgeAlerts();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("unacknowledged");
+  const [aiAlertId, setAiAlertId] = useState<string | null>(null);
 
   const filtered = (alerts ?? []).filter((a) => {
     if (filterSeverity !== "all" && a.severity !== filterSeverity) return false;
@@ -69,6 +75,8 @@ export default function Alerts() {
           )}
         </div>
 
+        <AlertRecipientsCard />
+
         {/* Filters */}
         <div className="flex items-center gap-3">
           <Filter className="h-4 w-4 text-muted-foreground" />
@@ -96,14 +104,32 @@ export default function Alerts() {
           </Select>
         </div>
 
+        {error && (
+          <QueryError error={error} title="Couldn't load alerts" bare />
+        )}
+
         {/* Alert List */}
         <div className="rounded-xl border border-border bg-card shadow-card">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">Loading alerts...</div>
           ) : filtered.length === 0 ? (
-            <div className="p-8 text-center">
-              <Bell className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground">No alerts to display</p>
+            <div className="p-6">
+              <EmptyState
+                icon={<Bell className="h-7 w-7" />}
+                title="No alerts in your current view"
+                tone="positive"
+                description={
+                  <>
+                    <p>Alerts come from several sources — they're <em>not</em> the same as Defender threats.</p>
+                  </>
+                }
+                steps={[
+                  { done: false, label: "Defender threat detected → auto-alert", detail: "Severe/High Defender threats create an alert + an incident." },
+                  { done: false, label: "M365 ITDR signal → auto-alert", detail: "Suspicious OAuth grants, risky sign-ins, mailbox-rule changes." },
+                  { done: false, label: "Custom IOC watchlist hit → alert", detail: "Hash/IP/domain matches across the threat-hunting library." },
+                ]}
+                secondaryAction={{ label: "Alerts vs threats →", href: "/glossary#alert-vs-threat" }}
+              />
             </div>
           ) : (
             <div>
@@ -132,7 +158,7 @@ export default function Alerts() {
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline" className={severityColors[alert.severity] || severityColors.info}>
                           {alert.severity}
                         </Badge>
@@ -140,6 +166,10 @@ export default function Alerts() {
                         {alert.acknowledged && (
                           <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
                         )}
+                        <AiTriageBadge
+                          alertId={alert.id}
+                          onClick={() => setAiAlertId(alert.id)}
+                        />
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
                       <div className="flex items-center gap-3 mt-1.5">
@@ -157,17 +187,26 @@ export default function Alerts() {
                         )}
                       </div>
                     </div>
-                    {!alert.acknowledged && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => acknowledge.mutate(alert.id)}
-                        disabled={acknowledge.isPending}
-                        className="flex-shrink-0"
+                        onClick={() => setAiAlertId(alert.id)}
+                        title="Open AI analysis"
                       >
-                        <CheckCircle className="h-4 w-4" />
+                        <Brain className="h-4 w-4" />
                       </Button>
-                    )}
+                      {!alert.acknowledged && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => acknowledge.mutate(alert.id)}
+                          disabled={acknowledge.isPending}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -175,6 +214,10 @@ export default function Alerts() {
           )}
         </div>
       </div>
+      <AiDecisionDrawer
+        alertId={aiAlertId}
+        onOpenChange={(open) => !open && setAiAlertId(null)}
+      />
     </MainLayout>
   );
 }

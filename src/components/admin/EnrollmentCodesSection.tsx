@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -227,7 +228,7 @@ export function EnrollmentCodesSection({ organizationId, organizationName }: Enr
                     {code.expires_at ? (
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {new Date(code.expires_at).toLocaleDateString()}
+                        {format(new Date(code.expires_at), "d MMM yyyy")}
                       </div>
                     ) : (
                       <span className="text-muted-foreground">Never</span>
@@ -248,7 +249,7 @@ export function EnrollmentCodesSection({ organizationId, organizationName }: Enr
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
-                      {code.is_active && status.label === "Active" && (
+                      {code.is_active && (
                         <Button
                           variant="ghost"
                           size="icon"

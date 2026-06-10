@@ -323,6 +323,10 @@ export function useUpdateOrganizationHardeningModule() {
       queryClient.invalidateQueries({ queryKey: ["direct-customers"] });
       queryClient.invalidateQueries({ queryKey: ["partner-customers"] });
       queryClient.invalidateQueries({ queryKey: ["hardening-profiles"] });
+      // First-enable triggers create_default_hardening_profiles() which
+      // seeds endpoint_hardening_status rows via FK trigger. Refresh the
+      // status list so the Hardening page reflects the new baseline.
+      queryClient.invalidateQueries({ queryKey: ["endpoint-hardening-status"] });
       queryClient.invalidateQueries({ queryKey: ["activity-logs"] });
     },
   });

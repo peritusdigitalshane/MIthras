@@ -64,6 +64,7 @@ export function useEndpoints() {
           *,
           defender_policies(id, name)
         `)
+        .is("deleted_at", null)             // hide soft-deleted endpoints
         .order("last_seen_at", { ascending: false });
 
       if (orgId) {
@@ -79,31 +80,132 @@ export function useEndpoints() {
   });
 }
 
+/**
+ * Latest active stable agent version (powershell runtime). Used to badge
+ * outdated endpoints — closes PoC rec #4 (only 2/11 hosts on the version
+ * that has microseg + app whitelist).
+ */
+export function useLatestAgentVersion() {
+  return useQuery({
+    queryKey: ["latest-agent-version"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agent_versions")
+        .select("version")
+        .eq("runtime", "powershell")
+        .eq("channel", "stable")
+        .eq("is_active", true)
+        .order("published_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.version as string | undefined) ?? null;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * True when the agent's reported version is older than the active stable.
+ * Returns false if either version is missing — we don't badge unknowns red.
+ */
+export function isAgentOutdated(reported: string | null | undefined, latest: string | null | undefined): boolean {
+  if (!reported || !latest) return false;
+  const pa = reported.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = latest.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] || 0;
+    const db = pb[i] || 0;
+    if (da !== db) return da < db;
+  }
+  return false;
+}
+
+/**
+ * Soft-delete an endpoint. Goes through the endpoint_soft_delete RPC
+ * (added 2026-06-01) which sets deleted_at + records who did it + logs
+ * to activity_logs. Hard DELETE on endpoints is blocked at the DB layer
+ * to prevent the silent-disappearance class of bug.
+ *
+ * Restoring is a single click via useRestoreEndpoint — the row stays in
+ * the table; the deleted_at column is what hides it from app queries.
+ */
 export function useDeleteEndpoint() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (endpointId: string) => {
-      const { error } = await supabase
-        .from("endpoints")
-        .delete()
-        .eq("id", endpointId);
+    mutationFn: async (
+      args: string | { endpointId: string; reason?: string },
+    ) => {
+      const endpointId = typeof args === "string" ? args : args.endpointId;
+      const reason     = typeof args === "string" ? "removed via dashboard" : (args.reason ?? "removed via dashboard");
+
+      const { data, error } = await supabase.rpc("endpoint_soft_delete", {
+        p_endpoint_id: endpointId,
+        p_reason:      reason,
+      });
       if (error) throw error;
+      // RPC returns false when already soft-deleted — surface that as a no-op
+      // rather than a success toast, so the caller can tell.
+      return { performed: data === true };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["endpoints"] });
       queryClient.invalidateQueries({ queryKey: ["endpoint_threats"] });
       queryClient.invalidateQueries({ queryKey: ["endpoint_statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["org-device-quota"] });
       toast({
-        title: "Endpoint removed",
-        description: "The endpoint and all associated data have been permanently deleted.",
+        title: res.performed ? "Endpoint removed" : "Endpoint was already removed",
+        description: res.performed
+          ? "Soft-deleted. The row is retained for audit and the slot is freed in the org's device quota. A super-admin can restore it from the database."
+          : undefined,
       });
     },
-    onError: () => {
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Unknown";
       toast({
-        title: "Failed to delete endpoint",
-        description: "Please try again or check your permissions.",
+        title: "Failed to remove endpoint",
+        description: msg.includes("forbidden")
+          ? "You must be an admin of the endpoint's organisation, or a super-admin, to remove it."
+          : msg.includes("Hard DELETE on public.endpoints is blocked")
+            ? "The endpoint cannot be hard-deleted from the UI by design. Refresh — the upgraded dashboard uses soft-delete via the endpoint_soft_delete RPC, and a stale tab may still hold the old code."
+            : msg,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+/**
+ * Reverse a soft-delete. Available to admins of the endpoint's org and
+ * super-admins. After restore the endpoint counts toward the org's
+ * device quota again — so callers should check capacity first.
+ */
+export function useRestoreEndpoint() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (endpointId: string) => {
+      const { data, error } = await supabase.rpc("endpoint_restore", {
+        p_endpoint_id: endpointId,
+      });
+      if (error) throw error;
+      return { performed: data === true };
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["endpoints"] });
+      queryClient.invalidateQueries({ queryKey: ["org-device-quota"] });
+      toast({
+        title: res.performed ? "Endpoint restored" : "Endpoint was already active",
+      });
+    },
+    onError: (e: unknown) => {
+      toast({
+        title: "Failed to restore endpoint",
+        description: e instanceof Error ? e.message : "Unknown",
         variant: "destructive",
       });
     },
@@ -118,27 +220,37 @@ export function useEndpointThreats() {
     queryKey: ["endpoint_threats", orgId],
     enabled: !!orgId,
     queryFn: async () => {
-      // First get endpoints for current org
+      // First get endpoints for current org (live only)
       const { data: endpoints } = await supabase
         .from("endpoints")
         .select("id")
-        .eq("organization_id", orgId!);
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null);
 
       const endpointIds = endpoints?.map(e => e.id) || [];
-      
+
       if (endpointIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from("endpoint_threats")
-        .select(`
-          *,
-          endpoints(hostname, organization_id)
-        `)
-        .in("endpoint_id", endpointIds)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data as EndpointThreat[];
+      // Batch the threats query the same way useLatestEndpointStatuses below
+      // already batches its endpoint_status query. At ~200+ endpoints an
+      // unbounded .in('endpoint_id', endpointIds) blows past PostgREST's 8KB
+      // URL ceiling AND past the default 1000-row result cap.
+      const allThreats: EndpointThreat[] = [];
+      const batchSize = 50;
+      for (let i = 0; i < endpointIds.length; i += batchSize) {
+        const batch = endpointIds.slice(i, i + batchSize);
+        const { data, error } = await supabase
+          .from("endpoint_threats")
+          .select(`
+            *,
+            endpoints(hostname, organization_id)
+          `)
+          .in("endpoint_id", batch)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        if (data) allThreats.push(...(data as EndpointThreat[]));
+      }
+      return allThreats;
     },
     refetchInterval: 30000,
     staleTime: 10000,
@@ -153,14 +265,15 @@ export function useLatestEndpointStatuses() {
     queryKey: ["endpoint_statuses", orgId],
     enabled: !!orgId,
     queryFn: async () => {
-      // First get endpoints for current org
+      // First get endpoints for current org (live only)
       const { data: endpoints } = await supabase
         .from("endpoints")
         .select("id")
-        .eq("organization_id", orgId!);
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null);
 
       const endpointIds = endpoints?.map(e => e.id) || [];
-      
+
       if (endpointIds.length === 0) return [];
 
       // Get the latest status for each endpoint using a per-endpoint approach
@@ -205,11 +318,12 @@ export interface SecurityRecommendation {
 }
 
 export function useDashboardStats() {
-  const { data: endpoints, isLoading: endpointsLoading } = useEndpoints();
-  const { data: threats, isLoading: threatsLoading } = useEndpointThreats();
-  const { data: statuses, isLoading: statusesLoading } = useLatestEndpointStatuses();
+  const { data: endpoints, isLoading: endpointsLoading, error: endpointsError } = useEndpoints();
+  const { data: threats,   isLoading: threatsLoading,   error: threatsError   } = useEndpointThreats();
+  const { data: statuses,  isLoading: statusesLoading,  error: statusesError  } = useLatestEndpointStatuses();
 
   const isLoading = endpointsLoading || threatsLoading || statusesLoading;
+  const error = endpointsError ?? threatsError ?? statusesError ?? null;
 
   const totalEndpoints = endpoints?.length || 0;
   
@@ -387,6 +501,7 @@ export function useDashboardStats() {
 
   return {
     isLoading,
+    error,
     totalEndpoints,
     protectedCount,
     activeThreats,

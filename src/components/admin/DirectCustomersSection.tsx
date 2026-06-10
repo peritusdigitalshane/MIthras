@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { useDirectCustomers, usePartners, useAssignCustomerToPartner, useRenameOrganization, useDeleteOrganization } from "@/hooks/usePartners";
 import { useUpdateOrganizationNetworkModule, useUpdateOrganizationRouterModule, useUpdateOrganizationLegacyHardening } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Building2, Monitor, ChevronRight, Loader2, Network, Router, Pencil, Trash2, Check, X, ShieldAlert } from "lucide-react";
+import { Building2, Monitor, ChevronRight, Loader2, Network, Router, Pencil, Trash2, Check, X, ShieldAlert, Brain, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useTenant } from "@/contexts/TenantContext";
+import { AiSocOrgDialog, type AiSocOrgDialogTarget } from "@/components/admin/AiSocOrgDialog";
+import { PlanQuotaDialog, type PlanQuotaDialogTarget } from "@/components/admin/PlanQuotaDialog";
+
+// Compact label for the per-customer AI SOC button. Triage and
+// investigation are independent flags so the button surfaces which is on
+// without needing to open the dialog.
+function aiSocLabel(c: { ai_triage_enabled?: boolean; ai_investigation_enabled?: boolean }): string {
+    const t = !!c.ai_triage_enabled;
+    const i = !!c.ai_investigation_enabled;
+    if (t && i) return "Triage + Investigate";
+    if (t) return "Triage only";
+    if (i) return "Investigate (no triage)";
+    return "Off";
+}
+
+// Compact plan summary for the customer-row button. Shows the override
+// when set, otherwise the plan's default name. Partner-child customers
+// inherit unlimited from their MSP so the button reflects that.
+function planLabel(c: {
+    subscription_plan?: "free" | "pro" | "business" | string;
+    device_quota_override?: number | null;
+    parent_partner_id?: string | null;
+}): string {
+    if (c.parent_partner_id) return "via partner";
+    if (c.device_quota_override !== null && c.device_quota_override !== undefined) {
+        return `cap ${c.device_quota_override}`;
+    }
+    switch (c.subscription_plan) {
+        case "business": return "Business · ∞";
+        case "pro":      return "Pro · 25";
+        case "free":     return "Free · 1";
+        default:         return c.subscription_plan ?? "—";
+    }
+}
 
 export function DirectCustomersSection() {
   const updateNetworkModule = useUpdateOrganizationNetworkModule();
@@ -49,6 +84,8 @@ export function DirectCustomersSection() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [aiSocTarget, setAiSocTarget] = useState<AiSocOrgDialogTarget | null>(null);
+  const [planTarget, setPlanTarget] = useState<PlanQuotaDialogTarget | null>(null);
 
   const handleRename = async (id: string) => {
     if (!renameValue.trim()) return;
@@ -118,9 +155,11 @@ export function DirectCustomersSection() {
             <TableRow>
               <TableHead>Customer</TableHead>
               <TableHead>Endpoints</TableHead>
+              <TableHead className="text-center">Plan</TableHead>
               <TableHead className="text-center">Network</TableHead>
               <TableHead className="text-center">Routers</TableHead>
               <TableHead className="text-center">Hardening</TableHead>
+              <TableHead className="text-center">AI SOC</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Assign to Partner</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
@@ -163,6 +202,26 @@ export function DirectCustomersSection() {
                     <Monitor className="h-4 w-4 text-muted-foreground" />
                     <span>{customer.endpoint_count || 0}</span>
                   </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() =>
+                      setPlanTarget({
+                        id: customer.id,
+                        name: customer.name,
+                        subscription_plan: (customer.subscription_plan ?? "free") as "free" | "pro" | "business",
+                        device_quota_override: customer.device_quota_override ?? null,
+                        is_partner_child: !!customer.parent_partner_id,
+                      })
+                    }
+                    title="Subscription plan + device quota"
+                  >
+                    <CreditCard className="h-3 w-3 mr-1" />
+                    {planLabel(customer)}
+                  </Button>
                 </TableCell>
                 <TableCell className="text-center">
                   <Button
@@ -239,8 +298,27 @@ export function DirectCustomersSection() {
                     {customer.legacy_hardening_enabled ? "Enabled" : "Disabled"}
                   </Button>
                 </TableCell>
+                <TableCell className="text-center">
+                  <Button
+                    variant={(customer.ai_triage_enabled || customer.ai_investigation_enabled) ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={() =>
+                      setAiSocTarget({
+                        id: customer.id,
+                        name: customer.name,
+                        ai_triage_enabled: !!customer.ai_triage_enabled,
+                        ai_investigation_enabled: !!customer.ai_investigation_enabled,
+                        ai_soc_daily_cap_cents: customer.ai_soc_daily_cap_cents ?? 500,
+                      })
+                    }
+                  >
+                    <Brain className="h-3 w-3 mr-1" />
+                    {aiSocLabel(customer)}
+                  </Button>
+                </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {new Date(customer.created_at).toLocaleDateString()}
+                  {format(new Date(customer.created_at), "d MMM yyyy")}
                 </TableCell>
                 <TableCell>
                   {assigningId === customer.id ? (
@@ -294,7 +372,7 @@ export function DirectCustomersSection() {
             ))}
             {customers?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No direct customers found. All customers are assigned to partners.
                 </TableCell>
               </TableRow>
@@ -302,6 +380,9 @@ export function DirectCustomersSection() {
           </TableBody>
         </Table>
       </Card>
+
+      <AiSocOrgDialog target={aiSocTarget} onClose={() => setAiSocTarget(null)} />
+      <PlanQuotaDialog target={planTarget} onClose={() => setPlanTarget(null)} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

@@ -10,9 +10,10 @@ interface ReportDocumentProps {
 export function ReportDocument({ reportType, title, reportData, visibility }: ReportDocumentProps) {
   const isMonthly = reportType === "monthly_security";
 
-  // Use explicit colors for print/PDF - these will show on white background
+  // Wrap in an explicit white canvas so dark-mode preview stays readable —
+  // this component is the print/PDF preview, intentionally always white.
   return (
-    <div className="text-gray-900">
+    <div className="bg-white text-gray-900 p-8 rounded-lg">
       {/* Header */}
       <div className="report-header text-center mb-8 pb-6 border-b-2 border-gray-200">
         <h1 className="report-title text-2xl font-bold mb-2 text-gray-900">{title}</h1>
@@ -20,7 +21,10 @@ export function ReportDocument({ reportType, title, reportData, visibility }: Re
           {reportData.organizationName} | {reportData.reportPeriod}
         </p>
         <p className="text-xs text-gray-500 mt-2">
-          Generated on {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          Generated on{" "}
+          <time dateTime={new Date().toISOString()}>
+            {new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" })}
+          </time>
         </p>
       </div>
 

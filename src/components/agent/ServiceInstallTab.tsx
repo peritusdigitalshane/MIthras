@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Copy, CheckCircle, Loader2, RefreshCw, Shield } from "lucide-react";
+import { AlertCircle, Copy, CheckCircle, Loader2, RefreshCw, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,6 +19,7 @@ interface InstallerManifest {
   sha256: string;
   ed25519_sig: string;
   api_base_url: string;
+  max_uses: number;
 }
 
 const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
@@ -26,6 +28,7 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [maxUses, setMaxUses] = useState<number>(1);
 
   useEffect(() => {
     setManifest(null);
@@ -45,15 +48,19 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
 
     try {
       // 1. Mint an enrolment token via the SECURITY DEFINER RPC.
+      const requestedUses = Math.max(1, Math.min(1000, Math.floor(Number(maxUses) || 1)));
       const { data: tokenRows, error: rpcError } = await supabase.rpc("create_enrollment_token", {
         p_org_id: organizationId,
         p_runtime_hint: "powershell",
         p_channel: "stable",
         p_hostname_hint: null,
+        p_max_uses: requestedUses,
       });
 
       if (rpcError) throw new Error(rpcError.message ?? "Token creation failed");
-      const token = Array.isArray(tokenRows) ? tokenRows[0]?.token : (tokenRows as { token?: string } | null)?.token;
+      const row = Array.isArray(tokenRows) ? tokenRows[0] : (tokenRows as { token?: string; max_uses?: number } | null);
+      const token = row?.token;
+      const tokenMaxUses = row?.max_uses ?? requestedUses;
       if (!token) throw new Error("Token creation returned no token");
 
       // 2. Resolve the latest release manifest for { runtime, channel } via agent-installer.
@@ -70,6 +77,7 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
         throw new Error(`agent-installer ${installerResp.status}: ${errBody}`);
       }
       const installerData = (await installerResp.json()) as InstallerManifest;
+      installerData.max_uses = tokenMaxUses;
 
       setManifest(installerData);
     } catch (e) {
@@ -82,13 +90,13 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
   const oneLiner = manifest
     ? [
         "$ErrorActionPreference='Stop'",
-        `$zip = Join-Path $env:TEMP "peritus-agent-${manifest.latest_version}.zip"`,
-        '$dir = Join-Path $env:TEMP "peritus-agent-install"',
+        `$zip = Join-Path $env:TEMP "mithras-agent-${manifest.latest_version}.zip"`,
+        '$dir = Join-Path $env:TEMP "mithras-agent-install"',
         `Invoke-WebRequest -Uri "${manifest.download_url}" -OutFile $zip -UseBasicParsing`,
-        `if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -ne "${manifest.sha256}") { throw "SHA256 mismatch — refusing to install." }`,
+        `if ((Get-FileHash $zip -Algorithm SHA256).Hash.ToLower() -ne "${manifest.sha256}") { throw "SHA256 mismatch - refusing to install." }`,
         "if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }",
         "Expand-Archive -Path $zip -DestinationPath $dir -Force",
-        `& (Join-Path $dir "install-agent.ps1") -EnrollmentToken "${manifest.token}" -ApiBaseUrl "${manifest.api_base_url}"`,
+        `& (Join-Path $dir "install-agent.ps1") -EnrollmentToken "${manifest.token}" -ApiBaseUrl "${manifest.api_base_url}" -Force`,
       ].join("; ")
     : "";
 
@@ -105,17 +113,39 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
         <Shield className="h-4 w-4" />
         <AlertTitle>Phase 2 — runs as a Windows service via NSSM</AlertTitle>
         <AlertDescription>
-          The modern agent installs as the <code>PeritusSecureAgent</code> Windows service. It signs every API call
+          The Mithras agent installs as the <code>MithrasAgent</code> Windows service. It signs every API call
           with a per-endpoint HMAC secret stored under DPAPI (LocalMachine scope). Each install command is single-use
           and expires in 7 days.
         </AlertDescription>
       </Alert>
 
       {!manifest && (
-        <Button onClick={generateInstallCommand} disabled={isGenerating || !organizationId} className="gap-2">
-          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-          Generate install command
-        </Button>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="max-uses" className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              How many endpoints will use this command?
+            </Label>
+            <Input
+              id="max-uses"
+              type="number"
+              min={1}
+              max={1000}
+              step={1}
+              value={maxUses}
+              onChange={(e) => setMaxUses(Math.max(1, Math.min(1000, Math.floor(Number(e.target.value) || 1))))}
+              className="w-32 font-mono"
+            />
+            <p className="text-xs text-muted-foreground">
+              Same install command can be deployed to this many machines (e.g. via RMM). Each install
+              consumes one slot. Max 1000. Token still expires after 7 days regardless.
+            </p>
+          </div>
+          <Button onClick={generateInstallCommand} disabled={isGenerating || !organizationId} className="gap-2">
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+            Generate install command
+          </Button>
+        </div>
       )}
 
       {error && (
@@ -163,10 +193,15 @@ const ServiceInstallTab = ({ organizationId }: ServiceInstallTabProps) => {
             </Button>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            The enrolment token above expires 7 days after generation and is single-use — once an endpoint installs
-            with it, it can't be reused.
-          </p>
+          <Alert>
+            <Users className="h-4 w-4" />
+            <AlertTitle>Token capacity: up to {manifest.max_uses} endpoint{manifest.max_uses === 1 ? "" : "s"}</AlertTitle>
+            <AlertDescription>
+              Run the command above on up to {manifest.max_uses} machine{manifest.max_uses === 1 ? "" : "s"} (RMM-friendly).
+              The token expires 7 days after generation. Once {manifest.max_uses} install{manifest.max_uses === 1 ? " has" : "s have"} succeeded
+              it will refuse further enrolments.
+            </AlertDescription>
+          </Alert>
         </>
       )}
     </div>

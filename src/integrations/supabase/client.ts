@@ -11,10 +11,17 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
-// Import as: import { supabase } from "@/integrations/supabase/client";
+// XSS mitigation: keep the JWT out of localStorage so any successful
+// script-injection on this origin can't ship the session token to an
+// attacker. sessionStorage scopes to the tab and is cleared on close.
+// Users get re-prompted to sign in if they close the tab, which is the
+// correct trade-off for a SOC console.
+//
+// A future move to httpOnly cookies would be even stronger but requires
+// server-side session bridging; sessionStorage is the right step today.
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: localStorage,
+    storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
   },

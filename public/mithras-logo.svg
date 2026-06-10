@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 240" width="820" height="240">
+    <defs>
+        <linearGradient id="shieldEdge" x1="100" y1="0" x2="100" y2="240" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00FFE0"/>
+            <stop offset="50%" stop-color="#00E5C8"/>
+            <stop offset="100%" stop-color="#005E50"/>
+        </linearGradient>
+        <linearGradient id="mGrad" x1="100" y1="60" x2="100" y2="190">
+            <stop stop-color="#00FFE0"/>
+            <stop offset="1" stop-color="#00B4A0"/>
+        </linearGradient>
+        <linearGradient id="mFill" x1="100" y1="60" x2="100" y2="190">
+            <stop stop-color="#00FFE0" stop-opacity="0.2"/>
+            <stop offset="1" stop-color="#00B4A0" stop-opacity="0.05"/>
+        </linearGradient>
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+    </defs>
+
+    <g transform="translate(5, 2)" filter="url(#glow)">
+        <!-- Shield -->
+        <path d="M100 8 L188 44 L188 128 C188 178 150 208 100 226 C50 208 12 178 12 128 L12 44 Z"
+              fill="rgba(0,229,200,0.08)" stroke="url(#shieldEdge)" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M100 24 L176 56 L176 126 C176 170 143 196 100 212 C57 196 24 170 24 126 L24 56 Z"
+              fill="none" stroke="url(#shieldEdge)" stroke-width="0.8" opacity="0.15" stroke-linejoin="round"/>
+
+        <!-- Abstract M — filled -->
+        <path d="M48 170 L48 72 L64 72 L64 130 L88 88 L100 68 L112 88 L136 130 L136 72 L152 72 L152 170
+                 L136 170 L136 110 L112 148 L100 164 L88 148 L64 110 L64 170 Z"
+              fill="url(#mFill)"/>
+
+        <!-- Abstract M — stroke -->
+        <path d="M48 170 L48 72 L64 72 L64 130 L88 88 L100 68 L112 88 L136 130 L136 72 L152 72 L152 170"
+              fill="none" stroke="url(#mGrad)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>
+        <line x1="48" y1="170" x2="64" y2="170" stroke="url(#mGrad)" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="136" y1="170" x2="152" y2="170" stroke="url(#mGrad)" stroke-width="2.8" stroke-linecap="round"/>
+
+        <!-- Center peak highlight -->
+        <circle cx="100" cy="68" r="3.5" fill="#00FFE0" opacity="0.8"/>
+        <line x1="100" y1="62" x2="100" y2="44" stroke="#00FFE0" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+
+        <!-- Tech accents -->
+        <line x1="22" y1="66" x2="38" y2="66" stroke="#00E5C8" stroke-width="0.7" opacity="0.2"/>
+        <line x1="22" y1="66" x2="22" y2="82" stroke="#00E5C8" stroke-width="0.7" opacity="0.2"/>
+        <circle cx="22" cy="82" r="1.5" fill="#00E5C8" opacity="0.2"/>
+        <line x1="178" y1="66" x2="162" y2="66" stroke="#00E5C8" stroke-width="0.7" opacity="0.2"/>
+        <line x1="178" y1="66" x2="178" y2="82" stroke="#00E5C8" stroke-width="0.7" opacity="0.2"/>
+        <circle cx="178" cy="82" r="1.5" fill="#00E5C8" opacity="0.2"/>
+    </g>
+
+    <!-- Brand Text -->
+    <text x="230" y="122" font-family="'Space Grotesk', 'Segoe UI', Arial, sans-serif"
+          font-size="72" font-weight="700" letter-spacing="8" fill="#FFFFFF">
+        MITHRAS
+    </text>
+    <text x="234" y="162" font-family="'Space Grotesk', 'Segoe UI', Arial, sans-serif"
+          font-size="18" font-weight="500" letter-spacing="14" fill="#00E5C8">
+        THREAT DEFENCE
+    </text>
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 240" width="820" height="240">
+    <!-- Embroidery-friendly: flat, single-colour, bold strokes, no gradients or effects -->
+
+    <g transform="translate(10, 10)">
+        <!-- Solid shield -->
+        <path d="M100 8 L188 44 L188 128 C188 178 150 208 100 226 C50 208 12 178 12 128 L12 44 Z"
+              fill="none" stroke="#00C4AB" stroke-width="10" stroke-linejoin="round"/>
+
+        <!-- Bold abstract M -->
+        <path d="M50 172 L50 74 L72 74 L72 128 L100 80 L128 128 L128 74 L150 74 L150 172"
+              fill="none" stroke="#00C4AB" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+    </g>
+
+    <!-- Brand text — solid, no gradients -->
+    <text x="250" y="130" font-family="'Space Grotesk', 'Arial Black', Arial, sans-serif"
+          font-size="76" font-weight="800" letter-spacing="6" fill="#FFFFFF">
+        MITHRAS
+    </text>
+    <text x="252" y="170" font-family="'Space Grotesk', Arial, sans-serif"
+          font-size="18" font-weight="600" letter-spacing="12" fill="#00C4AB">
+        THREAT DEFENCE
+    </text>
+</svg>

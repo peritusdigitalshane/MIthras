@@ -21,6 +21,7 @@ import { EndpointUacList } from "@/components/security/EndpointUacList";
 import { WindowsUpdatePoliciesManager } from "@/components/security/WindowsUpdatePoliciesManager";
 import { EndpointWindowsUpdateList } from "@/components/security/EndpointWindowsUpdateList";
 import { AuditModeManager } from "@/components/policies/AuditModeManager";
+import { PageHelp } from "@/components/help/PageHelp";
 
 const Policies = () => {
   const [editorOpen, setEditorOpen] = useState(false);
@@ -123,9 +124,55 @@ const Policies = () => {
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Policy Management</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-foreground">Policy Management</h1>
+                <PageHelp
+                  title="Policy Management"
+                  glossaryAnchor="/glossary#default-policy"
+                  whatIsThis={
+                    <>
+                      <p>
+                        Policies are reusable configurations for the agents — Defender hardening,
+                        Application Control, UAC, Windows Update, GPO, DNS, firewall. Each org
+                        can have many; one is marked <b>default</b> and auto-applies to new
+                        endpoints on enrolment.
+                      </p>
+                      <p>
+                        Endpoints can override the default via direct assignment or via
+                        membership in a group with its own assigned policy.
+                      </p>
+                    </>
+                  }
+                  tasks={[
+                    { label: "Create or edit a policy in one of the tabs (Defender, App Control, etc.)" },
+                    { label: "Mark it as Default so new endpoints inherit it automatically" },
+                    { label: "Assign it to specific endpoints / groups for overrides" },
+                    { label: "Test in Audit mode first, then flip to Enforce when ready" },
+                  ]}
+                  faq={[
+                    {
+                      q: "What's the difference between WDAC and AppWhitelist?",
+                      a: (
+                        <>
+                          <p><b>WDAC</b> — kernel-level. Win10/11 Enterprise + Server 2016+. Zero race window, can't be killed from user space.</p>
+                          <p><b>AppWhitelist</b> — user-mode WMI watcher. Works on all SKUs including EOL boxes. ~30s race window where a malicious binary briefly runs.</p>
+                          <p>Mithras runs both side-by-side and uses each where supported.</p>
+                        </>
+                      ),
+                    },
+                    {
+                      q: "What are ASR rules?",
+                      a: <p>Attack Surface Reduction — Defender's 16+ hardening rules (e.g. "block Office child processes spawning EXE"). Set each to Block, Audit (log only), or Off.</p>,
+                    },
+                    {
+                      q: "Audit vs Enforce — when do I switch?",
+                      a: <p>Run in Audit for ~7 days, review what would have been blocked in /threats and /logs. Once you're confident no business processes are caught, flip to Enforce.</p>,
+                    },
+                  ]}
+                />
+              </div>
               <p className="text-muted-foreground">
-                Configure Defender, Application Control, UAC, and Windows Update policies
+                Configure Defender, Application Control, UAC, and Windows Update policies. Run in audit, then enforce.
               </p>
             </div>
           </div>

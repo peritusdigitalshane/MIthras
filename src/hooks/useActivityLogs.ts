@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
+import { useTenant } from "@/contexts/TenantContext";
 
 export interface ActivityLog {
   id: string;
@@ -18,8 +19,16 @@ export interface ActivityLog {
 }
 
 export function useActivityLogs() {
+  // Belt-and-braces tenant scoping. Without this, the super-admin RLS
+  // policy explicitly grants all rows, so the Activity Log page for any
+  // selected customer org returned interleaved logs from every
+  // organization — operationally confusing and a CLAUDE.md violation.
+  const { currentOrganization } = useTenant();
+  const orgId = currentOrganization?.id ?? null;
+
   return useQuery({
-    queryKey: ["activity-logs"],
+    queryKey: ["activity-logs", orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("activity_logs")
@@ -28,6 +37,7 @@ export function useActivityLogs() {
           profiles:user_id(display_name, email),
           endpoints:endpoint_id(hostname)
         `)
+        .eq("organization_id", orgId!)
         .order("created_at", { ascending: false })
         .limit(500);
 

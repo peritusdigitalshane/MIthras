@@ -2,7 +2,8 @@ import { AlertTriangle, Clock, Monitor, Loader2, ShieldCheck } from "lucide-reac
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useEndpointThreats } from "@/hooks/useDashboardData";
+import { useEndpointThreats, useEndpoints } from "@/hooks/useDashboardData";
+import { EmptyState } from "@/components/help/EmptyState";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +53,7 @@ export function ThreatsList({
   enableResolveActions?: boolean;
 }) {
   const { data: threats, isLoading, error } = useEndpointThreats();
+  const { data: endpoints } = useEndpoints();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -138,10 +140,23 @@ export function ThreatsList({
       </div>
       
       {displayThreats.length === 0 ? (
-        <div className="p-8 text-center">
-          <ShieldCheck className="mx-auto h-12 w-12 text-status-healthy/50 mb-3" />
-          <p className="text-muted-foreground">No threats detected</p>
-          <p className="text-xs text-muted-foreground mt-1">Your endpoints are secure</p>
+        <div className="p-6">
+          <EmptyState
+            icon={<ShieldCheck className="h-7 w-7" />}
+            title="No threats detected — that's a good thing"
+            tone="positive"
+            description={
+              <>
+                <p>Defender detections appear here within ~60s of an event. To prove the pipeline works, drop an EICAR test file on any agent endpoint.</p>
+              </>
+            }
+            steps={[
+              { done: (endpoints?.length ?? 0) > 0, label: `Deploy the Mithras agent (${endpoints?.length ?? 0} so far)`, href: "/deploy" },
+              { done: (endpoints?.some((e: any) => e.policy_id)) ?? false, label: "Assign a Defender policy", href: "/policies" },
+              { done: false, label: "Test ingestion with EICAR", detail: "Save the EICAR test string to a .txt file on the endpoint -- Defender catches it instantly." },
+            ]}
+            secondaryAction={{ label: "What is EICAR? →", href: "/glossary#severity" }}
+          />
         </div>
       ) : (
         <div className="divide-y divide-border">

@@ -42,6 +42,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Service-role client for super_admins lookup + platform_settings reads
+    // (both have admin-only RLS). Auth verification also goes via this client.
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify user and get their organization
@@ -56,13 +58,33 @@ serve(async (req) => {
     }
 
     // Get organization_id from request body
-    const { organization_id } = await req.json();
-    
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* empty body */ }
+    const organization_id = (body.organization_id as string) ?? "";
+
     if (!organization_id) {
       return new Response(JSON.stringify({ error: "organization_id required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Verify caller belongs to the supplied organization_id (super-admin bypass).
+    {
+      const { data: isSuperRow } = await supabase
+        .from("super_admins")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!isSuperRow) {
+        const { data: isMember } = await supabase.rpc("is_member_of_org", { _user_id: user.id, _org_id: organization_id });
+        if (!isMember) {
+          return new Response(JSON.stringify({ error: "forbidden_not_member" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
     // Get OpenAI settings from platform_settings
@@ -90,8 +112,22 @@ serve(async (req) => {
     const openaiApiKey = apiKeySetting.value;
     const model = modelSetting?.value || "gpt-4o-mini";
 
+    // User-scoped client for data reads. RLS on endpoints / endpoint_threats /
+    // endpoint_status enforces the org boundary again — defence in depth in
+    // case the membership check above ever silently passes (e.g. if RLS
+    // helpers regress). Previously this code used the service-role client
+    // here which would have happily returned cross-tenant data if the
+    // is_member_of_org check ever returned a false positive. Anon key +
+    // Authorization header override is the existing project pattern
+    // (see virustotal-lookup, m365-posture-* etc).
+    const supabaseUser = createClient(
+      supabaseUrl,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+
     // Gather security data for the organization
-    const { data: endpoints } = await supabase
+    const { data: endpoints } = await supabaseUser
       .from("endpoints")
       .select("id, hostname, is_online, policy_id")
       .eq("organization_id", organization_id);
@@ -102,13 +138,13 @@ serve(async (req) => {
     let statuses: StatusData[] = [];
 
     if (endpointIds.length > 0) {
-      const { data: threatData } = await supabase
+      const { data: threatData } = await supabaseUser
         .from("endpoint_threats")
         .select("threat_name, severity, status, category")
         .in("endpoint_id", endpointIds);
       threats = threatData || [];
 
-      const { data: statusData } = await supabase
+      const { data: statusData } = await supabaseUser
         .from("endpoint_status")
         .select("endpoint_id, realtime_protection_enabled, antivirus_enabled, antispyware_enabled, behavior_monitor_enabled, ioav_protection_enabled, antivirus_signature_age")
         .in("endpoint_id", endpointIds)
@@ -214,13 +250,15 @@ Guidelines:
 - If there are no endpoints or data, acknowledge that and suggest deploying agents via the Deploy Agent page.
 - Always reference Peritus Threat Defence features, never Microsoft 365 Defender or other Microsoft admin portals.`;
 
-    // Call OpenAI
+    // Call OpenAI — hard 45s abort so a hung connection can't burn the
+    // edge-runtime wall-clock budget.
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(45_000),
       body: JSON.stringify({
         model,
         messages: [

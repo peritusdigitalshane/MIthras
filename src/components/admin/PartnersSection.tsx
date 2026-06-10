@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { usePartnersWithStats, useCreatePartner, usePartnerCustomers, useCreatePartnerCustomer, useRenameOrganization, useDeleteOrganization } from "@/hooks/usePartners";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,19 +40,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Building2, Users, ChevronRight, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import { Plus, Building2, Users, ChevronRight, Loader2, Pencil, Trash2, Check, X, Brain, Copy, KeyRound, Briefcase, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { useTenant } from "@/contexts/TenantContext";
+import { AiSocOrgDialog, type AiSocOrgDialogTarget } from "@/components/admin/AiSocOrgDialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCreateEnrollmentCode } from "@/hooks/useEnrollmentCodes";
+import type { ChannelOrgType } from "@/hooks/usePartners";
 
 export function PartnersSection() {
   const { data: partners, isLoading } = usePartnersWithStats();
   const createPartner = useCreatePartner();
+  const createCode = useCreateEnrollmentCode();
   const { setImpersonatedOrg } = useTenant();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newPartnerName, setNewPartnerName] = useState("");
   const [newPartnerSlug, setNewPartnerSlug] = useState("");
+  const [newPartnerType, setNewPartnerType] = useState<ChannelOrgType>("partner");
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+
+  // After-create dialog: shows the signup URL Shane sends to the new contact.
+  const [createdOrg, setCreatedOrg] = useState<{ id: string; name: string; type: ChannelOrgType; code: string } | null>(null);
 
   const handleCreatePartner = async () => {
     if (!newPartnerName.trim() || !newPartnerSlug.trim()) {
@@ -60,16 +70,30 @@ export function PartnersSection() {
     }
 
     try {
-      await createPartner.mutateAsync({
+      const created = await createPartner.mutateAsync({
         name: newPartnerName.trim(),
         slug: newPartnerSlug.trim().toLowerCase().replace(/\s+/g, "-"),
+        orgType: newPartnerType,
       });
-      toast.success("Partner created successfully");
+
+      // Immediately generate a single-use admin enrolment code so Shane
+      // can hand the URL to the new contact. Single-use because the FIRST
+      // person to claim it becomes admin; once they're in they invite
+      // their team via Users → Invite.
+      const code = await createCode.mutateAsync({
+        organizationId: (created as any).id,
+        role: "admin",
+        isSingleUse: true,
+      });
+
+      toast.success(`${newPartnerType === "distributor" ? "Distributor" : "Partner"} created — enrolment URL ready`);
       setIsCreateOpen(false);
       setNewPartnerName("");
       setNewPartnerSlug("");
+      setNewPartnerType("partner");
+      setCreatedOrg({ id: (created as any).id, name: (created as any).name, type: newPartnerType, code: code.code });
     } catch (error: any) {
-      toast.error(error.message || "Failed to create partner");
+      toast.error(error.message || "Failed to create");
     }
   };
 
@@ -98,36 +122,69 @@ export function PartnersSection() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Partners</h3>
+          <h3 className="text-lg font-semibold">Channel partners</h3>
           <p className="text-sm text-muted-foreground">
-            Manage partner organizations (MSPs/Resellers)
+            Resellers sell direct to end customers. Distributors recruit resellers underneath them.
           </p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog
+          open={isCreateOpen}
+          onOpenChange={(o) => {
+            setIsCreateOpen(o);
+            if (!o) {
+              setNewPartnerName("");
+              setNewPartnerSlug("");
+              setNewPartnerType("partner");
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Add Partner
+              Add channel partner
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create Partner</DialogTitle>
+              <DialogTitle>Create channel partner</DialogTitle>
               <DialogDescription>
-                Add a new partner organization that can manage their own customers
+                Add a new reseller or distributor organisation. After it's created you'll get a
+                one-time enrolment URL to send the contact — they sign up using that link and become admin of the org.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="name">Partner Name</Label>
+                <Label htmlFor="org-type">Type</Label>
+                <Select value={newPartnerType} onValueChange={(v) => setNewPartnerType(v as ChannelOrgType)}>
+                  <SelectTrigger id="org-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="partner">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        <span>Reseller</span>
+                        <span className="text-xs text-muted-foreground">— sells direct to end customers</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="distributor">
+                      <div className="flex items-center gap-2">
+                        <Warehouse className="h-4 w-4" />
+                        <span>Distributor</span>
+                        <span className="text-xs text-muted-foreground">— signs up resellers under them</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Company name</Label>
                 <Input
                   id="name"
                   value={newPartnerName}
                   onChange={(e) => {
                     setNewPartnerName(e.target.value);
-                    setNewPartnerSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"));
+                    setNewPartnerSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""));
                   }}
-                  placeholder="Acme IT Services"
+                  placeholder={newPartnerType === "distributor" ? "Acme Distribution Pty Ltd" : "Acme IT Services"}
                 />
               </div>
               <div className="grid gap-2">
@@ -136,17 +193,18 @@ export function PartnersSection() {
                   id="slug"
                   value={newPartnerSlug}
                   onChange={(e) => setNewPartnerSlug(e.target.value)}
-                  placeholder="acme-it-services"
+                  placeholder={newPartnerType === "distributor" ? "acme-distribution" : "acme-it-services"}
                 />
+                <p className="text-xs text-muted-foreground">URL-safe identifier. Lowercase, hyphens only.</p>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreatePartner} disabled={createPartner.isPending}>
-                {createPartner.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Create Partner
+              <Button onClick={handleCreatePartner} disabled={createPartner.isPending || createCode.isPending}>
+                {(createPartner.isPending || createCode.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Create + generate enrolment URL
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -157,7 +215,8 @@ export function PartnersSection() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Partner</TableHead>
+              <TableHead>Organisation</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Customers</TableHead>
               <TableHead>Members</TableHead>
               <TableHead>Created</TableHead>
@@ -170,7 +229,9 @@ export function PartnersSection() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                      <Building2 className="h-4 w-4 text-primary" />
+                      {partner.organization_type === "distributor"
+                        ? <Warehouse className="h-4 w-4 text-primary" />
+                        : <Briefcase className="h-4 w-4 text-primary" />}
                     </div>
                     <div>
                       <div className="font-medium">{partner.name}</div>
@@ -179,13 +240,18 @@ export function PartnersSection() {
                   </div>
                 </TableCell>
                 <TableCell>
+                  <Badge variant={partner.organization_type === "distributor" ? "default" : "secondary"}>
+                    {partner.organization_type === "distributor" ? "Distributor" : "Reseller"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
                   <Badge variant="secondary">{partner.customer_count}</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline">{partner.member_count}</Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {new Date(partner.created_at).toLocaleDateString()}
+                  {format(new Date(partner.created_at), "d MMM yyyy")}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -211,8 +277,8 @@ export function PartnersSection() {
             ))}
             {partners?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                  No partners found. Create your first partner to get started.
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No channel partners yet. Add your first reseller or distributor to get started.
                 </TableCell>
               </TableRow>
             )}
@@ -225,7 +291,93 @@ export function PartnersSection() {
         partnerName={partners?.find(p => p.id === selectedPartnerId)?.name}
         onClose={() => setSelectedPartnerId(null)}
       />
+
+      <EnrollmentUrlDialog
+        target={createdOrg}
+        onClose={() => setCreatedOrg(null)}
+      />
     </div>
+  );
+}
+
+// Post-create dialog: shows the one-time signup URL Shane sends to the new
+// distributor/reseller contact. They click it, fill in their details, and
+// become admin of the org they were enrolled into.
+function EnrollmentUrlDialog({
+  target,
+  onClose,
+}: {
+  target: { id: string; name: string; type: ChannelOrgType; code: string } | null;
+  onClose: () => void;
+}) {
+  if (!target) return null;
+  const url = `${window.location.origin}/signup?code=${encodeURIComponent(target.code)}`;
+  const typeLabel = target.type === "distributor" ? "distributor" : "reseller";
+  return (
+    <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-primary" />
+            Enrolment URL for {target.name}
+          </DialogTitle>
+          <DialogDescription>
+            Send this link to your new {typeLabel} contact. The first person to use it becomes admin of the
+            organisation — they can then invite their own team from inside the portal. The link is single-use.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Signup URL</Label>
+            <div className="flex items-center gap-2">
+              <Input value={url} readOnly className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    toast.success("URL copied to clipboard");
+                  } catch {
+                    toast.error("Couldn't copy — select the text and copy manually");
+                  }
+                }}
+                title="Copy URL"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Or the code on its own</Label>
+            <div className="flex items-center gap-2">
+              <Input value={target.code} readOnly className="font-mono text-base tracking-widest" onFocus={(e) => e.currentTarget.select()} />
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(target.code);
+                    toast.success("Code copied");
+                  } catch {
+                    toast.error("Couldn't copy — select and copy manually");
+                  }
+                }}
+                title="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              They can also enter this on the signup page if they prefer to navigate there manually.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -250,6 +402,7 @@ function PartnerCustomersSheet({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [aiSocTarget, setAiSocTarget] = useState<AiSocOrgDialogTarget | null>(null);
 
   const handleRename = async (id: string) => {
     if (!renameValue.trim()) return;
@@ -413,6 +566,23 @@ function PartnerCustomersSheet({
                       )}
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[10px]"
+                        onClick={() =>
+                          setAiSocTarget({
+                            id: customer.id,
+                            name: customer.name,
+                            ai_triage_enabled: !!customer.ai_triage_enabled,
+                            ai_investigation_enabled: !!customer.ai_investigation_enabled,
+                            ai_soc_daily_cap_cents: customer.ai_soc_daily_cap_cents ?? 500,
+                          })
+                        }
+                        title="AI SOC settings"
+                      >
+                        <Brain className={`h-3 w-3 ${(customer.ai_triage_enabled || customer.ai_investigation_enabled) ? "text-primary" : ""}`} />
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setRenamingId(customer.id); setRenameValue(customer.name); }}>
                         <Pencil className="h-3 w-3" />
                       </Button>
@@ -447,6 +617,8 @@ function PartnerCustomersSheet({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AiSocOrgDialog target={aiSocTarget} onClose={() => setAiSocTarget(null)} />
       </SheetContent>
     </Sheet>
   );

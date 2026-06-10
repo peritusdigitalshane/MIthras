@@ -6,7 +6,7 @@ interface Organization {
   id: string;
   name: string;
   slug: string;
-  organization_type: "partner" | "customer";
+  organization_type: "partner" | "customer" | "distributor" | "home_user";
   parent_partner_id: string | null;
   network_module_enabled: boolean;
   router_module_enabled: boolean;
@@ -22,6 +22,10 @@ interface TenantContextType {
   isSuperAdmin: boolean;
   // Whether the user is a partner admin
   isPartnerAdmin: boolean;
+  // True when the current user is owner/admin of their userOrganization.
+  // Used to gate destructive actions (queue agent command, etc.) at the UI
+  // layer so members see a disabled button rather than an RPC rejection.
+  isOrgAdmin: boolean;
   // Whether we're currently impersonating another tenant
   isImpersonating: boolean;
   // All organizations (only available for super admins)
@@ -39,6 +43,7 @@ const TenantContext = createContext<TenantContextType>({
   currentOrganization: null,
   isSuperAdmin: false,
   isPartnerAdmin: false,
+  isOrgAdmin:     false,
   isImpersonating: false,
   allOrganizations: [],
   partnerCustomers: [],
@@ -60,6 +65,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [impersonatedOrg, setImpersonatedOrgState] = useState<Organization | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isPartnerAdmin, setIsPartnerAdmin] = useState(false);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [allOrganizations, setAllOrganizations] = useState<Organization[]>([]);
   const [partnerCustomers, setPartnerCustomers] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,10 +104,12 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         const isPartner = !!isPartnerData;
         setIsPartnerAdmin(isPartner);
 
-        // Get user's organization
+        // Get user's organization (and role within it). Role tells us
+        // whether the user is owner/admin (can run destructive actions)
+        // vs member/viewer (read-only).
         const { data: membershipData, error: membershipError } = await supabase
           .from("organization_memberships")
-          .select("organization_id")
+          .select("organization_id, role")
           .eq("user_id", user.id)
           .limit(1)
           .maybeSingle();
@@ -112,6 +120,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (membershipData) {
+          setUserOrgRole((membershipData as any).role ?? null);
           const { data: orgData } = await supabase
             .from("organizations")
             .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled")
@@ -169,11 +178,44 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       console.warn("Only super admins or partner admins can impersonate organizations");
       return;
     }
+    const previous = impersonatedOrg;
     setImpersonatedOrgState(org);
+    // Audit trail: super-admin / partner pivots into / out of a customer tenant
+    // are recorded on BOTH the source and target orgs so each side has visibility
+    // of operator activity. Best-effort — never blocks the UI state change.
+    void (async () => {
+      try {
+        if (org && org.id !== previous?.id) {
+          const { error } = await supabase.rpc("log_activity", {
+            _org_id: org.id,
+            _action: "impersonation_start",
+            _resource_type: "organization",
+            _resource_id: org.id,
+            _details: { actor_role: isSuperAdmin ? "super_admin" : "partner_admin", target_org_name: org.name },
+          });
+          if (error) console.error("impersonation_start audit failed", error);
+        } else if (!org && previous) {
+          const { error } = await supabase.rpc("log_activity", {
+            _org_id: previous.id,
+            _action: "impersonation_end",
+            _resource_type: "organization",
+            _resource_id: previous.id,
+            _details: { actor_role: isSuperAdmin ? "super_admin" : "partner_admin", target_org_name: previous.name },
+          });
+          if (error) console.error("impersonation_end audit failed", error);
+        }
+      } catch (e) {
+        console.error("impersonation audit log threw", e);
+      }
+    })();
   };
 
   const currentOrganization = impersonatedOrg || userOrganization;
   const isImpersonating = impersonatedOrg !== null;
+  // Super-admins always have admin powers everywhere. Partner admins +
+  // impersonating super-admins act as admin of the org they're viewing.
+  // Otherwise: own-org membership role must be owner or admin.
+  const isOrgAdmin = isSuperAdmin || isPartnerAdmin || (userOrgRole === "owner" || userOrgRole === "admin");
 
   return (
     <TenantContext.Provider
@@ -182,6 +224,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         currentOrganization,
         isSuperAdmin,
         isPartnerAdmin,
+        isOrgAdmin,
         isImpersonating,
         allOrganizations,
         partnerCustomers,

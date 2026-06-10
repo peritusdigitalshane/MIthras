@@ -1,7 +1,10 @@
 import React, { useState } from "react";
+import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useTenant } from "@/contexts/TenantContext";
 import { useOrganizationsWithStats, useCreateOrganization, useUpdateOrganizationRetention, useUpdateOrganizationNetworkModule } from "@/hooks/useSuperAdmin";
+import { useBootstrapCustomer, BootstrapResult } from "@/hooks/useBootstrapCustomer";
+import { BootstrapResultDialog } from "@/components/admin/BootstrapResultDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +67,10 @@ const Admin = () => {
   const { isSuperAdmin, setImpersonatedOrg, isLoading: tenantLoading } = useTenant();
   const { data: organizations = [], isLoading } = useOrganizationsWithStats();
   const createOrg = useCreateOrganization();
+  const bootstrap = useBootstrapCustomer();
+  const [bootstrapResult, setBootstrapResult] = useState<BootstrapResult | null>(null);
+  const [bootstrapName, setBootstrapName] = useState<string>("");
+  const [bootstrapOpen, setBootstrapOpen] = useState(false);
   const updateRetention = useUpdateOrganizationRetention();
   const updateNetworkModule = useUpdateOrganizationNetworkModule();
   const { toast } = useToast();
@@ -100,17 +107,22 @@ const Admin = () => {
     }
 
     try {
-      await createOrg.mutateAsync({ name: newOrgName.trim(), slug: newOrgSlug.trim() });
-      toast({
-        title: "Customer created",
-        description: `${newOrgName} has been created successfully.`,
-      });
+      // Bootstrap: org + super-admin membership + baseline policies + default
+      // group + 50-use 30-day enrolment token, all in a single RPC.
+      const result = await bootstrap.mutateAsync({ name: newOrgName.trim(), slug: newOrgSlug.trim() });
+      setBootstrapResult(result);
+      setBootstrapName(newOrgName.trim());
+      setBootstrapOpen(true);
       setCreateDialogOpen(false);
       setNewOrgName("");
       setNewOrgSlug("");
+      toast({
+        title: "Customer ready",
+        description: `${result.slug} created with baseline policies. Install command available now.`,
+      });
     } catch (error: any) {
       toast({
-        title: "Failed to create customer",
+        title: "Failed to bootstrap customer",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -361,7 +373,7 @@ const Admin = () => {
                         </Button>
                       </TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">
-                        {new Date(org.created_at).toLocaleDateString()}
+                        {format(new Date(org.created_at), "d MMM yyyy")}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -478,6 +490,14 @@ const Admin = () => {
             isPending={updateRetention.isPending}
           />
         )}
+
+        {/* Post-bootstrap "customer is ready" dialog with install one-liner */}
+        <BootstrapResultDialog
+          open={bootstrapOpen}
+          onOpenChange={setBootstrapOpen}
+          result={bootstrapResult}
+          customerName={bootstrapName}
+        />
       </div>
     </MainLayout>
   );

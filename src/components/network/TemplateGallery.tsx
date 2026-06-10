@@ -8,7 +8,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useFirewallTemplates, FirewallTemplate } from "@/hooks/useFirewall";
+import { useFirewallTemplates, FirewallTemplate, useFirewallPolicies, useCreateFirewallPolicy } from "@/hooks/useFirewall";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEndpointGroups } from "@/hooks/useEndpointGroups";
 import { useState } from "react";
 import { 
@@ -49,7 +52,11 @@ const categoryColors = {
 export function TemplateGallery({ open, onOpenChange }: TemplateGalleryProps) {
   const { data: templates, isLoading } = useFirewallTemplates();
   const { data: groups } = useEndpointGroups();
+  const { data: policies } = useFirewallPolicies();
+  const createPolicy = useCreateFirewallPolicy();
+  const { currentOrganization } = useTenant();
   const { toast } = useToast();
+  const qc = useQueryClient();
   
   const [selectedTemplate, setSelectedTemplate] = useState<FirewallTemplate | null>(null);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -71,22 +78,80 @@ export function TemplateGallery({ open, onOpenChange }: TemplateGalleryProps) {
   };
 
   const handleDeploy = async () => {
-    if (!selectedTemplate || selectedGroups.length === 0) return;
+    if (!selectedTemplate || selectedGroups.length === 0 || !currentOrganization?.id) return;
 
     setIsDeploying(true);
     try {
-      // TODO: Actually deploy the template rules to selected groups
-      // This would create firewall_service_rules for each group and rule in the template
-      
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulated delay
+      // Find the org's default firewall policy; if there's none, create one.
+      // The template's rules attach to this policy via policy_id.
+      let policyId: string | undefined = policies?.find((p) => p.is_default)?.id ?? policies?.[0]?.id;
+      if (!policyId) {
+        const newPolicy = await createPolicy.mutateAsync({
+          name: "Default",
+          description: "Auto-created when deploying first firewall template.",
+        });
+        policyId = newPolicy.id;
+      }
+
+      // Fan out: one row per (group × template_rule). Skip the (group, service,
+      // port, protocol) pairs that already exist so re-deploys are idempotent.
+      const { data: existing } = await supabase
+        .from("firewall_service_rules")
+        .select("endpoint_group_id, service_name, port, protocol")
+        .in("endpoint_group_id", selectedGroups);
+      const dupKey = (gid: string, svc: string, port: string, proto: string) =>
+        `${gid}|${svc}|${port}|${proto}`;
+      const existingSet = new Set(
+        (existing ?? []).map((r) =>
+          dupKey(String(r.endpoint_group_id), String(r.service_name), String(r.port), String(r.protocol)),
+        ),
+      );
+
+      const rows: Array<Record<string, unknown>> = [];
+      for (const groupId of selectedGroups) {
+        for (const tr of selectedTemplate.rules_json ?? []) {
+          if (existingSet.has(dupKey(groupId, String(tr.service_name), String(tr.port), String(tr.protocol)))) continue;
+          rows.push({
+            policy_id: policyId,
+            endpoint_group_id: groupId,
+            service_name: tr.service_name,
+            port: String(tr.port),
+            protocol: tr.protocol,
+            action: tr.action ?? "block",
+            mode: deployMode,
+            enabled: true,
+            order_priority: 100,
+          });
+        }
+      }
+
+      if (rows.length === 0) {
+        toast({
+          title: "Nothing to deploy",
+          description: "Every rule in this template is already present on the selected groups.",
+        });
+        return;
+      }
+
+      const { error } = await supabase.from("firewall_service_rules").insert(rows);
+      if (error) throw new Error(error.message);
+
+      qc.invalidateQueries({ queryKey: ["firewall-service-rules"] });
+      qc.invalidateQueries({ queryKey: ["microseg-rules"] });
 
       toast({
         title: "Template Applied",
-        description: `"${selectedTemplate.name}" deployed to ${selectedGroups.length} group(s) in ${deployMode} mode`,
+        description: `Created ${rows.length} rule${rows.length === 1 ? "" : "s"} across ${selectedGroups.length} group${selectedGroups.length === 1 ? "" : "s"} in ${deployMode} mode.`,
       });
 
       onOpenChange(false);
       setSelectedTemplate(null);
+    } catch (e) {
+      toast({
+        title: "Deploy failed",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
     } finally {
       setIsDeploying(false);
     }

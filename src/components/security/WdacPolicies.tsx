@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { useWdacPolicies, useWdacMutations, WdacPolicy } from "@/hooks/useWdac";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -139,7 +140,7 @@ export function WdacPolicies({ onSelectPolicy, selectedPolicyId }: WdacPoliciesP
               <CardContent>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    Created {new Date(policy.created_at).toLocaleDateString()}
+                    Created {format(new Date(policy.created_at), "d MMM yyyy")}
                   </span>
                   <div className="flex gap-1">
                     <Button

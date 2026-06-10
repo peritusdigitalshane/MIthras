@@ -169,7 +169,8 @@ export function useEndpointWindowsUpdateStatuses() {
       const { data: endpoints, error: endpointsError } = await supabase
         .from("endpoints")
         .select(`id, hostname, windows_update_policy_id, windows_update_policies(name)`)
-        .eq("organization_id", orgId!);
+        .eq("organization_id", orgId!)
+        .is("deleted_at", null);
 
       if (endpointsError) throw endpointsError;
       if (!endpoints?.length) return [];

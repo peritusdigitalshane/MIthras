@@ -1,5 +1,6 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/help/EmptyState";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,7 @@ const Vulnerabilities = () => {
   const { currentOrganization } = useTenant();
   const { toast } = useToast();
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null);
 
   const [search, setSearch] = useState("");
   const [severityFilter, setSeverityFilter] = useState("all");
@@ -143,14 +145,30 @@ const Vulnerabilities = () => {
   const handleRunScan = async () => {
     if (!currentOrganization) return;
     setIsScanning(true);
+    setScanProgress(null);
+    let totalUpserted = 0;
+    let totalApps = 0;
     try {
-      const { data, error } = await supabase.functions.invoke("vulnerability-scan", {
-        body: { organization_id: currentOrganization.id },
-      });
-      if (error) throw error;
+      // cve-auto-scan processes one BATCH per invocation to fit in the edge
+      // runtime CPU limit. Call it in a loop until remaining_stale_apps hits 0,
+      // showing progress so the user sees something happen.
+      let safety = 50; // hard ceiling: never more than 50 chained calls per scan
+      while (safety-- > 0) {
+        const { data, error } = await supabase.functions.invoke("cve-auto-scan", {
+          body: { organization_id: currentOrganization.id, batch_size: 30 },
+        });
+        if (error) throw error;
+        totalUpserted += data.findings_upserted ?? 0;
+        totalApps = data.total_unique_apps ?? totalApps;
+        const remaining: number = data.remaining_stale_apps ?? 0;
+        setScanProgress({ done: totalApps - remaining, total: totalApps });
+        if (remaining <= 0) break;
+        // small breather between batches so the UI can re-render
+        await new Promise((r) => setTimeout(r, 50));
+      }
       toast({
         title: "Scan complete",
-        description: data.message || `Found ${data.findings} vulnerabilities.`,
+        description: `Reviewed ${totalApps} unique apps. ${totalUpserted} CVE findings recorded.`,
       });
       queryClient.invalidateQueries({ queryKey: ["vulnerability-findings"] });
       queryClient.invalidateQueries({ queryKey: ["software-inventory"] });
@@ -162,6 +180,7 @@ const Vulnerabilities = () => {
       });
     } finally {
       setIsScanning(false);
+      setScanProgress(null);
     }
   };
 
@@ -311,7 +330,9 @@ const Vulnerabilities = () => {
               ) : (
                 <Play className="mr-2 h-4 w-4" />
               )}
-              Run Scan
+              {isScanning && scanProgress
+                ? `Scanning ${scanProgress.done}/${scanProgress.total}`
+                : "Run Scan"}
             </Button>
           </div>
         </div>
@@ -411,13 +432,13 @@ const Vulnerabilities = () => {
                   {bulkPatch.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1 h-3.5 w-3.5" />}
                   Patch All
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleBulkStatus("mitigated")}>
+                <Button size="sm" variant="outline" disabled={bulkStatus.isPending} onClick={() => handleBulkStatus("mitigated")}>
                   Mark Mitigated
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleBulkStatus("resolved")}>
+                <Button size="sm" variant="outline" disabled={bulkStatus.isPending} onClick={() => handleBulkStatus("resolved")}>
                   Mark Resolved
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleBulkStatus("accepted")}>
+                <Button size="sm" variant="outline" disabled={bulkStatus.isPending} onClick={() => handleBulkStatus("accepted")}>
                   Accept Risk
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
@@ -535,15 +556,30 @@ const Vulnerabilities = () => {
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                   ) : filteredFindings.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <CheckCircle className="h-12 w-12 text-green-500 mb-3" />
-                      <h3 className="text-lg font-semibold">No vulnerabilities found</h3>
-                      <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                        {stats.total === 0
-                          ? "No CVE findings yet. Vulnerabilities will appear here once the agent collects software inventory and scans are run."
-                          : "No findings match your current filters."}
-                      </p>
-                    </div>
+                    stats.total === 0 ? (
+                      <div className="py-6">
+                        <EmptyState
+                          icon={<CheckCircle className="h-7 w-7" />}
+                          title="No CVE findings yet"
+                          tone="default"
+                          description={<p>Vulnerability findings appear here once the agent reports software inventory and a scan runs. Scans use AI to map installed apps to known CVEs.</p>}
+                          steps={[
+                            { done: (software?.length ?? 0) > 0, label: `Agent reports software inventory (${software?.length ?? 0} packages so far)`, detail: "Hourly cadence by default." },
+                            { done: false, label: "Run the auto-scan", detail: "Nightly cron + on-demand from this page. First scan can take a few minutes if cache is cold." },
+                            { done: false, label: "Triage findings", detail: "Mark mitigated, suppress false positives, or queue a patch command." },
+                          ]}
+                          secondaryAction={{ label: "How scanning works →", href: "/glossary" }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <CheckCircle className="h-12 w-12 text-green-500 mb-3" />
+                        <h3 className="text-lg font-semibold">No vulnerabilities match your filters</h3>
+                        <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                          Try clearing the search or relaxing the severity/status filter.
+                        </p>
+                      </div>
+                    )
                   ) : (
                     <>
                       <div className="rounded-md border">
@@ -626,7 +662,7 @@ const Vulnerabilities = () => {
                                   <TableCell>
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Finding options">
                                           <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                       </DropdownMenuTrigger>

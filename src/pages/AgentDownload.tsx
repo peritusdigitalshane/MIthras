@@ -4,81 +4,93 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Copy, CheckCircle, Shield, Terminal, Clock, Zap, AlertCircle, Loader2 } from "lucide-react";
+import { Download, Copy, CheckCircle, Shield, Terminal, Clock, Zap, AlertCircle, Loader2, MonitorSmartphone, Apple, Smartphone, Server } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTenant } from "@/contexts/TenantContext";
 import ServiceInstallTab from "@/components/agent/ServiceInstallTab";
+import InstallerTab from "@/components/agent/InstallerTab";
+import MacInstallTab from "@/components/agent/MacInstallTab";
 
-const AGENT_SCRIPT_BASE_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co/functions/v1/agent-script";
+// Always read the API base from the same env the supabase client uses, so
+// the platform never accidentally hits the cloud project.
+const AGENT_SCRIPT_BASE_URL = `${((import.meta.env.VITE_SUPABASE_URL as string) ?? "").replace(/\/$/, "")}/functions/v1/agent-script`;
 
 const REMOVAL_SCRIPT = String.raw`#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Removes the Peritus Threat Defence Agent from this machine.
+    Removes the Mithras Threat Defence Agent from this machine.
 .DESCRIPTION
-    Stops running agent processes, removes scheduled tasks,
-    cleans up configuration files, and removes startup entries.
+    Stops the MithrasAgent service (and any leftover PeritusSecureAgent), kills
+    straggler agent + tray processes, removes scheduled tasks + Startup-folder
+    launchers, deletes both C:\ProgramData\Mithras and C:\ProgramData\PeritusSecure.
 #>
 
 $ErrorActionPreference = "SilentlyContinue"
-$TaskName = "PeritusSecureAgent"
-$TrayTaskName = "PeritusSecureTray"
-$ConfigPath = "$env:ProgramData\PeritusSecure"
 
-Write-Host "=== Peritus Agent Removal ===" -ForegroundColor Cyan
+Write-Host "=== Mithras Threat Defence Agent Removal ===" -ForegroundColor Cyan
 
-# 1. Stop any running agent and tray processes
-Write-Host "[1/5] Stopping agent processes..." -ForegroundColor Yellow
+# 1. Stop + remove services (new MithrasAgent + legacy PeritusSecureAgent).
+Write-Host "[1/6] Stopping services..." -ForegroundColor Yellow
+foreach ($svc in 'MithrasAgent','PeritusSecureAgent') {
+    if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {
+        Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+        foreach ($nssm in 'C:\ProgramData\Mithras\install\vendor\nssm.exe','C:\ProgramData\PeritusSecure\install\vendor\nssm.exe') {
+            if (Test-Path $nssm) { & $nssm remove $svc confirm 2>&1 | Out-Null }
+        }
+        sc.exe delete $svc 2>&1 | Out-Null
+        Write-Host "  Removed service: $svc" -ForegroundColor Green
+    }
+}
+
+# 2. Kill straggler agent + tray PowerShell processes.
+Write-Host "[2/6] Killing straggler processes..." -ForegroundColor Yellow
 try {
     $myPid = $PID
     Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue | Where-Object {
-        $_.ProcessId -ne $myPid -and $_.CommandLine -like "*PeritusSecure*"
+        $_.ProcessId -ne $myPid -and $_.CommandLine -and (
+            $_.CommandLine -like "*mithras-agent.ps1*"     -or
+            $_.CommandLine -like "*mithras-tray.ps1*"      -or
+            $_.CommandLine -like "*peritus-secure-agent*"  -or
+            $_.CommandLine -like "*PeritusSecure\install*"
+        )
     } | ForEach-Object {
-        Write-Host "  Stopping process $($_.ProcessId)..." -ForegroundColor Gray
         Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
     }
-} catch {
-    Write-Host "  Could not enumerate processes: $_" -ForegroundColor Gray
-}
-Write-Host "  Done." -ForegroundColor Green
+} catch {}
 
-# 2. Remove scheduled tasks
-Write-Host "[2/5] Removing scheduled tasks..." -ForegroundColor Yellow
-$mainTask = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($mainTask) {
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-    Write-Host "  Removed task: $TaskName" -ForegroundColor Green
-} else {
-    Write-Host "  Task '$TaskName' not found (already removed)" -ForegroundColor Gray
+# 3. Remove legacy scheduled tasks + Startup-folder launcher.
+Write-Host "[3/6] Removing scheduled tasks + Startup entries..." -ForegroundColor Yellow
+foreach ($task in 'PeritusSecureAgent','PeritusSecureTray','MithrasAgent','MithrasTray') {
+    if (Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $task -Confirm:$false
+    }
 }
-$trayTask = Get-ScheduledTask -TaskName $TrayTaskName -ErrorAction SilentlyContinue
-if ($trayTask) {
-    Unregister-ScheduledTask -TaskName $TrayTaskName -Confirm:$false
-    Write-Host "  Removed task: $TrayTaskName" -ForegroundColor Green
-} else {
-    Write-Host "  Task '$TrayTaskName' not found (already removed)" -ForegroundColor Gray
-}
+$vbs = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp\Mithras-Tray.vbs"
+if (Test-Path $vbs) { Remove-Item $vbs -Force -ErrorAction SilentlyContinue }
 
-# 3. Remove startup registry entry
-Write-Host "[3/5] Cleaning registry entries..." -ForegroundColor Yellow
+# 4. Clean registry Run entries.
+Write-Host "[4/6] Cleaning registry entries..." -ForegroundColor Yellow
 Remove-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "PeritusSecureTray" -ErrorAction SilentlyContinue
-Write-Host "  Done." -ForegroundColor Green
+Remove-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "MithrasTray"        -ErrorAction SilentlyContinue
 
-# 4. Remove configuration directory
-Write-Host "[4/5] Removing agent files..." -ForegroundColor Yellow
-if (Test-Path $ConfigPath) {
-    Remove-Item -Path $ConfigPath -Recurse -Force
-    Write-Host "  Removed: $ConfigPath" -ForegroundColor Green
-} else {
-    Write-Host "  Directory not found (already removed)" -ForegroundColor Gray
+# 5. Delete agent directories (new + legacy).
+Write-Host "[5/6] Removing agent files..." -ForegroundColor Yellow
+foreach ($path in 'C:\ProgramData\Mithras','C:\ProgramData\PeritusSecure') {
+    if (Test-Path $path) {
+        Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path $path)) { Write-Host "  Removed: $path" -ForegroundColor Green }
+        else { Write-Host "  Partial removal: $path (some files locked)" -ForegroundColor Gray }
+    }
 }
 
-# 5. Summary
-Write-Host "[5/5] Cleanup complete." -ForegroundColor Yellow
+# 6. Summary.
+Write-Host "[6/6] Cleanup complete." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "Peritus Agent has been completely removed." -ForegroundColor Green
-Write-Host "Note: The endpoint will remain visible in the dashboard until manually deleted." -ForegroundColor Gray`;
+Write-Host "Mithras Threat Defence Agent has been removed." -ForegroundColor Green
+Write-Host "Note: the endpoint stays visible in the dashboard until you soft-delete it." -ForegroundColor Gray`;
 
 const stripUtf8Bom = (value: string) => value.replace(/^\uFEFF/, "");
 
@@ -108,13 +120,10 @@ const AgentDownload = () => {
 
   const oneLinerCommand = useMemo(() => {
     if (!agentScriptUrl) return "";
-
-    return [
-      `$agentUrl = "${agentScriptUrl}" + "&t=" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`,
-      '$agentPath = Join-Path $env:TEMP "PeritusSecureAgent.ps1"',
-      'Invoke-WebRequest -UseBasicParsing -Headers @{ "Cache-Control" = "no-cache" } -Uri $agentUrl -OutFile $agentPath',
-      'powershell.exe -ExecutionPolicy Bypass -File $agentPath',
-    ].join("; ");
+    // The agent-script edge function returns a self-contained bootstrap that
+    // downloads the latest Mithras bundle, verifies SHA256, extracts, and runs
+    // install-agent.ps1. iex executes it directly -- no temp file needed.
+    return `iex (irm "${agentScriptUrl}")`;
   }, [agentScriptUrl]);
 
   const fetchLatestScript = useCallback(async () => {
@@ -193,7 +202,7 @@ const AgentDownload = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "PeritusSecureAgent.ps1";
+      a.download = "MithrasInstaller.ps1";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -201,7 +210,7 @@ const AgentDownload = () => {
 
       toast({
         title: "Download started",
-        description: "PeritusSecureAgent.ps1 is downloading.",
+        description: "MithrasInstaller.ps1 is downloading.",
       });
     } catch (downloadError) {
       toast({
@@ -234,7 +243,7 @@ const AgentDownload = () => {
           <div>
             <h1 className="text-2xl font-bold">Deploy Agent</h1>
             <p className="text-muted-foreground">
-              Download and install the Peritus Threat Defence agent on your Windows endpoints
+              Install the Mithras agent across your fleet — Windows (production), Linux / macOS (coming soon), and iOS / Android via MDM integrations
             </p>
           </div>
           <Alert variant="destructive">
@@ -255,7 +264,7 @@ const AgentDownload = () => {
         <div>
           <h1 className="text-2xl font-bold">Deploy Agent</h1>
           <p className="text-muted-foreground">
-            Download and install the Peritus Threat Defence agent on your Windows endpoints
+            Download and install the Mithras Threat Defence agent on your Windows endpoints
           </p>
           {orgName && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -314,16 +323,32 @@ const AgentDownload = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="service" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="service">Modern (Service)</TabsTrigger>
-                <TabsTrigger value="download">Download Script</TabsTrigger>
-                <TabsTrigger value="oneliner">Legacy One-Liner</TabsTrigger>
+            <Tabs defaultValue="windows" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="windows" className="gap-1.5"><MonitorSmartphone className="h-3.5 w-3.5" /> Windows</TabsTrigger>
+                <TabsTrigger value="linux" className="gap-1.5"><Server className="h-3.5 w-3.5" /> Linux</TabsTrigger>
+                <TabsTrigger value="macos" className="gap-1.5"><Apple className="h-3.5 w-3.5" /> macOS</TabsTrigger>
+                <TabsTrigger value="ios" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" /> iOS</TabsTrigger>
+                <TabsTrigger value="android" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" /> Android</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="service">
-                <ServiceInstallTab organizationId={orgId} />
-              </TabsContent>
+              {/* ─── Windows tab ─── */}
+              <TabsContent value="windows" className="mt-4">
+                <Tabs defaultValue="installer" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="installer">Installer (.exe)</TabsTrigger>
+                    <TabsTrigger value="service">Service (PowerShell)</TabsTrigger>
+                    <TabsTrigger value="download">Download Script</TabsTrigger>
+                    <TabsTrigger value="oneliner">Legacy One-Liner</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="installer">
+                    <InstallerTab organizationId={orgId} />
+                  </TabsContent>
+
+                  <TabsContent value="service">
+                    <ServiceInstallTab organizationId={orgId} />
+                  </TabsContent>
 
               <TabsContent value="download" className="space-y-4 mt-4">
                 {scriptLoadError && (
@@ -343,7 +368,7 @@ const AgentDownload = () => {
                     disabled={isFetchingLatestScript || !agentScriptUrl}
                   >
                     {isFetchingLatestScript ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    Download PeritusSecureAgent.ps1
+                    Download MithrasInstaller.ps1
                   </Button>
                   <Button
                     variant="outline"
@@ -363,23 +388,152 @@ const AgentDownload = () => {
                 <div className="rounded-lg bg-secondary/50 p-4">
                   <p className="text-sm font-medium mb-2">Run the script as Administrator:</p>
                   <code className="text-xs text-muted-foreground">
-                    powershell.exe -ExecutionPolicy Bypass -File .\PeritusSecureAgent.ps1
+                    powershell.exe -ExecutionPolicy Bypass -File .\MithrasInstaller.ps1
                   </code>
                 </div>
               </TabsContent>
 
-              <TabsContent value="oneliner" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label>Run this command in an elevated PowerShell:</Label>
-                  <div className="relative">
-                    <pre className="rounded-lg bg-secondary/50 p-4 text-xs overflow-x-auto">
-                      <code>{oneLinerCommand}</code>
+                  <TabsContent value="oneliner" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label>Run this command in an elevated PowerShell:</Label>
+                      <div className="relative">
+                        <pre className="rounded-lg bg-secondary/50 p-4 text-xs overflow-x-auto">
+                          <code>{oneLinerCommand}</code>
+                        </pre>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      This pulls the live Mithras bootstrap installer (the same one the Download button serves) and runs it in-memory via Invoke-Expression. Bootstrap downloads the latest agent bundle, verifies its SHA256, extracts it, and runs install-agent.ps1.
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
+
+              {/* ─── Linux tab ─── */}
+              <TabsContent value="linux" className="mt-4 space-y-4">
+                <Alert>
+                  <Server className="h-4 w-4" />
+                  <AlertTitle className="flex items-center gap-2">Linux agent <Badge variant="outline" className="text-[10px] uppercase tracking-wider bg-status-healthy/10 text-status-healthy border-status-healthy/30">v0.1 — beta</Badge></AlertTitle>
+                  <AlertDescription className="text-xs space-y-1 mt-1">
+                    <p>Single Go binary running as a systemd service. Same HMAC-signed channel as the Windows agent. Heartbeats every 60s, software inventory hourly, auth events streamed from <code>journalctl</code>.</p>
+                    <p>Supported: Ubuntu 22.04+, Debian 12+, RHEL 9+, Rocky 9+, AlmaLinux 9+, Amazon Linux 2023. x86_64 + arm64.</p>
+                  </AlertDescription>
+                </Alert>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">One-line install</CardTitle>
+                    <CardDescription className="text-xs">Run as root on the Linux box. Mint a fresh enrolment token below first.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <pre className="rounded-lg bg-secondary/50 p-3 text-[11px] overflow-x-auto">
+                      <code>{`curl -fsSL https://api.mithras.com.au/agent/install-linux.sh | sudo bash -s -- --token=<ENROLMENT_TOKEN>`}</code>
                     </pre>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  This downloads the same live PeritusSecureAgent.ps1 file used by the button above.
-                </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <div><strong className="text-foreground">Status:</strong> <code>systemctl status mithras-agent</code></div>
+                      <div><strong className="text-foreground">Logs:</strong> <code>journalctl -u mithras-agent -f</code></div>
+                      <div><strong className="text-foreground">Config:</strong> <code>/etc/peritus/config.json</code></div>
+                      <div><strong className="text-foreground">Binary:</strong> <code>/usr/local/bin/mithras-agent</code></div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">What gets collected</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="text-xs space-y-1 list-disc pl-5">
+                      <li>Hostname, OS pretty-name, kernel, uptime, /etc/os-release</li>
+                      <li>Package inventory via <code>dpkg-query</code> or <code>rpm -qa</code> (hourly)</li>
+                      <li>Auth events from <code>journalctl -u ssh -u sshd -u sudo</code> (sshd Accepted/Failed Password, sudo COMMAND, new user, invalid user)</li>
+                      <li>Listening ports via <code>ss -Hlntu</code></li>
+                      <li><code>auditd</code> service state</li>
+                    </ul>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-dashed">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="text-sm font-medium">Not yet on Linux (roadmap)</div>
+                    <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-5">
+                      <li>Active response commands (isolate, kill, scan)</li>
+                      <li>Policy enforcement (firewall via iptables/nftables, AppArmor/SELinux state)</li>
+                      <li>WDAC-equivalent (AppArmor profile generation)</li>
+                      <li>Self-update via signed releases</li>
+                    </ul>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Email <a className="underline" href="mailto:support@mithras.com.au?subject=Linux%20agent%20feedback">support@mithras.com.au</a> with what would unblock you.
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ─── macOS tab ─── */}
+              <TabsContent value="macos" className="mt-4">
+                <MacInstallTab organizationId={orgId} />
+              </TabsContent>
+
+              {/* ─── iOS tab ─── */}
+              <TabsContent value="ios" className="mt-4 space-y-4">
+                <Alert>
+                  <Smartphone className="h-4 w-4" />
+                  <AlertTitle className="flex items-center gap-2">iOS — MDM integration model <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Coming soon</Badge></AlertTitle>
+                  <AlertDescription className="text-xs space-y-2 mt-1">
+                    <p>Apple doesn't allow general-purpose security agents on iOS. The right path is to integrate with an MDM that's already managing the device. Mithras will:</p>
+                    <ul className="list-disc pl-5 space-y-0.5">
+                      <li>Pull device posture (jailbreak, OS version, encryption, MDM-enrolment state) from your MDM's API</li>
+                      <li>Surface lost-mode / wipe controls in the Mithras console alongside Windows endpoints</li>
+                      <li>Correlate iOS sign-ins with your SSO provider's risk signals</li>
+                      <li>Apply baseline restrictions via configuration profiles</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <Card className="border-dashed">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="text-sm font-medium">Supported MDM connectors (roadmap)</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {["Jamf Pro", "Microsoft Intune", "Kandji", "Mosyle", "Apple Business Manager", "Hexnode"].map(n => (
+                        <Badge key={n} variant="outline" className="text-[10px]">{n}</Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-2">
+                      Email <a className="underline" href="mailto:support@mithras.com.au?subject=iOS%20MDM%20connector">support@mithras.com.au</a> with your MDM of choice — we prioritise connectors by customer demand.
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ─── Android tab ─── */}
+              <TabsContent value="android" className="mt-4 space-y-4">
+                <Alert>
+                  <Smartphone className="h-4 w-4" />
+                  <AlertTitle className="flex items-center gap-2">Android — MDM integration model <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Coming soon</Badge></AlertTitle>
+                  <AlertDescription className="text-xs space-y-2 mt-1">
+                    <p>Android Enterprise (Google's official management framework) and Samsung Knox are the only credible paths for managing Android at the OS level. Mithras will integrate with these via their MDM partners:</p>
+                    <ul className="list-disc pl-5 space-y-0.5">
+                      <li>Device posture (OS version, security patch level, work profile state)</li>
+                      <li>App inventory + compliance signals</li>
+                      <li>Lost-mode / remote wipe</li>
+                      <li>Knox attestation for high-security customers</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                <Card className="border-dashed">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="text-sm font-medium">Supported MDM connectors (roadmap)</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {["Microsoft Intune", "Google Workspace MDM", "Samsung Knox Manage", "Jamf Pro", "Hexnode", "Scalefusion"].map(n => (
+                        <Badge key={n} variant="outline" className="text-[10px]">{n}</Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-2">
+                      Email <a className="underline" href="mailto:support@mithras.com.au?subject=Android%20MDM%20connector">support@mithras.com.au</a> to register interest in a specific connector.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -453,19 +607,19 @@ const AgentDownload = () => {
             <div>
               <p className="text-sm font-medium mb-2">View agent logs:</p>
               <code className="text-xs bg-secondary/50 p-2 rounded block">
-                Get-Content "$env:ProgramData\PeritusSecure\agent.log" -Tail 50
+                {`Get-Content (Get-ChildItem "$env:ProgramData\\Mithras\\logs\\agent-*.log" | Sort LastWriteTime -Descending | Select-Object -First 1) -Tail 50`}
               </code>
             </div>
             <div>
               <p className="text-sm font-medium mb-2">Uninstall agent:</p>
               <code className="text-xs bg-secondary/50 p-2 rounded block">
-                powershell -File "$env:ProgramData\PeritusSecure\PeritusSecureAgent.ps1" -Uninstall
+                {`powershell -File "$env:ProgramData\\Mithras\\install\\uninstall-agent.ps1"`}
               </code>
             </div>
             <div>
-              <p className="text-sm font-medium mb-2">Check scheduled task status:</p>
+              <p className="text-sm font-medium mb-2">Check service status:</p>
               <code className="text-xs bg-secondary/50 p-2 rounded block">
-                Get-ScheduledTask -TaskName "PeritusSecureAgent"
+                Get-Service MithrasAgent
               </code>
             </div>
           </CardContent>
@@ -478,7 +632,7 @@ const AgentDownload = () => {
               Remove Agent (PowerShell Script)
             </CardTitle>
             <CardDescription>
-              Run this script as Administrator to completely remove the Peritus agent from an endpoint.
+              Run this script as Administrator to completely remove the Mithras agent (and any legacy PeritusSecure install) from an endpoint.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -499,7 +653,7 @@ const AgentDownload = () => {
             <div className="rounded-lg bg-secondary/50 p-4">
               <p className="text-sm font-medium mb-2">Run as Administrator:</p>
               <code className="text-xs text-muted-foreground">
-                powershell.exe -ExecutionPolicy Bypass -File .\RemovePeritusAgent.ps1
+                powershell.exe -ExecutionPolicy Bypass -File .\RemoveMithrasAgent.ps1
               </code>
             </div>
           </CardContent>

@@ -1,19 +1,71 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Shield, Loader2, ArrowLeft, CheckCircle, XCircle, Building2, Smartphone, Info, Sparkles } from "lucide-react";
+import { Loader2, ArrowLeft, CheckCircle, XCircle, Building2, Smartphone, Info, Sparkles, Shield, Briefcase, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useValidateEnrollmentCode } from "@/hooks/useEnrollmentCodes";
 
+// Portal role chosen on the marketing site dropdown. Determines post-auth
+// landing — anyone without ?role= still goes to /dashboard, preserving the
+// existing user experience.
+type PortalRole = "customer" | "partner" | "distributor";
+
+const ROLE_META: Record<PortalRole, { label: string; landing: string; icon: typeof Shield; accent: string; tagline: string }> = {
+  customer:    { label: "Customer portal",    landing: "/customer",    icon: Shield,    accent: "text-emerald-500", tagline: "See your own security posture, threats, and reports." },
+  partner:     { label: "Partner portal",     landing: "/dashboard",   icon: Briefcase, accent: "text-indigo-500",  tagline: "MSP / reseller console for managing your customers." },
+  distributor: { label: "Distributor portal", landing: "/distributor", icon: Warehouse, accent: "text-primary",     tagline: "Sales kit, channel management, and billing." },
+};
+
 const Login = () => {
   const [searchParams] = useSearchParams();
-  const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
+  const location = useLocation();
+  // Treat the /signup URL as a request to open the signup form regardless of
+  // query params. Without this, a direct link to /signup would land on the
+  // sign-in form and confuse new visitors.
+  const isSignupRoute = location.pathname === "/signup";
+  const [isSignUp, setIsSignUp] = useState(
+    isSignupRoute || searchParams.get("mode") === "signup",
+  );
+
+  // Portal role chosen on the marketing site dropdown. Stays null when the
+  // user reaches /login directly — that path retains the existing landing.
+  const roleParam = searchParams.get("role") as PortalRole | null;
+  const portalRole: PortalRole | null = (roleParam && roleParam in ROLE_META) ? roleParam : null;
+  const postAuthLanding = portalRole ? ROLE_META[portalRole].landing : "/dashboard";
+
+  // After sign-in, send the user to the portal that matches their org type
+  // even when they reached /login without a ?role=... query param.
+  // Super-admin path stays /dashboard so the SOC console still lands first.
+  const resolveLanding = async (userId: string): Promise<string> => {
+    try {
+      const { data: superRow } = await supabase
+        .from("super_admins")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (superRow) return postAuthLanding;
+
+      const { data } = await supabase
+        .from("organization_memberships")
+        .select("organizations!inner(organization_type)")
+        .eq("user_id", userId)
+        .limit(5);
+      const types = (data ?? []).map((r: any) => r.organizations?.organization_type);
+      if (types.includes("home_user"))   return "/account";
+      if (types.includes("distributor")) return "/distributor";
+      if (types.includes("partner"))     return "/partner";
+      if (types.includes("customer"))    return "/customer";
+    } catch {
+      // Non-fatal: fall back to the default landing if the lookup fails.
+    }
+    return postAuthLanding;
+  };
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -27,7 +79,10 @@ const Login = () => {
   const [isValidatingCode, setIsValidatingCode] = useState(false);
   
   // Free trial option
-  const [useFreeTrial, setUseFreeTrial] = useState(false);
+  // Free-trial path removed — Mithras is sold through channel partners only.
+  // State variable kept (always false) so the existing dependency arrays
+  // don't need rewriting; tree-shaken at build time.
+  const useFreeTrial = false;
   
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -56,7 +111,7 @@ const Login = () => {
             return;
           }
         }
-        navigate("/dashboard");
+        navigate(await resolveLanding(session.user.id));
       }
     };
     checkAuth();
@@ -75,7 +130,7 @@ const Login = () => {
             return;
           }
         }
-        navigate("/dashboard");
+        navigate(await resolveLanding(session.user.id));
       }
     });
 
@@ -84,7 +139,7 @@ const Login = () => {
 
   // Validate code when it changes (debounced) - skip if using free trial
   useEffect(() => {
-    if (!isSignUp || useFreeTrial || !enrollmentCode.trim()) {
+    if (!isSignUp || !enrollmentCode.trim()) {
       setCodeValidation(null);
       return;
     }
@@ -130,8 +185,10 @@ const Login = () => {
       });
       
       if (verifyError) throw verifyError;
-      
-      navigate("/dashboard");
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData.session?.user.id;
+      navigate(uid ? await resolveLanding(uid) : postAuthLanding);
     } catch (error: any) {
       toast({
         title: "Verification failed",
@@ -150,11 +207,15 @@ const Login = () => {
 
     try {
       if (isSignUp) {
-        // For free trial, skip enrollment code validation
-        if (!useFreeTrial && !codeValidation?.isValid) {
+        // Mithras is channel-only — every signup requires a valid enrolment
+        // code issued by a distributor / reseller / super-admin. Self-serve
+        // free trials are no longer offered. Prospects without a code are
+        // routed to the /contact-sales lead form, which puts them in front
+        // of a reseller in their region.
+        if (!codeValidation?.isValid) {
           toast({
-            title: "Invalid enrollment code",
-            description: "Please enter a valid enrollment code or select 'Start free trial'.",
+            title: "Enrolment code required",
+            description: "Enter a valid enrolment code from your reseller, or visit /contact-sales to find one.",
             variant: "destructive",
           });
           setIsLoading(false);
@@ -168,8 +229,10 @@ const Login = () => {
             emailRedirectTo: window.location.origin,
             data: {
               display_name: displayName,
-              // Only include enrollment code if not using free trial
-              ...(useFreeTrial ? {} : { enrollment_code: enrollmentCode.trim().toUpperCase() }),
+              // The handle_new_user trigger validates the enrolment code and
+              // joins this user to the named org. Invalid codes hard-fail
+              // server-side — no silent free-trial fallback.
+              enrollment_code: enrollmentCode.trim().toUpperCase(),
             },
           },
         });
@@ -214,7 +277,13 @@ const Login = () => {
     }
   };
 
-  const canSignUp = isSignUp && displayName.trim() && email.trim() && password.length >= 6 && 
+  // Server-side GoTrue enforces min length 12 + required-character classes (B12).
+  // Mirror the rule on the client so users see the gate immediately instead of
+  // bouncing off a 400 from /auth/v1/signup.
+  const passwordPolicyOk = (pw: string) =>
+    pw.length >= 12 &&
+    /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+  const canSignUp = isSignUp && displayName.trim() && email.trim() && passwordPolicyOk(password) &&
     (useFreeTrial || codeValidation?.isValid);
 
   // MFA Challenge Screen
@@ -300,57 +369,57 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center px-6 pb-20">
         <Card className="w-full max-w-md border-border/40">
           <CardHeader className="text-center pb-8">
-            <div className="mx-auto h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center mb-4">
-              <Shield className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-2xl">
+            <img
+              src="/mithras-shield.svg"
+              alt="Mithras"
+              className="mx-auto h-14 w-14 mb-4"
+              width={56}
+              height={56}
+            />
+            {portalRole && (() => {
+              const meta = ROLE_META[portalRole];
+              const Icon = meta.icon;
+              return (
+                <div className="inline-flex items-center gap-1.5 mx-auto px-3 py-1 rounded-full border bg-muted/50 mb-3">
+                  <Icon className={`h-3.5 w-3.5 ${meta.accent}`} />
+                  <span className="text-xs font-medium uppercase tracking-wider">{meta.label}</span>
+                </div>
+              );
+            })()}
+            <CardTitle className="text-2xl tracking-wide">
               {isSignUp ? "Create your account" : "Welcome back"}
             </CardTitle>
             <CardDescription>
-              {isSignUp
-                ? "Start your free trial or enter an enrollment code"
-                : "Sign in to your Peritus Threat Defence account"}
+              {portalRole
+                ? ROLE_META[portalRole].tagline
+                : (isSignUp
+                    ? "Start your free trial or enter an enrollment code"
+                    : "Sign in to your Mithras Threat Defence account")}
             </CardDescription>
+            {portalRole && !isSignUp && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Wrong portal? <Link to="/" className="underline">Pick a different one →</Link>
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <>
-                  {/* Free Trial Option */}
-                  <div 
-                    className={`p-4 rounded-lg border-2 transition-colors cursor-pointer ${
-                      useFreeTrial 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover:border-muted-foreground/50"
-                    }`}
-                    onClick={() => setUseFreeTrial(!useFreeTrial)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox 
-                        id="freeTrial"
-                        checked={useFreeTrial}
-                        onCheckedChange={(checked) => setUseFreeTrial(checked === true)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1">
-                        <label 
-                          htmlFor="freeTrial" 
-                          className="flex items-center gap-2 font-medium cursor-pointer"
-                        >
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          Start free trial
-                        </label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Get started with 1 device at no cost. No credit card required.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  {/* No more free trial — channel-only paid model. The user
+                      must have received an enrolment code from a reseller,
+                      distributor, or Peritus. Prospects without a code get
+                      bounced to /contact-sales below. */}
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Mithras is sold through authorised channel partners. Enter the enrolment code your reseller sent
+                      you, or <Link to="/contact-sales" className="underline font-medium">talk to sales</Link> to find one.
+                    </AlertDescription>
+                  </Alert>
 
-                  {/* Enrollment Code - only show if not using free trial */}
-                  {!useFreeTrial && (
-                    <div className="space-y-2">
-                      <Label htmlFor="enrollmentCode">Enrollment Code</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="enrollmentCode">Enrolment Code</Label>
                       <div className="relative">
                         <Input
                           id="enrollmentCode"
@@ -360,7 +429,7 @@ const Login = () => {
                           onChange={(e) => setEnrollmentCode(e.target.value.toUpperCase())}
                           className="uppercase font-mono pr-10"
                           maxLength={8}
-                          required={!useFreeTrial}
+                          required
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
                           {isValidatingCode && (
@@ -385,8 +454,7 @@ const Login = () => {
                           {codeValidation.error}
                         </p>
                       )}
-                    </div>
-                  )}
+                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="displayName">Your Name</Label>
@@ -421,17 +489,56 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={isSignUp ? 12 : 6}
                 />
+                {isSignUp && password.length > 0 && !passwordPolicyOk(password) && (
+                  <p className="text-xs text-muted-foreground">
+                    Must be 12+ chars and include lowercase, uppercase, digit, and symbol.
+                  </p>
+                )}
               </div>
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={isLoading || (isSignUp && !canSignUp)}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSignUp ? "Create Account" : "Sign In"}
               </Button>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  className="block mx-auto text-xs text-muted-foreground hover:text-foreground hover:underline mt-3 disabled:opacity-50 disabled:pointer-events-none"
+                  onClick={async () => {
+                    if (!email.trim()) {
+                      toast({ title: "Enter your email", description: "We'll send a reset link to that address.", variant: "destructive" });
+                      return;
+                    }
+                    setIsLoading(true);
+                    try {
+                      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) throw error;
+                      toast({
+                        title: "Reset link sent",
+                        description: "Check your email. If you don't get it within a few minutes, ask your administrator to mint one for you.",
+                      });
+                    } catch (e) {
+                      toast({
+                        title: "Couldn't send reset email",
+                        description: e instanceof Error ? e.message : "Email may not be configured yet — ask your admin to reset it from the dashboard.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
             </form>
             <div className="mt-6 text-center text-sm">
               {isSignUp ? (

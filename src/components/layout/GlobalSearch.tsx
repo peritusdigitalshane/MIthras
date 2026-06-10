@@ -100,6 +100,7 @@ export function GlobalSearch() {
             .from("endpoints")
             .select("id, hostname, is_online, os_version")
             .eq("organization_id", orgId)
+            .is("deleted_at", null)
             .ilike("hostname", searchTerm)
             .limit(5),
           supabase

@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServiceAccessMatrix } from "@/components/network/ServiceAccessMatrix";
 import { FirewallAuditLogs } from "@/components/network/FirewallAuditLogs";
 import { FirewallAuditWorkflow } from "@/components/network/FirewallAuditWorkflow";
-import { Network as NetworkIcon, ScrollText, Radio, KeyRound } from "lucide-react";
+import { MicrosegmentationDashboard } from "@/components/network/MicrosegmentationDashboard";
+import { Network as NetworkIcon, ScrollText, Radio, KeyRound, Shield } from "lucide-react";
 
 export default function Network() {
   return (
@@ -18,8 +19,12 @@ export default function Network() {
 
         <FirewallAuditWorkflow />
 
-        <Tabs defaultValue="firewall" className="space-y-6">
+        <Tabs defaultValue="microseg" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="microseg" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Microsegmentation
+            </TabsTrigger>
             <TabsTrigger value="firewall" className="flex items-center gap-2">
               <NetworkIcon className="h-4 w-4" />
               Firewall Matrix
@@ -39,6 +44,10 @@ export default function Network() {
               <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Soon</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="microseg" className="space-y-6">
+            <MicrosegmentationDashboard />
+          </TabsContent>
 
           <TabsContent value="firewall" className="space-y-6">
             <ServiceAccessMatrix />

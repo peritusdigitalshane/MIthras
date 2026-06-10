@@ -12,7 +12,7 @@ import { handlePreflight, buildCorsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const PUBLIC_API_BASE = Deno.env.get("PUBLIC_API_BASE_URL") ?? "https://api.cmwcollective.com.au";
+const PUBLIC_API_BASE = Deno.env.get("PUBLIC_API_BASE_URL") ?? "https://api.mithras.com.au";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

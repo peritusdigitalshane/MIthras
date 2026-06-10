@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { FileText, Shield, Plus, Calendar, Trash2, Download, Eye } from "lucide-react";
 import { useReports, useDeleteReport } from "@/hooks/useReports";
+import { QueryError } from "@/components/ui/query-error";
 import { ReportGenerator } from "@/components/reports/ReportGenerator";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import { format } from "date-fns";
@@ -27,7 +28,7 @@ const Reports = () => {
   const [previewReport, setPreviewReport] = useState<string | null>(null);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 
-  const { data: reports, isLoading } = useReports();
+  const { data: reports, isLoading, error } = useReports();
   const deleteReport = useDeleteReport();
 
   const handleNewReport = (type: "monthly_security" | "cyber_insurance") => {
@@ -147,7 +148,9 @@ const Reports = () => {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4 mt-4">
-            {isLoading ? (
+            {error ? (
+              <QueryError error={error} title="Couldn't load reports" bare />
+            ) : isLoading ? (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
                   Loading reports...

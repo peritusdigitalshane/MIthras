@@ -17,6 +17,10 @@ interface PartnerWithStats extends Partner {
   member_count: number;
 }
 
+// Channel-partner type spectrum. 'partner' is the legacy reseller type;
+// 'distributor' is the upstream tier that signs up resellers.
+export type ChannelOrgType = "partner" | "distributor";
+
 interface Customer {
   id: string;
   name: string;
@@ -38,7 +42,7 @@ export function usePartners() {
       const { data, error } = await supabase
         .from("organizations")
         .select("*")
-        .eq("organization_type", "partner")
+        .in("organization_type", ["partner", "distributor"])
         .order("name");
 
       if (error) throw error;
@@ -47,16 +51,16 @@ export function usePartners() {
   });
 }
 
-// Fetch partners with customer counts (super admin only)
+// Fetch partners + distributors with customer counts (super admin only).
+// Both types appear in the same list — the org_type column distinguishes them.
 export function usePartnersWithStats() {
   return useQuery({
     queryKey: ["partners-with-stats"],
     queryFn: async () => {
-      // Get all partner organizations
       const { data: partners, error: partnersError } = await supabase
         .from("organizations")
         .select("*")
-        .eq("organization_type", "partner")
+        .in("organization_type", ["partner", "distributor"])
         .order("name");
 
       if (partnersError) throw partnersError;
@@ -95,29 +99,31 @@ export function usePartnersWithStats() {
   });
 }
 
-// Create a new partner organization (super admin only)
+// Create a new channel-partner organization (super admin only).
+// orgType selects reseller ('partner') or distributor — distributors are an
+// upstream tier that signs up their own resellers.
 export function useCreatePartner() {
   const queryClient = useQueryClient();
   const { currentOrganization } = useTenant();
 
   return useMutation({
-    mutationFn: async ({ name, slug }: { name: string; slug: string }) => {
+    mutationFn: async ({ name, slug, orgType = "partner" }: { name: string; slug: string; orgType?: ChannelOrgType }) => {
       const { data, error } = await supabase
         .from("organizations")
-        .insert({ 
-          name, 
-          slug, 
-          organization_type: "partner" 
+        .insert({
+          name,
+          slug,
+          organization_type: orgType,
         })
         .select()
         .single();
 
       if (error) throw error;
-      
+
       if (currentOrganization?.id) {
-        await logActivity(currentOrganization.id, "create", "partner", data.id, { name, slug });
+        await logActivity(currentOrganization.id, "create", orgType, data.id, { name, slug });
       }
-      
+
       return data;
     },
     onSuccess: () => {
@@ -146,10 +152,11 @@ export function usePartnerCustomers(partnerId: string | null) {
 
       if (error) throw error;
 
-      // Get endpoint counts
+      // Get endpoint counts — live only
       const { data: endpoints } = await supabase
         .from("endpoints")
-        .select("organization_id");
+        .select("organization_id")
+        .is("deleted_at", null);
 
       const endpointCounts = (endpoints || []).reduce((acc, e) => {
         acc[e.organization_id] = (acc[e.organization_id] || 0) + 1;
@@ -225,10 +232,11 @@ export function useDirectCustomers() {
 
       if (error) throw error;
 
-      // Get endpoint counts
+      // Get endpoint counts — live only
       const { data: endpoints } = await supabase
         .from("endpoints")
-        .select("organization_id");
+        .select("organization_id")
+        .is("deleted_at", null);
 
       const endpointCounts = (endpoints || []).reduce((acc, e) => {
         acc[e.organization_id] = (acc[e.organization_id] || 0) + 1;

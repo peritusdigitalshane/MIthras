@@ -6,12 +6,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPABASE_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  // Reject non-POST early so health probes (GETs) don't trip the JSON.parse
+  // below and surface as a misleading 500 on the System Health dashboard.
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "method_not_allowed" }),
+      { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json", "Allow": "POST, OPTIONS" } }
+    );
   }
 
   try {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,17 +45,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users as UsersIcon, 
-  Plus, 
-  MoreHorizontal, 
-  Shield, 
-  UserCog, 
+import {
+  Users as UsersIcon,
+  Plus,
+  MoreHorizontal,
+  Shield,
+  UserCog,
   User,
   Trash2,
   Loader2,
   Crown,
+  KeyRound,
 } from "lucide-react";
+import { ResetUserPasswordDialog } from "@/components/users/ResetUserPasswordDialog";
+import { InviteUserDialog } from "@/components/users/InviteUserDialog";
+import { Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -86,9 +91,11 @@ const Users = () => {
   const { toast } = useToast();
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<OrgRole>("member");
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; email: string } | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ userId: string; email: string } | null>(null);
 
   const handleAddMember = async () => {
     if (!newEmail.trim()) {
@@ -203,11 +210,19 @@ const Users = () => {
               )}
             </p>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setInviteDialogOpen(true)}>
+              <Mail className="mr-2 h-4 w-4" />
+              Invite user
+            </Button>
+            <Button onClick={() => setAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add existing user
+            </Button>
+          </div>
         </div>
+
+        <InviteUserDialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen} />
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -304,12 +319,12 @@ const Users = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {new Date(member.created_at).toLocaleDateString()}
+                      {format(new Date(member.created_at), "d MMM yyyy")}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" disabled={isOwner && !isCurrentUser}>
+                          <Button variant="ghost" size="icon" aria-label="Member options" disabled={isOwner && !isCurrentUser}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -340,6 +355,14 @@ const Users = () => {
                               </DropdownMenuItem>
                             </>
                           )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setResetTarget({ userId: member.user_id, email: member.profile?.email || "" })}
+                            disabled={!member.profile?.email}
+                          >
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Reset password
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
@@ -442,6 +465,15 @@ const Users = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {resetTarget && (
+          <ResetUserPasswordDialog
+            open={!!resetTarget}
+            onOpenChange={(o) => { if (!o) setResetTarget(null); }}
+            targetUserId={resetTarget.userId}
+            targetEmail={resetTarget.email}
+          />
+        )}
       </div>
     </MainLayout>
   );

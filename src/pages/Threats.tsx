@@ -1,13 +1,15 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ThreatsList } from "@/components/dashboard/ThreatsList";
 import { StatCard } from "@/components/ui/stat-card";
-import { ShieldAlert, Shield, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { ShieldAlert, Shield, AlertTriangle, CheckCircle, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { useEndpointThreats } from "@/hooks/useDashboardData";
 import { useMemo } from "react";
 import { subDays, isAfter } from "date-fns";
 
 const Threats = () => {
-  const { data: threats, isLoading } = useEndpointThreats();
+  const { data: threats, isLoading, error } = useEndpointThreats();
 
   const stats = useMemo(() => {
     if (!threats) {
@@ -46,6 +48,25 @@ const Threats = () => {
       <MainLayout>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6 max-w-3xl mx-auto">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Couldn't load threats</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p className="text-sm">{(error as Error).message ?? "An unexpected error occurred."}</p>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
         </div>
       </MainLayout>
     );

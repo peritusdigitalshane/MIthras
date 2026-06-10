@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 240" width="220" height="240">
+    <!-- Shield-only emblem (no wordmark). Use this in nav components that
+         render the "MITHRAS / Threat Defence" text separately. The full
+         lockup at /mithras-emblem.svg + /mithras-logo.svg is for hero
+         contexts, landing pages, marketing collateral. -->
+    <g transform="translate(10, 10)">
+        <!-- Solid shield -->
+        <path d="M100 8 L188 44 L188 128 C188 178 150 208 100 226 C50 208 12 178 12 128 L12 44 Z"
+              fill="none" stroke="#00C4AB" stroke-width="10" stroke-linejoin="round"/>
+
+        <!-- Bold abstract M -->
+        <path d="M50 172 L50 74 L72 74 L72 128 L100 80 L128 128 L128 74 L150 74 L150 172"
+              fill="none" stroke="#00C4AB" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+    </g>
+</svg>

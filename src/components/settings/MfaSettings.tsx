@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,16 +118,25 @@ export function MfaSettings() {
   };
 
   const handleUnenroll = async (factorId: string) => {
+    // Confirm before removing — losing MFA without a backup factor is an
+    // account-recovery problem if the user signs out.
+    const confirmed = typeof window !== "undefined" && window.confirm(
+      "Remove this authenticator?\n\n"
+      + "You'll be asked to set up MFA again on your next sign-in. "
+      + "If you no longer have access to the authenticator app, you'll lose "
+      + "the ability to verify — your admin will need to reset MFA for you."
+    );
+    if (!confirmed) return;
     setIsUnenrolling(factorId);
     try {
       const { error } = await supabase.auth.mfa.unenroll({ factorId });
       if (error) throw error;
-      
+
       toast({
         title: "MFA disabled",
         description: "Two-factor authentication has been removed from your account.",
       });
-      
+
       fetchFactors();
     } catch (error: any) {
       toast({
@@ -222,7 +232,7 @@ export function MfaSettings() {
                     <div>
                       <p className="font-medium text-sm">{factor.friendly_name || "Authenticator App"}</p>
                       <p className="text-xs text-muted-foreground">
-                        Added {new Date(factor.created_at).toLocaleDateString()}
+                        Added {format(new Date(factor.created_at), "d MMM yyyy")}
                       </p>
                     </div>
                   </div>

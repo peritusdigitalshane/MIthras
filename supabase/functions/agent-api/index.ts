@@ -9,7 +9,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-const SUPABASE_URL = "https://njdcyjxgtckgtzgzoctw.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -231,6 +231,16 @@ Deno.serve(async (req) => {
       return await handleFirewallLogs(req);
     }
 
+    // Route: POST /sysmon-events - Report Sysmon process/network/file events
+    if (path === "/sysmon-events" && req.method === "POST") {
+      return await handleSysmonEvents(req);
+    }
+
+    // Route: GET /dns-policy - Fetch the DNS policy assigned to this endpoint
+    if (path === "/dns-policy" && req.method === "GET") {
+      return await handleGetDnsPolicy(req);
+    }
+
     // Route: GET /firewall-policy - Get assigned firewall policy and rules
     if (path === "/firewall-policy" && req.method === "GET") {
       return await handleGetFirewallPolicy(req);
@@ -286,6 +296,21 @@ Deno.serve(async (req) => {
       return await handleAgentUpdate(req);
     }
 
+    // Route: GET /app-whitelist-policy - mode + rules for app whitelisting
+    if (path === "/app-whitelist-policy" && req.method === "GET") {
+      return await handleGetAppWhitelistPolicy(req);
+    }
+
+    // Route: POST /app-audit-logs - process-launch events (observed/allowed/blocked)
+    if (path === "/app-audit-logs" && req.method === "POST") {
+      return await handleAppAuditLogs(req);
+    }
+
+    // Route: POST /wdac-applied - agent reports CI policy apply result
+    if (path === "/wdac-applied" && req.method === "POST") {
+      return await handleWdacApplied(req);
+    }
+
     return new Response(JSON.stringify({ error: "Not found" }), {
       status: 404,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -327,118 +352,30 @@ async function validateAgentToken(req: Request) {
     throw new Error("Invalid agent token");
   }
 
+  // Reject deactivated endpoints. Previously this check was missing,
+  // so a deactivated endpoint's bearer token kept fetching policies,
+  // shipping firewall logs, and pulling WDAC rules indefinitely (the
+  // HMAC path at agent-heartbeat already enforces this; legacy bearer
+  // didn't, defeating revocation).
+  if (endpoint.is_active === false) {
+    console.error(`[${VERSION}] validateAgentToken: endpoint ${endpoint.id} is deactivated; rejecting`);
+    throw new Error("Endpoint deactivated");
+  }
+
   return endpoint;
 }
 
 // POST /register - Register a new endpoint
-async function handleRegister(req: Request) {
-  const body = await req.json();
-  const { organization_token, hostname, os_version, os_build, defender_version } = body;
-
-  if (!organization_token || !hostname) {
-    return new Response(JSON.stringify({ error: "Missing required fields" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  // Validate organization token (for now, use org ID directly - in production, use a secure token)
-  const { data: org, error: orgError } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("id", organization_token)
-    .maybeSingle();
-
-  if (orgError || !org) {
-    return new Response(JSON.stringify({ error: "Invalid organization" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  // Generate unique agent token
-  const agentToken = generateAgentToken();
-
-  // Check if endpoint already exists by hostname in this org
-  const { data: existing } = await supabase
-    .from("endpoints")
-    .select("id, agent_token")
-    .eq("organization_id", org.id)
-    .eq("hostname", hostname)
-    .maybeSingle();
-
-  if (existing) {
-    // Update existing endpoint
-    const { error: updateError } = await supabase
-      .from("endpoints")
-      .update({
-        os_version,
-        os_build,
-        defender_version,
-        agent_version: body.agent_version || null,
-        last_seen_at: new Date().toISOString(),
-        is_online: true,
-      })
-      .eq("id", existing.id);
-
-    if (updateError) throw updateError;
-
-    // Log the re-registration
-    await supabase.from("endpoint_logs").insert({
-      endpoint_id: existing.id,
-      log_type: "agent",
-      message: "Agent re-registered",
-      details: { os_version, os_build, defender_version },
-    });
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        endpoint_id: existing.id,
-        agent_token: existing.agent_token,
-        message: "Endpoint re-registered",
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  // Create new endpoint
-  const { data: endpoint, error: insertError } = await supabase
-    .from("endpoints")
-    .insert({
-      organization_id: org.id,
-      agent_token: agentToken,
-      hostname,
-      os_version,
-      os_build,
-      defender_version,
-      agent_version: body.agent_version || null,
-      last_seen_at: new Date().toISOString(),
-      is_online: true,
-    })
-    .select()
-    .single();
-
-  if (insertError) throw insertError;
-
-  // Log the registration
-  await supabase.from("endpoint_logs").insert({
-    endpoint_id: endpoint.id,
-    log_type: "agent",
-    message: "Agent registered successfully",
-    details: { os_version, os_build, defender_version },
-  });
-
+async function handleRegister(_req: Request): Promise<Response> {
+  // disabled-legacy-register-410
+  // Legacy UUID-as-token registration is permanently disabled. Use
+  // /functions/v1/agent-enroll with a one-time enrollment token instead.
   return new Response(
-    JSON.stringify({
-      success: true,
-      endpoint_id: endpoint.id,
-      agent_token: agentToken,
-      message: "Endpoint registered successfully",
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    JSON.stringify({ error: "registration_disabled", hint: "Use /functions/v1/agent-enroll with an enrollment token" }),
+    { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
+
 
 // POST /heartbeat - Receive status update from agent
 async function handleHeartbeat(req: Request) {
@@ -451,6 +388,26 @@ async function handleHeartbeat(req: Request) {
       JSON.stringify({ success: true, message: "Heartbeat rate limited", rate_limited: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  }
+
+  // Detect agent version transitions BEFORE we overwrite the cached value.
+  // Writes a row to agent_update_log per (old -> new) transition; tolerant
+  // of the "no version reported" case so we don't double-log on null.
+  if (body.agent_version && body.agent_version !== endpoint.agent_version) {
+    try {
+      await supabase.from("agent_update_log").insert({
+        endpoint_id:     endpoint.id,
+        organization_id: endpoint.organization_id,
+        from_version:    endpoint.agent_version,
+        to_version:      String(body.agent_version),
+        trigger:         "heartbeat_detected",
+        status:          "completed",
+        completed_at:    new Date().toISOString(),
+      });
+      console.log(`[${VERSION}] agent_update_log: ${endpoint.id} ${endpoint.agent_version} -> ${body.agent_version}`);
+    } catch (e) {
+      console.error(`[${VERSION}] agent_update_log insert failed:`, e);
+    }
   }
 
   // Update endpoint last seen
@@ -523,40 +480,160 @@ async function handleHeartbeat(req: Request) {
     .eq("id", endpoint.organization_id)
     .single();
 
-  // Fetch pending commands for this endpoint
+  // Record incoming command results — the agent batches them and ships in
+  // the next heartbeat after execution. Idempotent: we accept whatever the
+  // agent says, scoped to this endpoint, and short-circuit if the row is
+  // already in a terminal state.
+  if (Array.isArray(body.command_results) && body.command_results.length > 0) {
+    for (const r of body.command_results as any[]) {
+      if (!r || !r.id) continue;
+      const status = r.status === "succeeded" ? "succeeded"
+                   : r.status === "failed"    ? "failed"
+                   : null;
+      if (!status) continue;
+      const errorMessage = typeof r.error === "string" ? r.error : null;
+      const result = r.result ?? null;
+      const { error: resErr } = await supabase
+        .from("agent_commands")
+        .update({
+          status,
+          completed_at: new Date().toISOString(),
+          result,
+          error_message: errorMessage,
+        })
+        .eq("id", r.id)
+        .eq("endpoint_id", endpoint.id)
+        .in("status", ["queued", "dispatched"]);
+      if (resErr) console.error(`[heartbeat] command-result update ${r.id}:`, resErr);
+    }
+  }
+
+  // PoC rec #10: the agent ships Defender threats inside the heartbeat
+  // payload but the previous code silently dropped them -- /threats was a
+  // dead route. Process them here so endpoint_threats actually reflects
+  // current Defender state.
+  if (Array.isArray(body.threats) && body.threats.length > 0) {
+    try {
+      const n = await ingestThreats(endpoint.id, body.threats);
+      if (n > 0) console.log(`[${VERSION}] heartbeat ingested ${n} threats for endpoint ${endpoint.id}`);
+    } catch (e) {
+      console.error(`[${VERSION}] threat ingest failed in heartbeat:`, e);
+    }
+  }
+
+  // v0.6.5: tamper-protection events. SCM events 7034/7036/7040/7045 on the
+  // MithrasAgent service. Each lands in alerts as alert_type='tamper_attempt'.
+  if (Array.isArray(body.tamper_events) && body.tamper_events.length > 0) {
+    try {
+      const n = await ingestTamperEvents(endpoint.id, endpoint.organization_id, body.tamper_events);
+      if (n > 0) console.log(`[${VERSION}] heartbeat ingested ${n} tamper_events for endpoint ${endpoint.id}`);
+    } catch (e) {
+      console.error(`[${VERSION}] tamper_events ingest failed in heartbeat:`, e);
+    }
+  }
+
+  // v0.6.6: ransomware canary trips. Each canary file the agent monitored
+  // that was modified or deleted lands as a critical alert.
+  if (Array.isArray(body.canary_events) && body.canary_events.length > 0) {
+    try {
+      const n = await ingestCanaryEvents(endpoint.id, endpoint.organization_id, body.canary_events);
+      if (n > 0) console.log(`[${VERSION}] heartbeat ingested ${n} canary_events for endpoint ${endpoint.id}`);
+    } catch (e) {
+      console.error(`[${VERSION}] canary_events ingest failed in heartbeat:`, e);
+    }
+  }
+
+  // v0.6.6: Defender state snapshot. Latest-wins -- stamps endpoints row.
+  if (body.defender_state && typeof body.defender_state === 'object') {
+    try {
+      await supabase.from('endpoints').update({
+        defender_state:            body.defender_state,
+        defender_state_updated_at: new Date().toISOString(),
+      }).eq('id', endpoint.id);
+    } catch (e) {
+      console.error(`[${VERSION}] defender_state update failed:`, e);
+    }
+  }
+
+  // v0.6.6: REMOVED auto-queue of upgrade_agent. Upgrades are now operator-
+  // driven via the Upgrade button on the endpoint detail page in the SOC
+  // console. Server only stamps `latest_version` in the response so the UI
+  // can show "upgrade available" -- it does NOT enqueue an upgrade command
+  // automatically. This prevents a bad release from cascading across the
+  // fleet without operator review. See `maybeQueueAgentUpgrade` below --
+  // function retained so we can re-enable per-org auto-update opt-in later,
+  // but it's no longer called from the heartbeat path.
+
+  // Fetch queued commands for this endpoint, then atomically flip them to
+  // dispatched. The previous code targeted a stale `endpoint_commands` table
+  // with the wrong column names — agent_commands is the real table created
+  // by the Phase 1 migration. Respect expires_at so stuck queue rows can't
+  // be replayed indefinitely.
   const { data: pendingCommands } = await supabase
-    .from("endpoint_commands")
-    .select("id, command_type, parameters")
+    .from("agent_commands")
+    .select("id, command_type, params")
     .eq("endpoint_id", endpoint.id)
-    .eq("status", "pending")
+    .eq("status", "queued")
+    .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
     .order("issued_at", { ascending: true })
     .limit(10);
 
-  // Mark fetched commands as sent
   if (pendingCommands && pendingCommands.length > 0) {
     const commandIds = pendingCommands.map((c: any) => c.id);
     await supabase
-      .from("endpoint_commands")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
+      .from("agent_commands")
+      .update({ status: "dispatched", dispatched_at: new Date().toISOString() })
       .in("id", commandIds);
   }
 
+  // Embed the current latest stable version in every heartbeat response so
+  // legacy bearer-token agents can see what they should be running. Modern
+  // (>=0.5.0) agents have their own /agent-version-check HMAC path, but
+  // exposing it here too means a single source of truth and lets the UI
+  // surface "upgrade available" without an extra round trip.
+  const reportedVersion = body.agent_version || endpoint.agent_version || null;
+  let latestVersionPayload: Record<string, unknown> | null = null;
+  try {
+    const { data: latest } = await supabase
+      .from("agent_versions")
+      .select("version, download_url, sha256")
+      .eq("runtime", "powershell")
+      .eq("channel", "stable")
+      .eq("is_active", true)
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest) {
+      latestVersionPayload = {
+        version:      latest.version,
+        download_url: latest.download_url,
+        sha256:       latest.sha256,
+        upgrade_available: reportedVersion ? cmpSemver(reportedVersion, latest.version) < 0 : false,
+      };
+    }
+  } catch (e) {
+    console.error(`[${VERSION}] heartbeat latest-version lookup failed:`, e);
+  }
+
   return new Response(
-    JSON.stringify({ 
-      success: true, 
+    JSON.stringify({
+      success: true,
       message: "Heartbeat received",
       network_module_enabled: org?.network_module_enabled ?? false,
       commands: pendingCommands || [],
+      latest_version: latestVersionPayload,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
 
 // POST /command-result - Agent reports result of executed command
+// (Legacy path. Modern agents batch results via the heartbeat payload
+// instead, but this endpoint is kept so older agents keep working.)
 async function handleCommandResult(req: Request) {
   const endpoint = await validateAgentToken(req);
   const body = await req.json();
-  const { command_id, success, result } = body;
+  const { command_id, success, result, error } = body;
 
   if (!command_id) {
     return new Response(
@@ -565,19 +642,19 @@ async function handleCommandResult(req: Request) {
     );
   }
 
-  const { error } = await supabase
-    .from("endpoint_commands")
+  const { error: updateErr } = await supabase
+    .from("agent_commands")
     .update({
-      status: success ? "completed" : "failed",
+      status: success ? "succeeded" : "failed",
       completed_at: new Date().toISOString(),
       result: result || null,
+      error_message: typeof error === "string" ? error : null,
     })
     .eq("id", command_id)
-    .eq("endpoint_id", endpoint.id);
+    .eq("endpoint_id", endpoint.id)
+    .in("status", ["queued", "dispatched"]);
 
-  if (error) {
-    console.error("Error updating command result:", error);
-  }
+  if (updateErr) console.error("Error updating command result:", updateErr);
 
   return new Response(
     JSON.stringify({ success: true }),
@@ -698,6 +775,188 @@ async function handleThreats(req: Request) {
     JSON.stringify({ success: true, message: `Processed ${threats.length} threats` }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// Process an array of threats for an endpoint. Mirrors handleThreats body but
+// callable from /heartbeat too -- the agent ships threats inside the heartbeat
+// payload, which was being silently dropped (PoC rec #10 found 0 fresh threats
+// in 30 days across the fleet; this closes that hole).
+async function ingestThreats(endpointId: string, threats: any[]) {
+  if (!Array.isArray(threats) || threats.length === 0) return 0;
+  let touched = 0;
+  for (const threat of threats) {
+    if (!threat?.threat_id) continue;
+    const { data: existing } = await supabase
+      .from("endpoint_threats")
+      .select("id, manual_resolution_active, manual_resolved_at")
+      .eq("endpoint_id", endpointId)
+      .eq("threat_id", threat.threat_id)
+      .maybeSingle();
+
+    const incomingStatus = String(threat.status || "Active");
+    const incomingStatusLc = incomingStatus.toLowerCase();
+    const incomingIndicatesNewActivity = ["active","allowed","executing","quarantined","blocked"].includes(incomingStatusLc);
+
+    if (existing) {
+      const incomingTimeStr = threat.last_threat_status_change_time || threat.initial_detection_time || null;
+      const incomingTime = incomingTimeStr ? new Date(incomingTimeStr) : null;
+      const manualResolvedAt = existing.manual_resolved_at ? new Date(existing.manual_resolved_at) : null;
+      const shouldClearManualResolution =
+        !!existing.manual_resolution_active && incomingIndicatesNewActivity && !!incomingTime &&
+        (!manualResolvedAt || incomingTime > manualResolvedAt);
+      if (existing.manual_resolution_active && !shouldClearManualResolution) {
+        await supabase.from("endpoint_threats").update({ raw_data: threat.raw_data }).eq("id", existing.id);
+      } else {
+        await supabase.from("endpoint_threats").update({
+          status: threat.status,
+          last_threat_status_change_time: threat.last_threat_status_change_time,
+          // Also refresh resources -- the latest detection's file path matters operationally.
+          resources: threat.resources,
+          raw_data: threat.raw_data,
+          ...(shouldClearManualResolution ? {
+            manual_resolution_active: false,
+            manual_resolved_at: null,
+            manual_resolved_by: null,
+          } : {}),
+        }).eq("id", existing.id);
+      }
+      touched++;
+    } else {
+      const { error: upsertError } = await supabase.from("endpoint_threats").upsert({
+        endpoint_id: endpointId,
+        threat_id: threat.threat_id,
+        threat_name: threat.threat_name,
+        severity: threat.severity || "Unknown",
+        category: threat.category,
+        status: threat.status || "Active",
+        initial_detection_time: threat.initial_detection_time,
+        last_threat_status_change_time: threat.last_threat_status_change_time,
+        resources: threat.resources,
+        raw_data: threat.raw_data,
+        manual_resolution_active: false,
+        manual_resolved_at: null,
+        manual_resolved_by: null,
+      }, { onConflict: "endpoint_id,threat_id" });
+      if (!upsertError) {
+        await supabase.from("endpoint_logs").insert({
+          endpoint_id: endpointId,
+          log_type: "threat",
+          message: `Threat detected: ${threat.threat_name}`,
+          details: { threat_id: threat.threat_id, severity: threat.severity },
+        });
+        touched++;
+      }
+    }
+  }
+  return touched;
+}
+
+// v0.6.5: tamper-protection event ingest. Mirrors the HMAC heartbeat path
+// (agent-heartbeat block 7b) so legacy bearer-token agents that get upgraded
+// in-place to v0.6.5 still land alerts even before they swing over to HMAC.
+async function ingestTamperEvents(endpointId: string, organizationId: string, events: any[]) {
+  if (!Array.isArray(events) || events.length === 0) return 0;
+  const sevMap: Record<string, string> = {
+    Severe:   'critical',
+    High:     'high',
+    Moderate: 'medium',
+    Low:      'low',
+  };
+  const titleFor = (t: string): string => {
+    switch (t) {
+      case 'service_stopped':      return 'Tamper attempt: MithrasAgent service stopped';
+      case 'service_stopping':     return 'Tamper attempt: MithrasAgent service stop initiated';
+      case 'crashed_unexpectedly': return 'Tamper attempt: MithrasAgent crashed unexpectedly';
+      case 'start_type_changed':   return 'Tamper attempt: MithrasAgent start type changed';
+      case 'service_installed':    return 'Tamper notice: MithrasAgent service installed';
+      default:                     return `Tamper event: ${t}`;
+    }
+  };
+
+  let inserted = 0;
+  for (const e of events) {
+    if (!e?.event_type || e.record_id === undefined) continue;
+    // record_id is supposed to be a Windows Event Log RecordId (integer).
+    // Reject anything non-numeric so a compromised agent can't send
+    // record_id="%" and have ilike match every existing tamper_attempt
+    // row, suppressing future tamper alerts for the 6h idempotency window.
+    const recIdNum = Number(e.record_id);
+    if (!Number.isFinite(recIdNum)) continue;
+    const recId = String(Math.trunc(recIdNum));
+
+    // 6-hour idempotency window — if we already logged this RecordId on this
+    // endpoint, skip. Cheap, and the agent's state file already prevents the
+    // common case of double-shipping.
+    const { data: existing } = await supabase
+      .from('alerts')
+      .select('id')
+      .eq('endpoint_id', endpointId)
+      .eq('alert_type', 'tamper_attempt')
+      .ilike('message', `%record ${recId}%`)
+      .gte('created_at', new Date(Date.now() - 6 * 3600_000).toISOString())
+      .limit(1);
+    if (existing && existing.length > 0) continue;
+
+    const row = {
+      organization_id: organizationId,
+      endpoint_id:     endpointId,
+      alert_type:      'tamper_attempt',
+      severity:        sevMap[String(e.severity)] ?? 'medium',
+      title:           titleFor(String(e.event_type)),
+      message:         `Event ${e.event_id} (record ${recId}) at ${e.event_time}: ${String(e.message ?? '').slice(0, 400)}`,
+      created_at:      (typeof e.event_time === 'string' ? e.event_time : new Date().toISOString()),
+    };
+    const { error: iErr } = await supabase.from('alerts').insert(row);
+    if (!iErr) inserted++;
+    else console.error('tamper_events insert', iErr);
+  }
+  return inserted;
+}
+
+// v0.6.6: ransomware canary trips. Each modified or deleted decoy ships as
+// a critical alert with full hash/size delta in the message.
+async function ingestCanaryEvents(endpointId: string, organizationId: string, events: any[]) {
+  if (!Array.isArray(events) || events.length === 0) return 0;
+  let inserted = 0;
+  for (const e of events) {
+    if (!e?.path || !e?.event_type) continue;
+    // Escape LIKE metacharacters so a compromised agent can't send path="%"
+    // to match all canary alert rows and suppress future canary alerts
+    // for the 6h idempotency window.
+    const canaryPath = String(e.path).replace(/[\\%_]/g, (c) => "\\" + c);
+
+    const { data: existing } = await supabase
+      .from('alerts')
+      .select('id')
+      .eq('endpoint_id', endpointId)
+      .eq('alert_type', 'ransomware_canary_tripped')
+      .ilike('message', `%${canaryPath}%`)
+      .gte('created_at', new Date(Date.now() - 6 * 3600_000).toISOString())
+      .limit(1);
+    if (existing && existing.length > 0) continue;
+
+    const name = canaryPath.split(/[\\/]/).pop() || canaryPath;
+    const titleVerb = e.event_type === 'modified' ? 'modified' : (e.event_type === 'deleted' ? 'deleted' : `tripped (${e.event_type})`);
+
+    const row = {
+      organization_id: organizationId,
+      endpoint_id:     endpointId,
+      alert_type:      'ransomware_canary_tripped',
+      severity:        'critical',
+      title:           `Ransomware suspected: canary file "${name}" was ${titleVerb}`,
+      message:         `Canary at ${canaryPath} (${e.event_type}). ` +
+                       `expected_sha256=${e.expected_sha256 ?? 'n/a'} ` +
+                       `observed_sha256=${e.observed_sha256 ?? 'n/a'} ` +
+                       `expected_size=${e.expected_size ?? 'n/a'} ` +
+                       `observed_size=${e.observed_size ?? 'n/a'}. ` +
+                       `This is a strong signal of active ransomware. Isolate this endpoint immediately.`,
+      created_at:      (typeof e.event_time === 'string' ? e.event_time : new Date().toISOString()),
+    };
+    const { error: iErr } = await supabase.from('alerts').insert(row);
+    if (!iErr) inserted++;
+    else console.error('canary_events insert', iErr);
+  }
+  return inserted;
 }
 
 // POST /logs - Receive event logs from agent
@@ -1680,13 +1939,17 @@ async function handleAgentUpdate(req: Request) {
     );
   }
 
-  // Try to get org ID from token if available, but don't fail if missing
-  let organizationId: string | null = null;
+  // Require a valid agent token. Previously this swallowed auth failures
+  // and returned the script_endpoint URL to any unauthenticated internet
+  // caller - that's a reconnaissance leak of the installer entry point.
+  let endpoint: { organization_id: string };
   try {
-    const endpoint = await validateAgentToken(req);
-    organizationId = endpoint.organization_id;
+    endpoint = await validateAgentToken(req);
   } catch {
-    console.log(`[${VERSION}] handleAgentUpdate: token validation failed, returning update info without org ID`);
+    return new Response(
+      JSON.stringify({ success: false, error: "unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   return new Response(
@@ -1694,9 +1957,9 @@ async function handleAgentUpdate(req: Request) {
       success: true,
       update_available: true,
       current_version: AGENT_VERSION,
-      ...(organizationId && { organization_id: organizationId }),
+      organization_id: endpoint.organization_id,
       // Agent will download from the agent-script edge function using its token
-      script_endpoint: `${SUPABASE_URL}/functions/v1/agent-script`,
+      script_endpoint: `${Deno.env.get("PUBLIC_API_BASE_URL") ?? SUPABASE_URL}/functions/v1/agent-script`,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
@@ -1750,21 +2013,120 @@ async function handleFirewallLogs(req: Request) {
     );
   }
 
-  // Build batch of valid logs
+  // Fetch firewall_service_rules visible to this endpoint so we can stamp
+  // rule_id on logs that arrived without one (legacy v2.19.0 agents). The
+  // dashboard RPC get_microseg_rule_stats filters WHERE rule_id IS NOT NULL,
+  // so unstamped logs silently disappear from the learn-phase UI.
+  type RuleMatch = {
+    id: string;
+    service_name: string;
+    ports: Set<number>;
+    ranges: [number, number][];
+    protocol: string;
+  };
+  const parsePortField = (port: string): { ports: Set<number>; ranges: [number, number][] } => {
+    const ports = new Set<number>();
+    const ranges: [number, number][] = [];
+    for (const raw of (port || "").split(",")) {
+      const tok = raw.trim();
+      if (!tok) continue;
+      const range = tok.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (range) {
+        const lo = parseInt(range[1], 10);
+        const hi = parseInt(range[2], 10);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo) {
+          if (hi - lo <= 1024) {
+            for (let p = lo; p <= hi; p++) ports.add(p);
+          } else {
+            ranges.push([lo, hi]);
+          }
+        }
+        continue;
+      }
+      const n = parseInt(tok, 10);
+      if (Number.isFinite(n)) ports.add(n);
+    }
+    return { ports, ranges };
+  };
+
+  let endpointRules: (RuleMatch & { direction: string })[] = [];
+  try {
+    const { data: memberships } = await supabase
+      .from("endpoint_group_memberships")
+      .select("group_id")
+      .eq("endpoint_id", endpoint.id);
+    const groupIds = (memberships ?? []).map((m: any) => m.group_id);
+    if (groupIds.length > 0) {
+      const { data: ruleRows } = await supabase
+        .from("firewall_service_rules")
+        .select("id, service_name, port, protocol, direction, firewall_policies!inner(organization_id)")
+        .eq("firewall_policies.organization_id", endpoint.organization_id)
+        .in("endpoint_group_id", groupIds)
+        .eq("enabled", true);
+      endpointRules = (ruleRows ?? []).map((r: any) => {
+        const { ports, ranges } = parsePortField(r.port);
+        return {
+          id: r.id,
+          service_name: r.service_name,
+          ports,
+          ranges,
+          protocol: (r.protocol || "tcp").toLowerCase(),
+          direction: ((r.direction as string) || "inbound").toLowerCase(),
+        };
+      });
+    }
+  } catch (e) {
+    console.error(`[${VERSION}] rule-prefetch failed (non-fatal):`, e);
+  }
+
+  // v0.5.7: matcher now considers direction so the same port can have separate
+  // inbound + outbound rules.
+  const matchRule = (localPort: number, protocol: string, direction: string): RuleMatch | null => {
+    const proto = (protocol || "tcp").toLowerCase();
+    const dir   = (direction || "inbound").toLowerCase();
+    for (const r of endpointRules) {
+      if (r.protocol !== proto) continue;
+      if (r.direction !== dir) continue;
+      if (r.ports.has(localPort)) return r;
+      for (const [lo, hi] of r.ranges) {
+        if (localPort >= lo && localPort <= hi) return r;
+      }
+    }
+    return null;
+  };
+
+  // Build batch of valid logs, stamping rule_id server-side if absent
+  let stampedCount = 0;
   const logsToInsert = logs
     .filter((log: any) => log?.service_name && log?.remote_address)
-    .map((log: any) => ({
-      organization_id: endpoint.organization_id,
-      endpoint_id: endpoint.id,
-      rule_id: log.rule_id || null,
-      service_name: log.service_name,
-      local_port: log.local_port || 0,
-      remote_address: log.remote_address,
-      remote_port: log.remote_port || null,
-      protocol: log.protocol || "tcp",
-      direction: log.direction || "inbound",
-      event_time: log.event_time || new Date().toISOString(),
-    }));
+    .map((log: any) => {
+      let ruleId: string | null = log.rule_id || null;
+      let serviceName: string = log.service_name;
+      const dir = (log.direction || "inbound").toLowerCase();
+      if (!ruleId && (dir === "inbound" || dir === "outbound") && endpointRules.length > 0) {
+        const matched = matchRule(Number(log.local_port) || 0, log.protocol || "tcp", dir);
+        if (matched) {
+          ruleId = matched.id;
+          if (matched.service_name) serviceName = matched.service_name;
+          stampedCount++;
+        }
+      }
+      return {
+        organization_id: endpoint.organization_id,
+        endpoint_id: endpoint.id,
+        rule_id: ruleId,
+        service_name: serviceName,
+        local_port: log.local_port || 0,
+        remote_address: log.remote_address,
+        remote_port: log.remote_port || null,
+        protocol: log.protocol || "tcp",
+        direction: log.direction || "inbound",
+        event_time: log.event_time || new Date().toISOString(),
+      };
+    });
+  if (stampedCount > 0) {
+    console.log(`[${VERSION}] Server-side rule_id stamped on ${stampedCount}/${logsToInsert.length} logs`);
+  }
 
   let insertedCount = 0;
 
@@ -1784,6 +2146,166 @@ async function handleFirewallLogs(req: Request) {
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
+// POST /sysmon-events - Receive Sysmon telemetry from agent (events 1/3/11)
+async function handleSysmonEvents(req: Request) {
+  console.log(`[${VERSION}] handleSysmonEvents called`);
+  const endpoint = await validateAgentToken(req);
+
+  const body = await req.json();
+  const eventsRaw = (body && typeof body === "object" && "events" in body) ? (body as any).events : body;
+  const events: any[] = Array.isArray(eventsRaw) ? eventsRaw : eventsRaw && typeof eventsRaw === "object" ? [eventsRaw] : [];
+
+  console.log(`[${VERSION}] Sysmon events received: ${events.length} from ${endpoint.hostname}`);
+
+  if (events.length === 0) {
+    return new Response(
+      JSON.stringify({ success: true, message: "No events", count: 0, _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Whitelist of columns the agent is allowed to set. We pass everything else
+  // through into the `raw` jsonb so we don't lose forensic context, but the
+  // typed columns are explicit to avoid Postgres rejecting an unknown field.
+  const ALLOWED_FIELDS = new Set([
+    "event_time", "event_id", "record_id", "user_name",
+    "process_guid", "process_id", "parent_process_guid", "parent_process_id",
+    "image", "parent_image", "command_line", "parent_command_line",
+    "current_directory", "hashes", "integrity_level",
+    "protocol", "initiated", "source_ip", "source_port", "source_hostname",
+    "destination_ip", "destination_port", "destination_hostname",
+    "target_filename",
+  ]);
+
+  const eventsToInsert = events
+    .filter((e: any) => e && typeof e === "object" && (e.event_id === 1 || e.event_id === 3 || e.event_id === 11))
+    .map((e: any) => {
+      const row: Record<string, unknown> = {
+        organization_id: endpoint.organization_id,
+        endpoint_id:     endpoint.id,
+        event_time:      e.event_time || new Date().toISOString(),
+        event_id:        e.event_id,
+        raw:             e,
+      };
+      for (const k of Object.keys(e)) {
+        if (ALLOWED_FIELDS.has(k)) row[k] = e[k];
+      }
+      return row;
+    });
+
+  if (eventsToInsert.length === 0) {
+    return new Response(
+      JSON.stringify({ success: true, message: "No supported event ids", count: 0, _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  let inserted = 0;
+  const BATCH = 200;
+  for (let i = 0; i < eventsToInsert.length; i += BATCH) {
+    const batch = eventsToInsert.slice(i, i + BATCH);
+    const { error } = await supabase.from("sysmon_events").insert(batch);
+    if (!error) {
+      inserted += batch.length;
+    } else {
+      console.error("Sysmon event batch insert error:", error);
+    }
+  }
+
+  console.log(`[${VERSION}] Sysmon events inserted: ${inserted} of ${events.length}`);
+
+  return new Response(
+    JSON.stringify({ success: true, message: "Sysmon events received", count: inserted, _version: VERSION }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// GET /dns-policy - Return the DNS policy assigned to the requesting endpoint
+async function handleGetDnsPolicy(req: Request) {
+  console.log(`[${VERSION}] handleGetDnsPolicy called`);
+  const endpoint = await validateAgentToken(req);
+
+  // Check org-level module gate
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id, dns_module_enabled")
+    .eq("id", endpoint.organization_id)
+    .single();
+
+  if (!org?.dns_module_enabled) {
+    return new Response(
+      JSON.stringify({ success: true, enabled: false, _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Resolve which policy applies (endpoint direct > group > org default)
+  const { data: resolved, error: rpcErr } = await supabase.rpc(
+    "get_endpoint_dns_policy",
+    { p_endpoint_id: endpoint.id }
+  );
+  if (rpcErr) {
+    console.error("[dns-policy] rpc error:", rpcErr);
+    return new Response(
+      JSON.stringify({ success: false, error: "policy_resolve_failed", _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  const policyId = resolved as string | null;
+  if (!policyId) {
+    return new Response(
+      JSON.stringify({ success: true, enabled: true, policy: null, _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const [policyRes, scopesRes] = await Promise.all([
+    supabase
+      .from("dns_policies")
+      .select(
+        "id, name, upstream_provider, upstream_doh_uri, block_malware, block_phishing, block_adult, block_gambling, block_social, custom_blocklist, custom_allowlist, disable_browser_doh",
+      )
+      .eq("id", policyId)
+      .single(),
+    supabase
+      .from("dns_internal_scopes")
+      .select("suffix, forwarders, description, display_order")
+      .eq("policy_id", policyId)
+      .order("display_order"),
+  ]);
+
+  if (policyRes.error || !policyRes.data) {
+    console.error("[dns-policy] policy fetch error:", policyRes.error);
+    return new Response(
+      JSON.stringify({ success: false, error: "policy_fetch_failed", _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const dohUri = `https://dns.mithras.com.au/${endpoint.organization_id}/dns-query`;
+
+  const response = {
+    success: true,
+    enabled: true,
+    policy: {
+      policy_id: policyRes.data.id,
+      name: policyRes.data.name,
+      doh_uri: dohUri,
+      disable_browser_doh: policyRes.data.disable_browser_doh,
+      internal_scopes: (scopesRes.data ?? []).map((s) => ({
+        suffix: s.suffix,
+        forwarders: s.forwarders,
+        description: s.description,
+      })),
+    },
+    _version: VERSION,
+  };
+
+  return new Response(JSON.stringify(response), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 async function handleGetFirewallPolicy(req: Request) {
   const endpoint = await validateAgentToken(req);
 
@@ -1842,7 +2364,8 @@ async function handleGetFirewallPolicy(req: Request) {
       allowed_source_ips,
       mode,
       enabled,
-      order_priority
+      order_priority,
+      direction
     `)
     .eq("policy_id", policy.id)
     .in("endpoint_group_id", groupIds)
@@ -2000,4 +2523,243 @@ async function handleSoftwareInventory(req: Request) {
     JSON.stringify({ success: true, software_received: inserted }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// GET /app-whitelist-policy - mode + rules so the agent knows whether to
+// observe-only or block, and which apps are allowed.
+async function handleGetAppWhitelistPolicy(req: Request) {
+  console.log(`[${VERSION}] handleGetAppWhitelistPolicy called`);
+  const endpoint = await validateAgentToken(req);
+
+  const [stateRes, rulesRes] = await Promise.all([
+    supabase
+      .from("app_whitelist_state")
+      .select("mode, audit_started_at, enforce_started_at")
+      .eq("endpoint_id", endpoint.id)
+      .maybeSingle(),
+    supabase
+      .from("app_whitelist_rules")
+      .select("id, match_type, match_value, app_name, publisher, enabled")
+      .eq("endpoint_id", endpoint.id)
+      .eq("enabled", true),
+  ]);
+
+  const mode = stateRes.data?.mode || "idle";
+  const rules = (rulesRes.data ?? []).map((r: any) => ({
+    id:          r.id,
+    match_type:  r.match_type,
+    match_value: r.match_value,
+    app_name:    r.app_name,
+    publisher:   r.publisher, // required for trusted_path compound match
+  }));
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      mode,
+      audit_started_at:   stateRes.data?.audit_started_at   ?? null,
+      enforce_started_at: stateRes.data?.enforce_started_at ?? null,
+      rules,
+      _version: VERSION,
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// POST /app-audit-logs - receive process-launch events from the agent.
+// Body: { logs: [{ file_name, file_path, sha256, publisher, product_name,
+//                  file_version, process_id, parent_path, user_name,
+//                  command_line, action, rule_id, event_time }] }
+async function handleAppAuditLogs(req: Request) {
+  console.log(`[${VERSION}] handleAppAuditLogs called`);
+  const endpoint = await validateAgentToken(req);
+
+  const body = await req.json().catch(() => ({}));
+  const logs: any[] = Array.isArray(body?.logs) ? body.logs : [];
+  if (logs.length === 0) {
+    return new Response(
+      JSON.stringify({ success: true, count: 0, _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const allowedActions = new Set(["observed", "allowed", "blocked"]);
+  const rows = logs
+    .filter((l) => l && typeof l === "object" && allowedActions.has(String(l.action || "observed")))
+    .map((l) => ({
+      organization_id: endpoint.organization_id,
+      endpoint_id:     endpoint.id,
+      event_time:      l.event_time || new Date().toISOString(),
+      file_name:       l.file_name    ? String(l.file_name).substring(0, 500)    : null,
+      file_path:       l.file_path    ? String(l.file_path).substring(0, 1000)   : null,
+      sha256:          l.sha256       ? String(l.sha256).substring(0, 128)       : null,
+      publisher:       l.publisher    ? String(l.publisher).substring(0, 500)    : null,
+      product_name:    l.product_name ? String(l.product_name).substring(0, 500) : null,
+      file_version:    l.file_version ? String(l.file_version).substring(0, 100) : null,
+      process_id:      Number.isFinite(Number(l.process_id)) ? Number(l.process_id) : null,
+      parent_path:     l.parent_path  ? String(l.parent_path).substring(0, 1000)  : null,
+      user_name:       l.user_name    ? String(l.user_name).substring(0, 500)    : null,
+      command_line:    l.command_line ? String(l.command_line).substring(0, 2000) : null,
+      action:          String(l.action || "observed"),
+      rule_id:         l.rule_id || null,
+    }));
+
+  let inserted = 0;
+  const batchSize = 200;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    const { error } = await supabase.from("app_audit_logs").insert(batch);
+    if (error) {
+      console.error("[app-audit-logs] insert error:", error);
+    } else {
+      inserted += batch.length;
+    }
+  }
+
+  console.log(`[${VERSION}] app-audit-logs inserted: ${inserted} of ${rows.length}`);
+  return new Response(
+    JSON.stringify({ success: true, count: inserted, _version: VERSION }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// POST /wdac-applied - agent reports it applied a WDAC policy version. Updates
+// endpoint_app_control_state per assigned rule set (matched by rule_set_id in
+// the payload, OR auto-discovered if the endpoint has exactly one assignment).
+// Body: { rules_hash, mode ('audit'|'enforce'|'off'), error?, rule_set_id? }
+async function handleWdacApplied(req: Request) {
+  console.log(`[${VERSION}] handleWdacApplied called`);
+  const endpoint = await validateAgentToken(req);
+  const body = await req.json().catch(() => ({}));
+
+  const rulesHash = body?.rules_hash ? String(body.rules_hash) : null;
+  const mode      = ["audit","enforce","off"].includes(String(body?.mode)) ? String(body.mode) : null;
+  const errorMsg  = body?.error ? String(body.error).substring(0, 2000) : null;
+  const explicitRuleSet = body?.rule_set_id ? String(body.rule_set_id) : null;
+
+  // Resolve which rule_set rows to update. If the agent didn't specify, find
+  // every active assignment for this endpoint and update each (they all just
+  // had the same policy applied client-side).
+  const { data: rows } = await supabase
+    .from("endpoint_app_control_state")
+    .select("endpoint_id, rule_set_id")
+    .eq("endpoint_id", endpoint.id);
+
+  if (!rows || rows.length === 0) {
+    return new Response(JSON.stringify({ success: true, message: "no_assignments", _version: VERSION }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const targets = explicitRuleSet
+    ? rows.filter(r => r.rule_set_id === explicitRuleSet)
+    : rows;
+
+  const patch: Record<string, unknown> = {
+    last_applied_at: new Date().toISOString(),
+  };
+  if (rulesHash) patch.last_applied_version = rulesHash;
+  if (mode)      patch.current_mode         = mode;
+  if (errorMsg) {
+    patch.last_apply_error    = errorMsg;
+    // Increment failure counter atomically via a follow-up update.
+  } else {
+    patch.last_apply_error    = null;
+    patch.apply_failure_count = 0;
+  }
+
+  let updated = 0;
+  for (const t of targets) {
+    const { error } = await supabase
+      .from("endpoint_app_control_state")
+      .update(patch)
+      .eq("endpoint_id", t.endpoint_id)
+      .eq("rule_set_id", t.rule_set_id);
+    if (!error) updated++;
+    else console.error(`[${VERSION}] /wdac-applied update error:`, error);
+
+    if (errorMsg) {
+      // RPC is optional — swallow failures so a missing function never
+      // breaks the /wdac-applied response. PostgREST's builder is thenable
+      // but not a Promise, so `.catch()` directly on it throws TypeError.
+      try {
+        await supabase.rpc("increment_wdac_apply_failure", {
+          p_endpoint_id: t.endpoint_id, p_rule_set_id: t.rule_set_id,
+        });
+      } catch { /* optional */ }
+    }
+  }
+
+  console.log(`[${VERSION}] wdac-applied updated ${updated} rows for endpoint ${endpoint.id}`);
+  return new Response(JSON.stringify({ success: true, updated, _version: VERSION }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+// Compare two semver-ish strings. Returns -1/0/+1.
+// Strict numeric tuple compare on the first three dotted segments.
+function cmpSemver(a: string | null, b: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] || 0;
+    const db = pb[i] || 0;
+    if (da !== db) return da < db ? -1 : 1;
+  }
+  return 0;
+}
+
+// PoC rec #4: queue an `upgrade_agent` command when an outdated v0.5.x+ host
+// heartbeats. Dedup'd by checking for an existing queued/dispatched row.
+async function maybeQueueAgentUpgrade(endpointId: string, orgId: string, reportedVersion: string | null) {
+  if (!reportedVersion) return;
+  // Only nudge agents on the modular runtime (>=0.5.0). Older hosts use the
+  // separate agent-legacy-upgrade migration path.
+  if (cmpSemver(reportedVersion, "0.5.0") < 0) return;
+
+  const { data: latest } = await supabase
+    .from("agent_versions")
+    .select("version, download_url, sha256")
+    .eq("runtime", "powershell")
+    .eq("channel", "stable")
+    .eq("is_active", true)
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!latest || cmpSemver(reportedVersion, latest.version) >= 0) return;
+
+  // Dedup: skip if an upgrade already queued/dispatched and not yet expired.
+  const nowIso = new Date().toISOString();
+  const { data: existing } = await supabase
+    .from("agent_commands")
+    .select("id")
+    .eq("endpoint_id", endpointId)
+    .eq("command_type", "upgrade_agent")
+    .in("status", ["queued", "dispatched"])
+    .or("expires_at.is.null,expires_at.gt." + nowIso)
+    .limit(1);
+
+  if (existing && existing.length > 0) return;
+
+  const { error } = await supabase
+    .from("agent_commands")
+    .insert({
+      endpoint_id: endpointId,
+      organization_id: orgId,
+      command_type: "upgrade_agent",
+      params: {
+        target_version: latest.version,
+        download_url: latest.download_url,
+        sha256: latest.sha256,
+        reason: "heartbeat_version_drift",
+        from_version: reportedVersion,
+      },
+    });
+  if (error) {
+    console.error(`[${VERSION}] auto-queue upgrade_agent failed:`, error);
+  } else {
+    console.log(`[${VERSION}] auto-queued upgrade_agent ${reportedVersion}->${latest.version} for endpoint ${endpointId}`);
+  }
 }

@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useToast } from "@/hooks/use-toast";
 
+// PoC rec #9: ILIKE wildcards in user input previously matched everything --
+// typing '%' returned the first 100 rows of every queried table, looking like
+// a real hit. Escape \, %, _ so the user's literal characters are matched
+// against literal characters in the DB. The leading/trailing '%' wrappers we
+// add to build "contains" semantics stay untouched.
+function escapeLikePattern(value: string): string {
+  return (value ?? "").replace(/[\\%_]/g, "\\$&");
+}
+
 // Types for threat hunting
 export type IocType = "file_hash" | "file_path" | "file_name" | "process_name";
 export type HashType = "md5" | "sha1" | "sha256";
@@ -413,6 +422,8 @@ export function useQuickSearch() {
       const results: QuickSearchResult[] = [];
       const normalizedValue = searchValue.trim().toLowerCase();
       const detection = detectIocType(searchValue);
+      const escapedSearch = escapeLikePattern(searchValue);
+      const escapedNormalized = escapeLikePattern(normalizedValue);
 
       // Search discovered apps
       if (detection.type === "file_hash" || detection.type === "file_path" || detection.type === "file_name") {
@@ -422,11 +433,11 @@ export function useQuickSearch() {
           .eq("organization_id", orgId);
 
         if (detection.type === "file_hash") {
-          query = query.ilike("file_hash", normalizedValue);
+          query = query.ilike("file_hash", escapedNormalized);
         } else if (detection.type === "file_path") {
-          query = query.ilike("file_path", `%${searchValue}%`);
+          query = query.ilike("file_path", `%${escapedSearch}%`);
         } else {
-          query = query.ilike("file_name", `%${searchValue}%`);
+          query = query.ilike("file_name", `%${escapedSearch}%`);
         }
 
         const { data } = await query.limit(100);
@@ -445,13 +456,54 @@ export function useQuickSearch() {
         }
       }
 
+      // Search endpoint_threats by name (file_name / process_name / generic) or
+      // hash inside the Defender raw payload. Closes PoC rec #6 -- the page
+      // advertises threats as a source, but the previous implementation never
+      // queried this table. ilike on a jsonb-as-text gives a coarse but useful
+      // match on hashes embedded in resources / additional_actions.
+      if (detection.type === "file_hash" || detection.type === "file_name" || detection.type === "process_name" || detection.type === "file_path") {
+        const term = `%${escapedSearch}%`;
+        let q = supabase
+          .from("endpoint_threats")
+          .select("id, endpoint_id, threat_name, severity, status, category, initial_detection_time, raw_data, endpoints!inner(hostname, organization_id)")
+          .eq("endpoints.organization_id", orgId);
+
+        if (detection.type === "file_hash") {
+          // Hash matches: raw_data jsonb-as-text contains the hash. Use a single
+          // ilike on the text cast so we don't need to know which key the
+          // Defender ETW payload nested it under.
+          q = q.filter("raw_data", "ilike", term);
+        } else {
+          // For names/paths/processes, threat_name is the primary signal;
+          // resources/raw_data also frequently contains paths.
+          q = q.or(`threat_name.ilike.${term},raw_data.ilike.${term}`);
+        }
+
+        const { data } = await q.limit(100);
+        if (data) {
+          results.push(...data.map((t: Record<string, unknown>) => ({
+            source: "threats" as MatchSource,
+            endpoint_id: t.endpoint_id as string,
+            endpoint_hostname: (t.endpoints as Record<string, string>)?.hostname ?? "Unknown",
+            matched_value: detection.type === "file_hash" ? searchValue : (t.threat_name as string),
+            context: {
+              threat_name: t.threat_name,
+              severity: t.severity,
+              status: t.status,
+              category: t.category,
+              initial_detection_time: t.initial_detection_time,
+            },
+          })));
+        }
+      }
+
       // Search event logs for path/name/process matches
       if (detection.type === "file_path" || detection.type === "file_name" || detection.type === "process_name") {
         const { data } = await supabase
           .from("endpoint_event_logs")
           .select("id, endpoint_id, message, event_time, log_source, event_id, raw_data, endpoints!inner(hostname, organization_id)")
           .eq("endpoints.organization_id", orgId)
-          .ilike("message", `%${searchValue}%`)
+          .ilike("message", `%${escapedSearch}%`)
           .limit(100);
 
         if (data) {
@@ -509,6 +561,8 @@ export function useExecuteHunt() {
       for (const ioc of iocs) {
         const detection = detectIocType(ioc.value);
         const normalizedValue = ioc.value.trim().toLowerCase();
+        const escapedNormalized = escapeLikePattern(normalizedValue);
+        const escapedIocValue = escapeLikePattern(ioc.value);
 
         // Search discovered apps for hashes
         if (detection.type === "file_hash") {
@@ -516,7 +570,7 @@ export function useExecuteHunt() {
             .from("wdac_discovered_apps")
             .select("endpoint_id, file_hash, file_path, file_name")
             .eq("organization_id", orgId)
-            .ilike("file_hash", normalizedValue);
+            .ilike("file_hash", escapedNormalized);
 
           if (apps?.length) {
             for (const app of apps) {
@@ -541,7 +595,7 @@ export function useExecuteHunt() {
             .from("wdac_discovered_apps")
             .select("endpoint_id, file_hash, file_path, file_name")
             .eq("organization_id", orgId)
-            .ilike(column, `%${ioc.value}%`);
+            .ilike(column, `%${escapedIocValue}%`);
 
           if (apps?.length) {
             for (const app of apps) {
@@ -565,7 +619,7 @@ export function useExecuteHunt() {
             .from("endpoint_event_logs")
             .select("endpoint_id, message, event_time, endpoints!inner(organization_id)")
             .eq("endpoints.organization_id", orgId)
-            .ilike("message", `%${ioc.value}%`)
+            .ilike("message", `%${escapedIocValue}%`)
             .limit(500);
 
           if (logs?.length) {

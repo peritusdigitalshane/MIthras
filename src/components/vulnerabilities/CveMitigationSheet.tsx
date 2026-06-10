@@ -75,6 +75,7 @@ export function CveMitigationSheet({
             affected_version: finding.affected_version,
             description: finding.description,
             hostname: (finding.endpoints as any)?.hostname || "Unknown",
+            organization_id: finding.organization_id,
           },
         }
       );

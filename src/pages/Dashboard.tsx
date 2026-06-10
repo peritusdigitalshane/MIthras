@@ -4,21 +4,45 @@ import { SecurityScore } from "@/components/dashboard/SecurityScore";
 import { ThreatsList } from "@/components/dashboard/ThreatsList";
 import { EndpointsTable } from "@/components/dashboard/EndpointsTable";
 import { ComplianceChart } from "@/components/dashboard/ComplianceChart";
+import { AiSocSummaryCard } from "@/components/dashboard/AiSocSummaryCard";
+import { M365SummaryCard } from "@/components/dashboard/M365SummaryCard";
 import { Button } from "@/components/ui/button";
-import { Shield, Monitor, AlertTriangle, CheckCircle, Sparkles } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Shield, Monitor, AlertTriangle, CheckCircle, Sparkles, Activity, AlertCircle, RefreshCw } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardData";
 import { Link } from "react-router-dom";
+import { OnboardingChecklist } from "@/components/help/OnboardingChecklist";
 
 const Dashboard = () => {
-  const { 
+  const {
     isLoading,
-    totalEndpoints, 
-    protectedCount, 
-    activeThreats, 
+    error,
+    totalEndpoints,
+    protectedCount,
+    activeThreats,
     compliancePercentage,
     securityScore,
     recommendations,
   } = useDashboardStats();
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="p-6 max-w-3xl mx-auto">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Couldn't load dashboard data</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p className="text-sm">{(error as Error).message ?? "An unexpected error occurred."}</p>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -31,13 +55,24 @@ const Dashboard = () => {
               Overview of your endpoint security posture
             </p>
           </div>
-          <Button asChild>
-            <Link to="/recommendations">
-              <Sparkles className="mr-2 h-4 w-4" />
-              AI Recommendations
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+              <Link to="/soc">
+                <Activity className="mr-2 h-4 w-4" />
+                SOC Console
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/recommendations">
+                <Sparkles className="mr-2 h-4 w-4" />
+                AI Recommendations
+              </Link>
+            </Button>
+          </div>
         </div>
+
+        {/* Onboarding checklist -- shows for orgs that haven't completed the basics. Auto-hides at 100%. */}
+        <OnboardingChecklist />
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -78,6 +113,12 @@ const Dashboard = () => {
           <div className="lg:col-span-2">
             <ComplianceChart />
           </div>
+        </div>
+
+        {/* AI SOC + M365 row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AiSocSummaryCard />
+          <M365SummaryCard />
         </div>
 
         {/* Threats and Endpoints */}

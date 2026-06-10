@@ -13,6 +13,13 @@ interface Organization {
   network_module_enabled: boolean;
   router_module_enabled: boolean;
   legacy_hardening_enabled: boolean;
+  ai_soc_enabled?: boolean;                  // derived from per-agent flags
+  ai_triage_enabled?: boolean;
+  ai_investigation_enabled?: boolean;
+  ai_soc_daily_cap_cents?: number;
+  subscription_plan?: "free" | "pro" | "business";
+  device_quota_override?: number | null;
+  parent_partner_id?: string | null;
 }
 
 interface OrganizationWithStats extends Organization {
@@ -47,10 +54,11 @@ export function useOrganizationsWithStats() {
 
       if (orgsError) throw orgsError;
 
-      // Get endpoint counts per org
+      // Get endpoint counts per org — live only
       const { data: endpoints } = await supabase
         .from("endpoints")
-        .select("organization_id");
+        .select("organization_id")
+        .is("deleted_at", null);
 
       // Get member counts per org
       const { data: members } = await supabase
@@ -260,6 +268,142 @@ export function useUpdateOrganizationLegacyHardening() {
   });
 }
 
+/**
+ * AI SOC per-org settings: per-agent toggles + daily cost cap. Used from
+ * the Admin → customer row so super-admins enable specific agents per
+ * customer based on tier. Two real toggles today: Triage + Investigation.
+ * Auto-Response is a future-Phase placeholder.
+ */
+export function useUpdateOrganizationAiSoc() {
+  const queryClient = useQueryClient();
+  const { currentOrganization } = useTenant();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      aiTriageEnabled,
+      aiInvestigationEnabled,
+      aiSocDailyCapCents,
+    }: {
+      id: string;
+      aiTriageEnabled?: boolean;
+      aiInvestigationEnabled?: boolean;
+      aiSocDailyCapCents?: number;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (typeof aiTriageEnabled === "boolean") patch.ai_triage_enabled = aiTriageEnabled;
+      if (typeof aiInvestigationEnabled === "boolean") patch.ai_investigation_enabled = aiInvestigationEnabled;
+      if (typeof aiSocDailyCapCents === "number" && aiSocDailyCapCents >= 0) {
+        patch.ai_soc_daily_cap_cents = aiSocDailyCapCents;
+      }
+      if (Object.keys(patch).length === 0) {
+        throw new Error("nothing to update");
+      }
+      const { data, error } = await supabase
+        .from("organizations")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (currentOrganization?.id) {
+        await logActivity(currentOrganization.id, "update", "organization_ai_soc", id, patch);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["direct-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["partner-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs"] });
+    },
+  });
+}
+
+/**
+ * Per-org subscription plan + device-quota override. Used from the
+ * Admin → customer row so super-admins set plan tier and optionally cap
+ * device count per customer (trial, contractual, lockout). Override of
+ * null = use plan default. Override of 0 = block all new enrolments.
+ */
+export function useUpdateOrganizationPlan() {
+  const queryClient = useQueryClient();
+  const { currentOrganization } = useTenant();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      subscriptionPlan,
+      deviceQuotaOverride,
+    }: {
+      id: string;
+      subscriptionPlan?: "free" | "pro" | "business";
+      // null = clear the override (back to plan default)
+      // undefined = don't touch the column
+      deviceQuotaOverride?: number | null;
+    }) => {
+      const patch: Record<string, unknown> = {};
+      if (subscriptionPlan) patch.subscription_plan = subscriptionPlan;
+      if (deviceQuotaOverride !== undefined) {
+        patch.device_quota_override =
+          deviceQuotaOverride === null || deviceQuotaOverride < 0
+            ? null
+            : Math.floor(deviceQuotaOverride);
+      }
+      if (Object.keys(patch).length === 0) {
+        throw new Error("nothing to update");
+      }
+      const { data, error } = await supabase
+        .from("organizations")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (currentOrganization?.id) {
+        await logActivity(currentOrganization.id, "update", "organization_plan", id, patch);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-organizations-with-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["direct-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["partner-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["org-device-quota"] });
+      queryClient.invalidateQueries({ queryKey: ["activity-logs"] });
+    },
+  });
+}
+
+export interface OrganizationDeviceQuota {
+  organization_id: string;
+  organization_name: string;
+  plan: "free" | "pro" | "business";
+  override: number | null;
+  plan_default: number | null;
+  effective_cap: number | null;
+  used: number;
+  partner_child: boolean;
+}
+
+export function useOrganizationDeviceQuota(orgId: string | undefined) {
+  return useQuery({
+    queryKey: ["org-device-quota", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("organization_device_quota")
+        .select("*")
+        .eq("organization_id", orgId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as OrganizationDeviceQuota | null;
+    },
+  });
+}
+
 export function useOrganizationMembers(orgId: string | null) {
   return useQuery({
     queryKey: ["admin-org-members", orgId],
@@ -295,6 +439,7 @@ export function useOrganizationEndpoints(orgId: string | null) {
         .from("endpoints")
         .select("*")
         .eq("organization_id", orgId)
+        .is("deleted_at", null)
         .order("hostname");
 
       if (error) throw error;
