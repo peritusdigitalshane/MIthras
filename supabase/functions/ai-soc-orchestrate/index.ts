@@ -333,6 +333,25 @@ Deno.serve(async (req) => {
         }
     }
 
+    // === STEP 6: CUSTOMER COMMS ===
+    // Send a customer-facing email whenever consensus is true_positive OR
+    // there was meaningful disagreement worth surfacing. Skipped for
+    // false_positive (auto-closed) and inconclusive (nothing to say).
+    let commsResult: any = null;
+    const worthNotifying =
+        consensus.finalVerdict === "true_positive" ||
+        (consensus.finalVerdict === "needs_human" && consensus.disagreement);
+    if (worthNotifying) {
+        const commsResp = await callAgent("ai-comms-notify", {
+            triage_decision_id: triageDecision.id,
+            action_id:          responseAction?.action_id ?? null,
+            confirmation_token: responseAction?.confirmation_token ?? null,
+        });
+        if (commsResp.ok && commsResp.data?.ok) {
+            commsResult = commsResp.data;
+        }
+    }
+
     if (shouldAutoClose) {
         await supabase.from("alerts").update({
             acknowledged: true,
@@ -363,5 +382,6 @@ Deno.serve(async (req) => {
         auto_closed:        shouldAutoClose,
         reasoning:          consensus.reasoning,
         response_action:    responseAction,
+        comms:              commsResult,
     }, 200, origin);
 });
