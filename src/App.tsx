@@ -69,6 +69,7 @@ import AdminPricing from "./pages/AdminPricing";
 import AdminInvoices from "./pages/AdminInvoices";
 import AdminAiCosts from "./pages/AdminAiCosts";
 import AiAgents from "./pages/AiAgents";
+import Hunt from "./pages/Hunt";
 import PortalInvoices from "./pages/PortalInvoices";
 import SalesKit from "./pages/SalesKit";
 import CustomerDashboard from "./pages/CustomerDashboard";
@@ -277,6 +278,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <AiAgents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/hunt"
+                element={
+                  <ProtectedRoute>
+                    <Hunt />
                   </ProtectedRoute>
                 }
               />
