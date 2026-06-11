@@ -137,9 +137,22 @@ function Get-DefenderThreatsPayload {
             try {
                 $raw = Get-Content $script:DefenderCatalogCachePath -Raw -ErrorAction Stop
                 $obj = $raw | ConvertFrom-Json
-                # ConvertFrom-Json gives PSCustomObject; convert back to hashtable
+                # v0.7.16: skip empty cached entries when loading from disk.
+                # Older versions persisted {name=null,sev_id=0} blanks if the
+                # catalog lookup timed out, and the on-disk file accumulated
+                # those entries. Loading them back into the script-scope cache
+                # caused the v0.7.10 re-query check to fire on every heartbeat,
+                # which then failed again under the old 4s timeout, leaving
+                # the threat permanently nameless in the UI. Drop blanks on
+                # load so a fresh (longer-timeout) lookup runs the next time.
                 foreach ($p in $obj.PSObject.Properties) {
-                    $val = @{ name = $p.Value.name; sev_id = [int]$p.Value.sev_id }
+                    $name = [string]$p.Value.name
+                    if (-not $name) { continue }
+                    $val = @{
+                        name        = $name
+                        sev_id      = [int]$p.Value.sev_id
+                        category_id = $(try { [int]$p.Value.category_id } catch { 0 })
+                    }
                     $script:DefenderCatalogCache[[string]$p.Name] = $val
                 }
             } catch {
@@ -149,31 +162,51 @@ function Get-DefenderThreatsPayload {
             }
         }
     }
+    # v0.7.16: per-heartbeat budget for cold catalog lookups. Get-MpThreatCatalog
+    # is documented as a local-DB lookup but on real-world endpoints it actually
+    # makes cloud-reputation calls and routinely takes 30-90 seconds per ID
+    # (measured directly: 30-94s on the test box, even on the second call for
+    # the same ID — Defender's own MAPS cache is unreliable). We can't afford
+    # to spend that on the heartbeat thread, and we can't go fully async
+    # without restructuring the collector. Compromise: do at most ONE cold
+    # lookup per heartbeat with a 30s timeout. Cache hits are free, so once
+    # the catalog is populated (N heartbeats after a clean install = N min)
+    # the cost goes to zero permanently. New threats added later still take
+    # one heartbeat each to populate.
+    $script:DefenderCatalogColdLookupsThisCall = 0
+    $maxColdLookupsPerCall = 1
+    $catalogLookupTimeoutSec = 30
     function _GetCatalogInfo([string]$tid) {
         if (-not $tid) { return $null }
         if ($script:DefenderCatalogCache.ContainsKey($tid)) {
             $cached = $script:DefenderCatalogCache[$tid]
-            # v0.7.10: don't honour a cached empty entry forever. Previously,
-            # if the catalog lookup failed once (MAPS timeout, transient
-            # network, unknown ID at the time) we stored {name=null,sev_id=0}
-            # and every future heartbeat returned the same blanks - the UI
-            # then showed "Unknown" severity + blank category permanently.
-            # Treat empty cache entries as missing so the next heartbeat
-            # re-queries the catalog.
             if ($cached -and $cached.name) { return $cached }
         }
+        # Budget check: only one cold lookup per heartbeat.
+        if ($script:DefenderCatalogColdLookupsThisCall -ge $maxColdLookupsPerCall) {
+            return @{ name = $null; sev_id = 0; category_id = 0 }
+        }
+        $script:DefenderCatalogColdLookupsThisCall++
+
         $info = @{ name = $null; sev_id = 0; category_id = 0 }
+        # Run inside Start-Job so we can bound it. Inline calls blocked the
+        # heartbeat for minutes (v0.7.15 in-development bug). The previous
+        # 4s timeout was too short — Start-Job cold-spawn alone takes 2-4s,
+        # leaving zero budget for the actual lookup. 30s gives the spawn +
+        # lookup enough headroom on slow-MAPS endpoints.
         try {
             $job = Start-Job -ScriptBlock {
                 param($id) try { Get-MpThreatCatalog -ThreatID ([uint64]$id) -ErrorAction SilentlyContinue } catch { $null }
             } -ArgumentList $tid
-            if (Wait-Job -Job $job -Timeout 4) {
+            if (Wait-Job -Job $job -Timeout $catalogLookupTimeoutSec) {
                 $c = Receive-Job -Job $job -ErrorAction SilentlyContinue
                 if ($c) {
                     if ($c.ThreatName)            { $info.name = [string]$c.ThreatName }
                     if ($null -ne $c.SeverityID)  { $info.sev_id = [int]$c.SeverityID }
                     if ($null -ne $c.CategoryID)  { $info.category_id = [int]$c.CategoryID }
                 }
+            } else {
+                _LogCollect 'WARN' ("catalog lookup timed out for tid=$tid after ${catalogLookupTimeoutSec}s")
             }
             Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
         } catch {}
@@ -196,7 +229,14 @@ function Get-DefenderThreatsPayload {
     # Falls back to "Category #N" so unmapped values are still distinguishable.
     function _CategoryName([int]$cid) {
         switch ($cid) {
-            0  { 'Invalid' }
+            # v0.7.16: don't surface Defender's enum-value-zero label as a
+            # category. CategoryID=0 means "no category" and the old code
+            # returned the literal string "Invalid", which the name-fallback
+            # template ($catName + " detection (id $tid)") then turned into
+            # the user-facing "Invalid detection (id 2147829265)" — confusing
+            # because it implies the detection itself is invalid, not that
+            # we just couldn't categorise it.
+            0  { $null }
             1  { 'Adware' }
             2  { 'Spyware' }
             3  { 'PasswordStealer' }
@@ -253,6 +293,75 @@ function Get-DefenderThreatsPayload {
 
     $toStr = { param($v) [string]$v }
     $toInt = { param($v) try { [int]$v } catch { 0 } }
+
+    # v0.7.16: pre-warm the catalog cache for all detections in parallel.
+    # _GetCatalogInfo is bounded to ONE cold lookup per heartbeat (because each
+    # cold call can run 30-90s through MAPS), so sequential population would
+    # take minutes-per-heartbeat × N heartbeats to finish. Launching all
+    # uncached lookups as parallel Start-Job instances and waiting once for
+    # them all collapses that to a single 30s window — usually less, since
+    # Defender's cold-MAPS calls return in 30-50s and they run concurrently.
+    # After this loop the per-threat _GetCatalogInfo calls in the main
+    # foreach become cache hits and are free.
+    $needLookup = @()
+    foreach ($t in ($detections | Select-Object -First $MaxThreats)) {
+        $tid = $null
+        if ($t.PSObject.Properties['ThreatID'] -and $null -ne $t.ThreatID) { $tid = [string]$t.ThreatID }
+        elseif ($t.PSObject.Properties['ThreatId'] -and $null -ne $t.ThreatId) { $tid = [string]$t.ThreatId }
+        elseif ($t.PSObject.Properties['DetectionID']) { $tid = [string]$t.DetectionID }
+        if (-not $tid) { continue }
+        if ($script:DefenderCatalogCache.ContainsKey($tid) -and $script:DefenderCatalogCache[$tid].name) { continue }
+        if ($needLookup -notcontains $tid) { $needLookup += $tid }
+    }
+    if ($needLookup.Count -gt 0) {
+        _LogCollect 'INFO' ("catalog pre-warm: launching " + $needLookup.Count + " parallel lookups")
+        $jobs = @{}
+        foreach ($tid in $needLookup) {
+            $jobs[$tid] = Start-Job -ScriptBlock {
+                param($id) try { Get-MpThreatCatalog -ThreatID ([uint64]$id) -ErrorAction SilentlyContinue } catch { $null }
+            } -ArgumentList $tid
+        }
+        # 180s shared budget. Measured: on a test box with 5-6 cold IDs,
+        # parallel lookups all complete in ~170s — each individual MAPS
+        # call is 30-50s and Defender appears to serialise them server-side.
+        # Wait-Job with -Job @list blocks until the LAST one completes or
+        # the timeout fires, so all jobs share the window. (A previous
+        # attempt did Wait-Job per job in a foreach loop, which serialised
+        # the waits and only the first job ever got harvested.)
+        # First heartbeat after a fresh install will be ~3 min, every
+        # subsequent heartbeat is a cache hit and free.
+        $allJobs = @($jobs.Values)
+        Wait-Job -Job $allJobs -Timeout 180 | Out-Null
+        $populated = 0
+        foreach ($tid in $needLookup) {
+            $job = $jobs[$tid]
+            if ($job.State -eq 'Completed') {
+                $c = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                if ($c -and $c.ThreatName) {
+                    $script:DefenderCatalogCache[$tid] = @{
+                        name        = [string]$c.ThreatName
+                        sev_id      = $(if ($null -ne $c.SeverityID) { [int]$c.SeverityID } else { 0 })
+                        category_id = $(if ($null -ne $c.CategoryID) { [int]$c.CategoryID } else { 0 })
+                    }
+                    $populated++
+                }
+            }
+        }
+        foreach ($tid in $needLookup) {
+            try { Remove-Job -Job $jobs[$tid] -Force -ErrorAction SilentlyContinue } catch {}
+        }
+        if ($populated -gt 0) {
+            try {
+                $script:DefenderCatalogCache | ConvertTo-Json -Depth 4 -Compress |
+                    Set-Content -Path $script:DefenderCatalogCachePath -Force -Encoding utf8
+            } catch {}
+        }
+        _LogCollect 'INFO' ("catalog pre-warm: populated " + $populated + "/" + $needLookup.Count)
+    }
+    # Reset the per-call cold-lookup budget so the inline _GetCatalogInfo
+    # below treats any remaining misses (unlikely after pre-warm) as
+    # budget-bounded individual lookups.
+    $script:DefenderCatalogColdLookupsThisCall = 0
 
     $seen = @{}
     $threats = @()
