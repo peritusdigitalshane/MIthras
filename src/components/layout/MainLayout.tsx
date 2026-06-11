@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SocChatPanel } from "@/components/soc/SocChatPanel";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,10 @@ interface MainLayoutProps {
 // via a hamburger button rendered inside the Header (Header.tsx owns the
 // mobileOpen callback so it can render the trigger inside its sticky bar
 // without nesting two sticky containers — nested sticky breaks scrolling).
+//
+// The SocChatPanel renders its own floating action button (bottom-right)
+// and slides out as a Sheet — visible from every page that wraps in
+// MainLayout, which is the entire SOC console.
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
@@ -32,6 +37,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Header onOpenMobileNav={() => setMobileOpen(true)} />
         <main className="p-4 sm:p-6">{children}</main>
       </div>
+
+      {/* Conversational interface to the AI SOC. Available from every page. */}
+      <SocChatPanel />
     </div>
   );
 }

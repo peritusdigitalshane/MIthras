@@ -318,6 +318,39 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
         auto_closed:          shouldAutoClose,
     }).eq("id", triageDecision.id);
 
+    // === STEP 4b: FORENSIC INVESTIGATION ===
+    // ai-investigate-alert (the "L2 analyst" of the AI SOC) pulls the full
+    // event-log context around the alert, reconstructs the attack chain,
+    // identifies affected assets, drafts containment + eradication steps,
+    // and writes a customer-facing report — every claim cited.
+    //
+    // Fire whenever consensus is true_positive OR there's meaningful
+    // disagreement (operator will want the timeline either way). We skip
+    // false_positive and inconclusive — no point spending the LLM budget
+    // on alerts the consensus already dismissed.
+    //
+    // Investigation runs BEFORE response so the response agent (and the
+    // comms agent below) can reference the attack chain in its decisions
+    // and the customer email. We never block response on investigation
+    // succeeding — if it errors out we log and continue.
+    let investigationId: string | null = null;
+    const worthInvestigating =
+        consensus.finalVerdict === "true_positive" ||
+        (consensus.finalVerdict === "needs_human" && consensus.disagreement);
+    if (worthInvestigating) {
+        try {
+            const invResp = await callAgent("ai-investigate-alert", {
+                alert_id:           alertId,
+                triage_decision_id: triageDecision.id,
+            });
+            if (invResp.ok && invResp.data?.investigation?.id) {
+                investigationId = invResp.data.investigation.id;
+            }
+        } catch (e) {
+            console.error("forensic investigation failed (non-fatal):", e instanceof Error ? e.message : String(e));
+        }
+    }
+
     // === STEP 5: AUTONOMOUS RESPONSE ===
     // Fire the Response Agent if consensus is solid TP. The agent applies
     // additional gates (org policy, confidence threshold, action-kind allowlist)
@@ -333,6 +366,35 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
         });
         if (respResp.ok && respResp.data?.ok) {
             responseAction = respResp.data;
+        }
+    }
+
+    // === STEP 5b: INCIDENT COMMANDER ===
+    // For confirmed true_positive verdicts at high/critical severity, escalate
+    // to a long-lived incident. The commander agent creates or updates the
+    // platform incidents row, drafts the customer status update, sets SLA,
+    // and links investigation + response together. Lower-severity TPs are
+    // handled by the response + comms pipeline directly without spinning up
+    // an incident object.
+    let incidentId: string | null = null;
+    const shouldOpenIncident =
+        consensus.finalVerdict === "true_positive" &&
+        !consensus.disagreement &&
+        advRefuted !== true &&
+        investigationId !== null;
+    if (shouldOpenIncident) {
+        try {
+            const icResp = await callAgent("ai-incident-commander", {
+                alert_id:           alertId,
+                triage_decision_id: triageDecision.id,
+                investigation_id:   investigationId,
+                response_action:    responseAction,
+            });
+            if (icResp.ok && icResp.data?.incident_id) {
+                incidentId = icResp.data.incident_id;
+            }
+        } catch (e) {
+            console.error("incident commander failed (non-fatal):", e instanceof Error ? e.message : String(e));
         }
     }
 
@@ -384,6 +446,8 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
         disagreement:       consensus.disagreement,
         auto_closed:        shouldAutoClose,
         reasoning:          consensus.reasoning,
+        investigation_id:   investigationId,
+        incident_id:        incidentId,
         response_action:    responseAction,
         comms:              commsResult,
     };
