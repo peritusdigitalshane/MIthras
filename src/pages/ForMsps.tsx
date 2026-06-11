@@ -7,6 +7,8 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
+import { MockMultiTenantConsole } from "@/components/landing/visuals/MockMultiTenantConsole";
 
 const PILLARS = [
   {
@@ -132,6 +134,13 @@ const ForMsps = () => {
                 <Link to="/channel-program">Become a partner</Link>
               </Button>
             </div>
+          </div>
+
+          {/* Multi-tenant console preview */}
+          <div className="container mx-auto max-w-6xl mt-12 sm:mt-14">
+            <BrowserFrame url="console.mithras.com.au/partner" tilt>
+              <MockMultiTenantConsole />
+            </BrowserFrame>
           </div>
         </section>
 

@@ -7,6 +7,8 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
+import { MockEolFleet } from "@/components/landing/visuals/MockEolFleet";
 
 const SUPPORTED_OS = [
   { name: "Windows 7 SP1",        eol: "Out of mainstream since Jan 2020", mithras: true,  competitor: false },
@@ -98,6 +100,13 @@ const EolWindows = () => {
                 <Link to="/platform">See the platform</Link>
               </Button>
             </div>
+          </div>
+
+          {/* EOL fleet mock */}
+          <div className="container mx-auto max-w-6xl mt-12 sm:mt-14">
+            <BrowserFrame url="console.mithras.com.au/endpoints?filter=eol" tilt>
+              <MockEolFleet />
+            </BrowserFrame>
           </div>
         </section>
 

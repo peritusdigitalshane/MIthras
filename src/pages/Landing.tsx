@@ -1,7 +1,9 @@
 import { LandingNav } from "@/components/landing/LandingNav";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { AISocTeaser } from "@/components/landing/AISocTeaser";
+import { PlatformShowcase } from "@/components/landing/PlatformShowcase";
 import { PlatformHighlights } from "@/components/landing/PlatformHighlights";
+import { ThreatIntelStrip } from "@/components/landing/ThreatIntelStrip";
 import { MSPTeaser } from "@/components/landing/MSPTeaser";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
@@ -39,6 +41,8 @@ const Landing = () => {
         <LandingNav />
         <HeroSection />
         <AISocTeaser />
+        <PlatformShowcase />
+        <ThreatIntelStrip />
         <PlatformHighlights />
         <MSPTeaser />
         <PricingSection />

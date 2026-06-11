@@ -7,6 +7,11 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { SocConsoleHero } from "@/components/landing/visuals/SocConsoleHero";
+import { ThreatIntelFeed } from "@/components/landing/visuals/ThreatIntelFeed";
+import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
+import { MockSocDashboard } from "@/components/landing/visuals/MockSocDashboard";
+import { MockIncidentView } from "@/components/landing/visuals/MockIncidentView";
 
 interface Agent {
   number: string;
@@ -149,11 +154,74 @@ const AISoc = () => {
               to act without consensus, and document every decision so you
               can audit exactly how a conclusion was reached.
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 max-w-3xl mx-auto text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 max-w-3xl mx-auto text-sm mb-12 sm:mb-14">
               <ProofPoint icon={<Clock className="h-4 w-4" />} label="Triage in seconds" />
               <ProofPoint icon={<Brain className="h-4 w-4" />} label="3-agent consensus" />
               <ProofPoint icon={<Eye className="h-4 w-4" />} label="24/7/365" />
               <ProofPoint icon={<Zap className="h-4 w-4" />} label="Citation-enforced" />
+            </div>
+          </div>
+
+          {/* The animated SOC console — the page's proof of life. */}
+          <div className="container mx-auto max-w-7xl">
+            <SocConsoleHero />
+          </div>
+        </section>
+
+        {/* THREAT INTEL — what the agents correlate against */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6 relative overflow-hidden">
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/2 left-1/3 -translate-y-1/2 w-[900px] h-[600px] bg-fuchsia-500/5 rounded-full blur-3xl" />
+          </div>
+          <div className="container mx-auto max-w-7xl">
+            <div className="text-center mb-10 sm:mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300 text-[11px] font-medium uppercase tracking-wider mb-4">
+                Threat intelligence
+              </div>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
+                Every verdict is checked against{" "}
+                <span className="bg-gradient-to-r from-fuchsia-400 to-primary bg-clip-text text-transparent">
+                  live threat intel.
+                </span>
+              </h2>
+              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
+                Active campaigns, fresh IOCs, ANZ-region MITRE telemetry. Your
+                agents correlate against this stream every time they make a
+                triage call — no human IOC review queue, no analyst lag.
+              </p>
+            </div>
+            <ThreatIntelFeed />
+          </div>
+        </section>
+
+        {/* PLATFORM SCREENSHOTS — what it looks like inside */}
+        <section className="py-16 sm:py-20 px-4 sm:px-6 relative overflow-hidden bg-muted/10">
+          <div className="absolute inset-0 -z-10">
+            <div className="absolute top-1/3 right-1/4 w-[700px] h-[500px] bg-primary/8 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-1/4 w-[600px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl" />
+          </div>
+          <div className="container mx-auto max-w-7xl">
+            <div className="text-center mb-12 sm:mb-14">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-medium uppercase tracking-wider mb-4">
+                <Bot className="h-3.5 w-3.5" />
+                Inside the console
+              </div>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
+                Built for the analyst, not the spreadsheet.
+              </h2>
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto">
+                Open an alert and the agents have already classified it, cited
+                their evidence, and run the playbook. The analyst&apos;s job is
+                to confirm, not investigate from scratch.
+              </p>
+            </div>
+            <div className="space-y-10 sm:space-y-14">
+              <BrowserFrame url="console.mithras.com.au/soc" tilt>
+                <MockSocDashboard />
+              </BrowserFrame>
+              <BrowserFrame url="console.mithras.com.au/soc/incidents/INC-2418" tilt>
+                <MockIncidentView />
+              </BrowserFrame>
             </div>
           </div>
         </section>

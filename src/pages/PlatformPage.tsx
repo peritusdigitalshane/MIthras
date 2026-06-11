@@ -7,6 +7,8 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
+import { MockSocDashboard } from "@/components/landing/visuals/MockSocDashboard";
 
 interface Pillar {
   id: string;
@@ -164,12 +166,19 @@ const Platform = () => {
               </span>{" "}
               Eight capabilities.
             </h1>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed">
               AI SOC, microsegmentation, EOL Windows hardening, Defender
               management, application control, AI vulnerability scanning,
               cross-platform agents, and remote access &mdash; integrated end
               to end, multi-tenant from day one.
             </p>
+          </div>
+
+          {/* Platform-overview screenshot */}
+          <div className="container mx-auto max-w-6xl">
+            <BrowserFrame url="console.mithras.com.au/soc" tilt>
+              <MockSocDashboard />
+            </BrowserFrame>
           </div>
         </section>
 
