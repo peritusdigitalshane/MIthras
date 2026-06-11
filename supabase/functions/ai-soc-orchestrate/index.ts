@@ -181,28 +181,32 @@ function computeConsensus(args: {
     };
 }
 
-Deno.serve(async (req) => {
-    const preflight = handlePreflight(req); if (preflight) return preflight;
-    const origin = req.headers.get("origin");
-    if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405, origin);
-    if (!isAuthorised(req)) return jsonResponse({ error: "forbidden" }, 403, origin);
+// Detach the heavy multi-agent work from the inbound request lifecycle.
+// Supabase edge runtime can kill an isolate when the client disconnects
+// (pg_net trigger's 60s timeout, browser tab close, etc.) — that aborts
+// the orchestrator mid-chain and we end up with orphaned ai_triage_decisions
+// at orchestration_state='pending'. EdgeRuntime.waitUntil() (available on
+// Deno's Supabase runtime) ensures the promise keeps running until done.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
+function detach(p: Promise<unknown>): void {
+    try {
+        if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+            EdgeRuntime.waitUntil(p);
+        }
+    } catch { /* ignore — fall through, p still runs */ }
+}
 
-    let body: Record<string, unknown> = {};
-    try { body = await req.json(); } catch {}
-    const alertId = String(body.alert_id ?? "");
-    if (!alertId) return jsonResponse({ error: "alert_id_required" }, 400, origin);
-
+async function runOrchestration(alertId: string, force: boolean): Promise<Record<string, unknown>> {
     // === STEP 1: TRIAGE ===
-    const triageResp = await callAgent("ai-triage-alert", { alert_id: alertId, force: body.force === true });
+    const triageResp = await callAgent("ai-triage-alert", { alert_id: alertId, force });
     if (!triageResp.ok && triageResp.status !== 429) {
-        return jsonResponse({ error: "triage_failed", details: triageResp.data }, triageResp.status || 502, origin);
+        return { ok: false, error: "triage_failed", details: triageResp.data };
     }
     if (triageResp.status === 429) {
-        // Budget exceeded — orchestrator stops cleanly.
         await supabase.from("ai_triage_decisions").update({
             orchestration_state: "budget_exceeded",
         }).eq("alert_id", alertId);
-        return jsonResponse({ error: "budget_exceeded" }, 429, origin);
+        return { ok: false, error: "budget_exceeded" };
     }
 
     // Load the triage decision row to get the id + verdict.
@@ -211,14 +215,13 @@ Deno.serve(async (req) => {
         .select("id, organization_id, verdict, confidence, key_indicators, reasoning_steps, summary, status")
         .eq("alert_id", alertId).maybeSingle();
     if (!triageDecision) {
-        return jsonResponse({ error: "triage_decision_missing" }, 500, origin);
+        return { ok: false, error: "triage_decision_missing" };
     }
     if (triageDecision.status !== "completed" || !triageDecision.verdict) {
-        // Triage failed — record state and bail.
         await supabase.from("ai_triage_decisions").update({
             orchestration_state: "failed",
         }).eq("id", triageDecision.id);
-        return jsonResponse({ error: "triage_did_not_complete", status: triageDecision.status }, 500, origin);
+        return { ok: false, error: "triage_did_not_complete", status: triageDecision.status };
     }
 
     // Persist triage's verdict to ai_agent_verdicts (mirror) so all three
@@ -370,7 +373,7 @@ Deno.serve(async (req) => {
         }
     }
 
-    return jsonResponse({
+    return {
         ok: true,
         triage_decision_id: triageDecision.id,
         triage_verdict:     triageDecision.verdict,
@@ -383,5 +386,43 @@ Deno.serve(async (req) => {
         reasoning:          consensus.reasoning,
         response_action:    responseAction,
         comms:              commsResult,
-    }, 200, origin);
+    };
+}
+
+Deno.serve(async (req) => {
+    const preflight = handlePreflight(req); if (preflight) return preflight;
+    const origin = req.headers.get("origin");
+    if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405, origin);
+    if (!isAuthorised(req)) return jsonResponse({ error: "forbidden" }, 403, origin);
+
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch {}
+    const alertId = String(body.alert_id ?? "");
+    if (!alertId) return jsonResponse({ error: "alert_id_required" }, 400, origin);
+
+    const force = body.force === true;
+    // When the caller passes wait=true we run synchronously (for /agents
+    // manual fire). Otherwise we accept the alert, kick off the chain in
+    // the background (surviving client disconnect), and return immediately.
+    const waitForResult = body.wait === true;
+
+    if (waitForResult) {
+        try {
+            const result = await runOrchestration(alertId, force);
+            return jsonResponse(result, 200, origin);
+        } catch (e) {
+            return jsonResponse({ error: "orchestration_failed", details: e instanceof Error ? e.message : String(e) }, 500, origin);
+        }
+    }
+
+    detach(runOrchestration(alertId, force).catch((e) => {
+        console.error("orchestration_background_failed", { alert_id: alertId, error: e instanceof Error ? e.message : String(e) });
+    }));
+
+    return jsonResponse({
+        ok: true,
+        queued: true,
+        alert_id: alertId,
+        note: "Orchestration running in the background. Poll ai_triage_decisions.orchestration_state for progress.",
+    }, 202, origin);
 });

@@ -137,7 +137,14 @@ if (Test-Path (Join-Path $LegacyAgentRoot 'install')) {
 }
 
 # 4. Stop AND remove an existing MithrasAgent install if -Force was given.
+#    Tamper Protection (Phase 1+2) hardens the service DACL so even
+#    Administrator gets "Access is denied" on sc.exe stop/delete. We reset
+#    the service descriptor BEFORE stop so the rest of the path works.
 if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+    Write-Step "Resetting tamper-protected service ACL so admin can remove it"
+    # SDDL: SYSTEM read+control / Admins full / Interactive+ServiceUser read
+    & sc.exe sdset $ServiceName "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)" 2>&1 | Out-Null
+
     Write-Step "Stopping existing service"
     Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
     for ($i = 0; $i -lt 10; $i++) {
@@ -148,10 +155,10 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     $existingNssm = Join-Path $InstallRoot 'vendor\nssm.exe'
     if (Test-Path $existingNssm) {
         Write-Step "Removing existing service registration via NSSM"
-        & $existingNssm remove $ServiceName confirm | Out-Null
+        & $existingNssm remove $ServiceName confirm 2>&1 | Out-Null
     } else {
         Write-Step "Removing existing service registration via sc.exe"
-        & sc.exe delete $ServiceName | Out-Null
+        & sc.exe delete $ServiceName 2>&1 | Out-Null
     }
     for ($i = 0; $i -lt 10; $i++) {
         if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) { break }
@@ -159,9 +166,49 @@ if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
     }
 }
 
+# 4b. Kill straggler agent + tray processes so they release file handles.
+#     Tamper Protection's watchdog can respawn the agent after Stop-Service;
+#     this catches any zombie that's still holding lib/*.psm1 open.
+Write-Step "Killing straggler agent + tray processes"
+foreach ($pattern in @('*mithras-agent*','*mithras-tray*','MithrasAgent','MithrasTray')) {
+    Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='MithrasAgent.exe' OR Name='MithrasTray.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and ($_.CommandLine -like $pattern -or $_.Name -like $pattern) } |
+        ForEach-Object {
+            try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
+        }
+}
+Start-Sleep -Milliseconds 500
+
 # 5. Copy files
 Write-Step "Staging files at $InstallRoot"
-if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
+if (Test-Path $InstallRoot) {
+    # Tamper Protection (TamperProtection.psm1) sets DENY ACEs on the
+    # install dir so a regular admin can't Remove-Item without first
+    # taking ownership + resetting the DACL. takeown + icacls handles
+    # the explicit-deny case; the recursive form needed because each
+    # file has its own protected DACL.
+    Write-Step "Resetting tamper-protected install dir ACLs"
+    & takeown.exe /F $InstallRoot /R /D Y 2>&1 | Out-Null
+    & icacls.exe   $InstallRoot /reset /T /C /Q 2>&1 | Out-Null
+    & icacls.exe   $InstallRoot /grant "Administrators:(OI)(CI)F" /T /C /Q 2>&1 | Out-Null
+
+    try {
+        Remove-Item $InstallRoot -Recurse -Force -ErrorAction Stop
+    } catch {
+        # Last-ditch: rename to a temp path and let Windows clean it up at
+        # next reboot. Avoids bricking the reinstall if one file is still
+        # locked by a process we couldn't kill.
+        $stash = Join-Path $AgentRoot ("install.old." + [Guid]::NewGuid().ToString('N').Substring(0,8))
+        Write-Step "Could not delete $InstallRoot - moving to $stash (will be cleaned at next reboot)"
+        Move-Item $InstallRoot $stash -Force -ErrorAction SilentlyContinue
+        # Tag it for cleanup. PendingFileRenameOperations removes at boot.
+        $pending = (Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name 'PendingFileRenameOperations' -ErrorAction SilentlyContinue).PendingFileRenameOperations
+        if (-not $pending) { $pending = @() }
+        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' `
+            -Name 'PendingFileRenameOperations' `
+            -Value (@($pending) + @("\??\$stash", "")) -Type MultiString -ErrorAction SilentlyContinue
+    }
+}
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 Copy-Item -Path (Join-Path $PSScriptRoot '*') -Destination $InstallRoot -Recurse -Force -Exclude 'install-agent.ps1','uninstall-agent.ps1','tests'
 

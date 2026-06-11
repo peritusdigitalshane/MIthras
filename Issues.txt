@@ -1,0 +1,272 @@
+PS C:\WINDOWS\system32> Get-Process | Where-Object { $_.Path -like "*Mithras*" -or $_.CommandLine -like "*mithras-agent*" -or $_.CommandLine -like "*mithras-tray*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+PS C:\WINDOWS\system32> & sc.exe delete MithrasAgent 2>$null
+>> & sc.exe stop MithrasAgent 2>$null
+>> & sc.exe sdset MithrasAgent "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)"  2>$null
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+PS C:\WINDOWS\system32> & sc.exe delete MithrasAgent 2>$null
+>> & sc.exe stop MithrasAgent 2>$null
+>> & sc.exe sdset MithrasAgent "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)"  2>$null
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+[SC] OpenService FAILED 5:
+
+Access is denied.
+
+PS C:\WINDOWS\system32>   icacls "C:\ProgramData\Mithras" /grant Administrators:F /T /C
+>>   icacls "C:\ProgramData\Mithras" /reset /T /C
+>>   takeown /f "C:\ProgramData\Mithras" /r /d Y
+processed file: C:\ProgramData\Mithras
+C:\ProgramData\Mithras\config.dat: Access is denied.
+processed file: C:\ProgramData\Mithras\event-log-state.json
+processed file: C:\ProgramData\Mithras\firewall-audit-state.json
+C:\ProgramData\Mithras\install: Access is denied.
+processed file: C:\ProgramData\Mithras\logs
+processed file: C:\ProgramData\Mithras\persistence-state.json
+processed file: C:\ProgramData\Mithras\policy_hash.txt
+processed file: C:\ProgramData\Mithras\process-event-state.json
+C:\ProgramData\Mithras\sysmon: Access is denied.
+processed file: C:\ProgramData\Mithras\tamper-events-state.json
+processed file: C:\ProgramData\Mithras\watchdog.ps1
+processed file: C:\ProgramData\Mithras\wdac
+C:\ProgramData\Mithras\install\agent.version: Access is denied.
+C:\ProgramData\Mithras\install\install-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\lib: Access is denied.
+C:\ProgramData\Mithras\install\mithras-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\mithras-tray.ps1: Access is denied.
+C:\ProgramData\Mithras\install\mithras.ico: Access is denied.
+C:\ProgramData\Mithras\install\README.md: Access is denied.
+C:\ProgramData\Mithras\install\sysmon-config.xml: Access is denied.
+C:\ProgramData\Mithras\install\uninstall-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\vendor: Access is denied.
+C:\ProgramData\Mithras\install\lib\ApiClient.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\AppDiscoveryCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\AppWhitelistEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\CommandExecutor.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DefenderCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DefenderStateCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DnsPolicyEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\EventLogCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\FirewallAuditCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\HmacAuth.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\PersistenceCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\PolicyEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\ProcessEventCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\RansomwareCanary.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SecureConfig.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SoftwareCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SysmonCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SysmonInstaller.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\TamperDetector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\TamperProtection.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\Updater.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\WdacControl.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\WdacEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm-LICENSE.txt: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm.exe: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm.sha256: Access is denied.
+processed file: C:\ProgramData\Mithras\logs\agent-2026-06-11.log
+processed file: C:\ProgramData\Mithras\logs\collectors.log
+processed file: C:\ProgramData\Mithras\logs\tamper.log
+processed file: C:\ProgramData\Mithras\sysmon\sysmon-config.hash
+processed file: C:\ProgramData\Mithras\sysmon\sysmon-config.xml
+processed file: C:\ProgramData\Mithras\sysmon\Sysmon64.exe
+processed file: C:\ProgramData\Mithras\wdac\mithras-wdac.bin
+processed file: C:\ProgramData\Mithras\wdac\mithras-wdac.xml
+Successfully processed 18 files; Failed processing 39 files
+processed file: C:\ProgramData\Mithras
+C:\ProgramData\Mithras\config.dat: Access is denied.
+processed file: C:\ProgramData\Mithras\event-log-state.json
+processed file: C:\ProgramData\Mithras\firewall-audit-state.json
+C:\ProgramData\Mithras\install: Access is denied.
+processed file: C:\ProgramData\Mithras\logs
+processed file: C:\ProgramData\Mithras\persistence-state.json
+processed file: C:\ProgramData\Mithras\policy_hash.txt
+processed file: C:\ProgramData\Mithras\process-event-state.json
+C:\ProgramData\Mithras\sysmon: Access is denied.
+processed file: C:\ProgramData\Mithras\tamper-events-state.json
+processed file: C:\ProgramData\Mithras\watchdog.ps1
+processed file: C:\ProgramData\Mithras\wdac
+C:\ProgramData\Mithras\install\agent.version: Access is denied.
+C:\ProgramData\Mithras\install\install-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\lib: Access is denied.
+C:\ProgramData\Mithras\install\mithras-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\mithras-tray.ps1: Access is denied.
+C:\ProgramData\Mithras\install\mithras.ico: Access is denied.
+C:\ProgramData\Mithras\install\README.md: Access is denied.
+C:\ProgramData\Mithras\install\sysmon-config.xml: Access is denied.
+C:\ProgramData\Mithras\install\uninstall-agent.ps1: Access is denied.
+C:\ProgramData\Mithras\install\vendor: Access is denied.
+C:\ProgramData\Mithras\install\lib\ApiClient.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\AppDiscoveryCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\AppWhitelistEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\CommandExecutor.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DefenderCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DefenderStateCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\DnsPolicyEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\EventLogCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\FirewallAuditCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\HmacAuth.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\PersistenceCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\PolicyEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\ProcessEventCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\RansomwareCanary.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SecureConfig.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SoftwareCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SysmonCollector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\SysmonInstaller.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\TamperDetector.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\TamperProtection.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\Updater.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\WdacControl.psm1: Access is denied.
+C:\ProgramData\Mithras\install\lib\WdacEnforcer.psm1: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm-LICENSE.txt: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm.exe: Access is denied.
+C:\ProgramData\Mithras\install\vendor\nssm.sha256: Access is denied.
+processed file: C:\ProgramData\Mithras\logs\agent-2026-06-11.log
+processed file: C:\ProgramData\Mithras\logs\collectors.log
+processed file: C:\ProgramData\Mithras\logs\tamper.log
+processed file: C:\ProgramData\Mithras\sysmon\sysmon-config.hash
+processed file: C:\ProgramData\Mithras\sysmon\sysmon-config.xml
+processed file: C:\ProgramData\Mithras\sysmon\Sysmon64.exe
+processed file: C:\ProgramData\Mithras\wdac\mithras-wdac.bin
+processed file: C:\ProgramData\Mithras\wdac\mithras-wdac.xml
+Successfully processed 18 files; Failed processing 39 files
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\config.dat" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\event-log-state.json" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\firewall-audit-state.json" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\logs" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\persistence-state.json" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\policy_hash.txt" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\process-event-state.json" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\sysmon" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\tamper-events-state.json" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\watchdog.ps1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\wdac" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\agent.version" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\install-agent.ps1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\mithras-agent.ps1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\mithras-tray.ps1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\mithras.ico" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\README.md" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\sysmon-config.xml" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\uninstall-agent.ps1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\vendor" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\ApiClient.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\AppDiscoveryCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\AppWhitelistEnforcer.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\CommandExecutor.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\DefenderCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\DefenderStateCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\DnsPolicyEnforcer.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\EventLogCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\FirewallAuditCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\HmacAuth.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\PersistenceCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\PolicyEnforcer.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\ProcessEventCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\RansomwareCanary.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\SecureConfig.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\SoftwareCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\SysmonCollector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\SysmonInstaller.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\TamperDetector.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\TamperProtection.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\Updater.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\WdacControl.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\lib\WdacEnforcer.psm1" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\vendor\nssm-LICENSE.txt" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\vendor\nssm.exe" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\install\vendor\nssm.sha256" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\logs\agent-2026-06-11.log" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\logs\collectors.log" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\logs\tamper.log" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\sysmon\sysmon-config.hash" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\sysmon\sysmon-config.xml" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\sysmon\Sysmon64.exe" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\wdac\mithras-wdac.bin" now owned by user "AzureAD\CameronBull".
+
+SUCCESS: The file (or folder): "C:\ProgramData\Mithras\wdac\mithras-wdac.xml" now owned by user "AzureAD\CameronBull".
+PS C:\WINDOWS\system32> Remove-Item "C:\ProgramData\Mithras" -Recurse -Force
+Remove-Item : Cannot remove item C:\ProgramData\Mithras\install\lib\ApiClient.psm1: Access to the path is denied.
+At line:1 char:1
++ Remove-Item "C:\ProgramData\Mithras" -Recurse -Force
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (ApiClient.psm1:FileInfo) [Remove-Item], ArgumentException
+    + FullyQualifiedErrorId : RemoveFileSystemItemArgumentError,Microsoft.PowerShell.Commands.RemoveItemCommand
+PS C:\WINDOWS\system32> Remove-Item "C:\ProgramData\Mithras" -Recurse -Force
