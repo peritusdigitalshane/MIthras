@@ -1,11 +1,8 @@
 import { LandingNav } from "@/components/landing/LandingNav";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { AISocSection } from "@/components/landing/AISocSection";
-import { StatsSection } from "@/components/landing/StatsSection";
-import { FeaturesOverview } from "@/components/landing/FeaturesOverview";
-import { FeatureShowcase } from "@/components/landing/FeatureShowcase";
-import { ProtectionSection } from "@/components/landing/ProtectionSection";
-import { MSPSection } from "@/components/landing/MSPSection";
+import { AISocTeaser } from "@/components/landing/AISocTeaser";
+import { PlatformHighlights } from "@/components/landing/PlatformHighlights";
+import { MSPTeaser } from "@/components/landing/MSPTeaser";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FaqSection } from "@/components/landing/FaqSection";
 import { CTASection, Footer } from "@/components/landing/CTAFooter";
@@ -18,6 +15,12 @@ import {
 } from "@/components/seo/jsonLd";
 import { LANDING_FAQ } from "@/components/landing/FaqSection";
 
+/**
+ * Homepage. After the Jun 12 IA refactor, dense capability content lives on
+ * dedicated routes (/ai-soc, /platform, /for-msps, /eol-windows). The home
+ * page is now a short marketing surface: hero → AI SOC teaser → 4 platform
+ * highlights linking to the deep pages → MSP teaser → pricing → FAQ → CTA.
+ */
 const Landing = () => {
   return (
     <>
@@ -35,12 +38,9 @@ const Landing = () => {
       <div className="min-h-screen bg-background">
         <LandingNav />
         <HeroSection />
-        <AISocSection />
-        <StatsSection />
-        <FeaturesOverview />
-        <FeatureShowcase />
-        <ProtectionSection />
-        <MSPSection />
+        <AISocTeaser />
+        <PlatformHighlights />
+        <MSPTeaser />
         <PricingSection />
         <FaqSection />
         <CTASection />

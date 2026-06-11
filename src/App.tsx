@@ -80,6 +80,10 @@ import Landed from "./pages/Landed";
 import ChannelProgram from "./pages/ChannelProgram";
 import ContactSales from "./pages/ContactSales";
 import Personal from "./pages/Personal";
+import AISoc from "./pages/AISoc";
+import PlatformPage from "./pages/PlatformPage";
+import ForMsps from "./pages/ForMsps";
+import EolWindows from "./pages/EolWindows";
 import HomeUserAccount from "./pages/HomeUserAccount";
 import HomeUserProtectedRoute from "./components/auth/HomeUserProtectedRoute";
 import { RouteAnalytics } from "@/components/analytics/RouteAnalytics";
@@ -122,6 +126,10 @@ const App = () => (
               <Route path="/channel-program" element={<ChannelProgram />} />
               <Route path="/contact-sales" element={<ContactSales />} />
               <Route path="/personal" element={<Personal />} />
+              <Route path="/ai-soc" element={<AISoc />} />
+              <Route path="/platform" element={<PlatformPage />} />
+              <Route path="/for-msps" element={<ForMsps />} />
+              <Route path="/eol-windows" element={<EolWindows />} />
               <Route
                 path="/account"
                 element={
