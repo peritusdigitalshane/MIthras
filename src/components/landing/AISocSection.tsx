@@ -65,23 +65,23 @@ const AGENTS: Agent[] = [
 
 export function AISocSection() {
   return (
-    <section id="ai-soc" className="relative py-24 px-6 overflow-hidden">
+    <section id="ai-soc" className="relative py-16 sm:py-20 md:py-24 px-4 sm:px-6 overflow-hidden">
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-0 left-1/4 w-[800px] h-[400px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
       <div className="container mx-auto max-w-6xl">
         {/* Section header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase mb-6 border border-primary/20">
+        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 md:mb-16">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tracking-wide uppercase mb-5 sm:mb-6 border border-primary/20">
             <Bot className="h-3.5 w-3.5" />
             Meet your AI SOC
           </div>
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6 leading-[1.1]">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-5 sm:mb-6 leading-[1.1] text-balance">
             Five agents.{" "}
             <span className="text-muted-foreground">One unified verdict.</span>
           </h2>
-          <p className="text-lg text-muted-foreground leading-relaxed">
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
             Every alert passes through a chain of independent AI agents before
             any action runs. They check each other's work, refuse to act
             without consensus, and document every decision so you can audit
@@ -89,8 +89,11 @@ export function AISocSection() {
           </p>
         </div>
 
-        {/* Agent flow diagram — visual chain on desktop */}
-        <div className="hidden lg:flex items-stretch justify-between gap-3 mb-16">
+        {/* Agent flow diagram — visual chain only on xl+ screens.
+            Below xl (1280px), five cards in a row + arrows compresses each
+            card to ~150px which crushes the description. Use a 1/2/3-column
+            grid for everything below xl so cards keep readable widths. */}
+        <div className="hidden xl:flex items-stretch justify-between gap-3 mb-12 md:mb-16">
           {AGENTS.map((agent, idx) => (
             <div key={agent.number} className="flex items-start flex-1 min-w-0">
               <AgentCard agent={agent} />
@@ -103,21 +106,22 @@ export function AISocSection() {
           ))}
         </div>
 
-        {/* Mobile / tablet — stacked */}
-        <div className="lg:hidden grid sm:grid-cols-2 gap-4 mb-16">
+        {/* Mobile / tablet / small desktop — grid that scales 1→2→3 cols
+            with the viewport so the cards always have breathing room. */}
+        <div className="xl:hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-12 md:mb-16">
           {AGENTS.map((agent) => (
             <AgentCard key={agent.number} agent={agent} />
           ))}
         </div>
 
         {/* Outcomes strip — why this matters */}
-        <div className="bg-card/40 backdrop-blur border border-border/40 rounded-2xl p-8 md:p-12">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div className="bg-card/40 backdrop-blur border border-border/40 rounded-2xl p-6 sm:p-8 md:p-12">
+          <div className="grid md:grid-cols-2 gap-6 sm:gap-8 items-start md:items-center">
             <div>
-              <h3 className="text-2xl md:text-3xl font-bold tracking-tight mb-4">
+              <h3 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight mb-3 sm:mb-4 text-balance">
                 Why an AI SOC beats a human one
               </h3>
-              <p className="text-muted-foreground leading-relaxed">
+              <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
                 Traditional MDR sells you analysts watching screens. Analysts
                 burn out, take holidays, and cost six figures. The AI SOC
                 doesn't &mdash; and it applies the same rigour to alert
