@@ -1,5 +1,6 @@
 import { LandingNav } from "@/components/landing/LandingNav";
 import { HeroSection } from "@/components/landing/HeroSection";
+import { AISocSection } from "@/components/landing/AISocSection";
 import { StatsSection } from "@/components/landing/StatsSection";
 import { FeaturesOverview } from "@/components/landing/FeaturesOverview";
 import { FeatureShowcase } from "@/components/landing/FeatureShowcase";
@@ -21,8 +22,8 @@ const Landing = () => {
   return (
     <>
       <Seo
-        title="Mithras Threat Defence — Endpoint security for MSPs, built in Australia"
-        description="Multi-tenant endpoint security platform for MSPs and SMBs. Centrally harden Microsoft Defender, microsegment Windows endpoints, and protect end-of-life Windows boxes — no E5 required. Sold through authorised channel partners."
+        title="Mithras Threat Defence — 24/7 AI SOC for MSPs, built in Australia"
+        description="An AI-first SOC for MSPs. Five specialised AI agents triage every alert, cross-check each other, and respond in seconds — 24/7/365. Centrally harden Microsoft Defender, microsegment Windows endpoints, and protect end-of-life Windows boxes — no E5 required."
         canonical="/"
         structuredData={[
           organizationSchema(),
@@ -34,6 +35,7 @@ const Landing = () => {
       <div className="min-h-screen bg-background">
         <LandingNav />
         <HeroSection />
+        <AISocSection />
         <StatsSection />
         <FeaturesOverview />
         <FeatureShowcase />

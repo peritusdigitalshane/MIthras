@@ -880,6 +880,158 @@ function Get-CompletedInstallUpdates {
 }
 
 # ============================================================================
+# uninstall_self -- v0.7.17
+#
+# Authorised, server-driven decommissioning. SOC operator clicks Decommission
+# on the endpoint detail page; server queues uninstall_self; agent picks it
+# up here and performs the tamper-aware teardown.
+#
+# Why a scheduled task and not just stop-and-delete inline:
+#   The agent IS the service. We can't stop or delete ourselves while we
+#   own the process. The break-glass Force-Remove.ps1 that lives at
+#   install\Force-Remove.ps1 already knows how to take down the tamper
+#   stack + delete files; we re-use it here, deferred a minute via a
+#   one-shot SYSTEM scheduled task. The agent stays running long enough
+#   to flush its success ack back to the server, then exits when the
+#   task arrives and stops the service.
+#
+# Sequence:
+#   1. Disable the watchdog scheduled task(s) so they don't fight us.
+#   2. Wipe the hardened service DACL (Security registry value) so the
+#      cleanup script's sc.exe stop will be accepted.
+#   3. Locate install\Force-Remove.ps1. If absent (older install that
+#      pre-dates this feature) we fall back to embedding the same logic
+#      inline as a temp script.
+#   4. Register a one-shot scheduled task "MithrasUninstall" that fires
+#      60 seconds from now as SYSTEM and runs the cleanup script. The
+#      lag gives the agent enough time to flush this command's result
+#      to the server via the next heartbeat.
+#   5. Return success. Main loop will save + ship the result.
+# ============================================================================
+
+function Invoke-UninstallSelf {
+    param([hashtable]$Params)
+
+    $reason = if ($Params -and $Params.reason) { [string]$Params.reason } else { 'no reason supplied' }
+    _CmdLog 'INFO' ("uninstall_self: decommissioning initiated; reason=" + $reason)
+
+    try {
+        # --- 1. Disable watchdog so it doesn't restart the service mid-teardown ---
+        foreach ($name in 'MithrasWatchdog','MithrasAgentWatchdog','PeritusSecureWatchdog','MithrasTray') {
+            try {
+                Disable-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue | Out-Null
+                Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
+            } catch {}
+        }
+        _CmdLog 'INFO' 'uninstall_self: watchdog tasks disabled'
+
+        # --- 2. Reset service DACL via the Security registry value ---
+        # The cleanup script's sc.exe stop would otherwise be denied by the
+        # tamper-protection DACL the agent itself installed. Same mechanism
+        # the break-glass Force-Remove.ps1 uses.
+        try {
+            $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\MithrasAgent'
+            if (Test-Path $svcKey) {
+                $regKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+                    'SYSTEM\CurrentControlSet\Services\MithrasAgent',
+                    [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,
+                    [System.Security.AccessControl.RegistryRights]::TakeOwnership
+                )
+                if ($regKey) {
+                    $admins = New-Object System.Security.Principal.SecurityIdentifier 'S-1-5-32-544'
+                    $acl = $regKey.GetAccessControl()
+                    $acl.SetOwner($admins)
+                    $regKey.SetAccessControl($acl)
+                    $regKey.Close()
+
+                    $regKey = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+                        'SYSTEM\CurrentControlSet\Services\MithrasAgent',
+                        [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,
+                        [System.Security.AccessControl.RegistryRights]::ChangePermissions
+                    )
+                    if ($regKey) {
+                        $acl  = $regKey.GetAccessControl()
+                        $rule = New-Object System.Security.AccessControl.RegistryAccessRule(
+                            $admins,
+                            [System.Security.AccessControl.RegistryRights]::FullControl,
+                            [System.Security.AccessControl.InheritanceFlags]::"ContainerInherit",
+                            [System.Security.AccessControl.PropagationFlags]::None,
+                            [System.Security.AccessControl.AccessControlType]::Allow
+                        )
+                        $acl.AddAccessRule($rule)
+                        $regKey.SetAccessControl($acl)
+                        $regKey.Close()
+                    }
+
+                    Remove-Item "$svcKey\Security" -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
+            _CmdLog 'INFO' 'uninstall_self: service DACL reset'
+        } catch {
+            _CmdLog 'WARN' ("uninstall_self: DACL reset failed: " + $_.Exception.Message)
+        }
+
+        # --- 3. Find the cleanup script ---
+        # Preferred: the Force-Remove.ps1 that the v0.7.17+ installer drops
+        # into C:\ProgramData\Mithras\install\. Fallback: install root.
+        $cleanupScript = $null
+        foreach ($candidate in @(
+            'C:\ProgramData\Mithras\install\Force-Remove.ps1',
+            (Join-Path $PSScriptRoot '..\Force-Remove.ps1')
+        )) {
+            if (Test-Path $candidate) { $cleanupScript = (Resolve-Path $candidate).Path; break }
+        }
+        if (-not $cleanupScript) {
+            # No bundled script -- agent was installed before Force-Remove
+            # was added to the payload. Stage a copy of the same logic to
+            # a temp file so the scheduled task has something to run.
+            $cleanupScript = Join-Path $env:TEMP 'mithras-uninstall-inline.ps1'
+            $inline = @'
+$ErrorActionPreference = 'SilentlyContinue'
+foreach ($name in 'MithrasWatchdog','MithrasAgentWatchdog','PeritusSecureWatchdog','MithrasAgent','MithrasTray','MithrasUninstall') {
+    try { Disable-ScheduledTask -TaskName $name | Out-Null } catch {}
+    try { Unregister-ScheduledTask -TaskName $name -Confirm:$false } catch {}
+}
+& sc.exe stop MithrasAgent 2>&1 | Out-Null
+Start-Sleep 2
+& sc.exe delete MithrasAgent 2>&1 | Out-Null
+& takeown.exe /F 'C:\ProgramData\Mithras' /R /D Y 2>&1 | Out-Null
+& icacls.exe 'C:\ProgramData\Mithras' /reset /T /C /Q 2>&1 | Out-Null
+& icacls.exe 'C:\ProgramData\Mithras' /grant 'Administrators:(OI)(CI)F' /T /C /Q 2>&1 | Out-Null
+Remove-Item 'C:\ProgramData\Mithras' -Recurse -Force -ErrorAction SilentlyContinue
+'@
+            $inline | Set-Content -Path $cleanupScript -Encoding UTF8 -Force
+        }
+        _CmdLog 'INFO' ("uninstall_self: cleanup script = " + $cleanupScript)
+
+        # --- 4. Schedule a one-shot SYSTEM task to fire in 60 seconds ---
+        # The lag covers the agent's next heartbeat so the success result
+        # reaches the server before the service is stopped.
+        $taskName  = 'MithrasUninstall'
+        $action    = New-ScheduledTaskAction    -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$cleanupScript`""
+        $trigger   = New-ScheduledTaskTrigger   -Once -At ((Get-Date).AddSeconds(60))
+        $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+        $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DeleteExpiredTaskAfter (New-TimeSpan -Minutes 10)
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+        _CmdLog 'INFO' "uninstall_self: scheduled task '$taskName' armed to fire in 60s"
+
+        return @{
+            status = 'succeeded'
+            result = @{
+                reason          = $reason
+                cleanup_script  = $cleanupScript
+                cleanup_in_secs = 60
+                armed_at        = (Get-Date).ToUniversalTime().ToString('o')
+                note            = 'Agent will be stopped + uninstalled by the scheduled task in ~60s. This is the last heartbeat from this endpoint.'
+            }
+        }
+    } catch {
+        _CmdLog 'WARN' ("uninstall_self failed: " + $_.Exception.Message)
+        return @{ status='failed'; error = $_.Exception.Message }
+    }
+}
+
+# ============================================================================
 # Dispatcher
 # ============================================================================
 
@@ -905,6 +1057,7 @@ function Invoke-AgentCommand {
         'install_mesh_agent'  { Invoke-InstallMeshAgent  -Params $Params }
         'uninstall_mesh_agent'{ Invoke-UninstallMeshAgent -Params $Params }
         'install_updates'     { Invoke-InstallUpdates    -CommandId $CommandId -Params $Params }
+        'uninstall_self'      { Invoke-UninstallSelf     -Params $Params }
         default               { @{ status='failed'; error="unsupported command_type: $CommandType" } }
     }
     $result['id'] = $CommandId
@@ -912,4 +1065,4 @@ function Invoke-AgentCommand {
     return $result
 }
 
-Export-ModuleMember -Function Invoke-AgentCommand, Invoke-IsolateNetwork, Invoke-ReleaseIsolation, Invoke-KillProcess, Invoke-QuarantineFile, Invoke-RunQuickScan, Invoke-RunFullScan, Invoke-RestartAgent, Invoke-CollectPersistence, Invoke-EmergencyUnlock, Invoke-UpgradeAgent, Invoke-InstallMeshAgent, Invoke-UninstallMeshAgent, Invoke-InstallUpdates, Get-CompletedInstallUpdates
+Export-ModuleMember -Function Invoke-AgentCommand, Invoke-IsolateNetwork, Invoke-ReleaseIsolation, Invoke-KillProcess, Invoke-QuarantineFile, Invoke-RunQuickScan, Invoke-RunFullScan, Invoke-RestartAgent, Invoke-CollectPersistence, Invoke-EmergencyUnlock, Invoke-UpgradeAgent, Invoke-InstallMeshAgent, Invoke-UninstallMeshAgent, Invoke-InstallUpdates, Invoke-UninstallSelf, Get-CompletedInstallUpdates
