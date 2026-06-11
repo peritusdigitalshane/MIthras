@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Nuclear cleanup for a tamper-protected Mithras Threat Defence install
@@ -28,7 +28,7 @@
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-Write-Host "=== Mithras Threat Defence — nuclear cleanup ===" -ForegroundColor Cyan
+Write-Host "=== Mithras Threat Defence -- nuclear cleanup ===" -ForegroundColor Cyan
 
 # --- 1. Disable + delete the watchdog scheduled task ---
 Write-Host "`n[1/7] Disabling watchdog scheduled task..." -ForegroundColor Yellow
@@ -125,7 +125,7 @@ Write-Host "`n[5/7] Taking ownership of C:\ProgramData\Mithras..." -ForegroundCo
 & takeown.exe /F 'C:\ProgramData\PeritusSecure' /R /D Y 2>&1 | Out-Null
 Write-Host "  ownership taken" -ForegroundColor Green
 
-# --- 6. Reset + grant ACLs (in this ORDER — reset must come AFTER takeown) ---
+# --- 6. Reset + grant ACLs (in this ORDER -- reset must come AFTER takeown) ---
 Write-Host "`n[6/7] Resetting ACLs on install tree..." -ForegroundColor Yellow
 & icacls.exe 'C:\ProgramData\Mithras' /reset /T /C /Q 2>&1 | Out-Null
 & icacls.exe 'C:\ProgramData\Mithras' /grant 'Administrators:(OI)(CI)F' /T /C /Q 2>&1 | Out-Null
@@ -157,7 +157,7 @@ foreach ($path in 'C:\ProgramData\Mithras','C:\ProgramData\PeritusSecure') {
 
 # --- Summary ---
 Write-Host "`n=== Cleanup complete ===" -ForegroundColor Cyan
-Write-Host "Run the installer again — it should now go through."
+Write-Host "Run the installer again -- it should now go through."
 Write-Host ""
 $leftover = Test-Path 'C:\ProgramData\Mithras'
 if ($leftover) {
