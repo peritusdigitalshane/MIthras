@@ -70,13 +70,49 @@ function Get-DefenderStatusPayload {
 
 function Get-DefenderThreatsPayload {
     [CmdletBinding()]
-    param([int]$MaxThreats = 200)
+    param(
+        [int]$MaxThreats = 200,
+        # v0.7.15: skip the Defender WMI provider for this many seconds after
+        # a successful collect. 0 disables the cache (the previous behaviour).
+        [int]$CacheTtlSeconds = 300
+    )
+
+    # v0.7.15: hot WMI fix.
+    #
+    # Get-MpThreatDetection + Get-MpThreat go through the Defender Protection-
+    # Management WMI provider (hosted by WmiPrvSE). On an endpoint with N
+    # historical detections both calls enumerate every record, and the agent's
+    # 60-second heartbeat cadence puts that work on WmiPrvSE every minute even
+    # though the detection set rarely changes minute-to-minute. We've measured
+    # this as the dominant WmiPrvSE CPU consumer on endpoints with EICAR test
+    # fixtures or normal day-to-day threat history.
+    #
+    # Cache the parsed payload at script scope. While the cache is fresh we
+    # ship the same payload (server is the source of truth + dedupes by
+    # threat_id), but skip the two WMI calls + per-threat catalog lookups
+    # entirely. Real new detections still surface within $CacheTtlSeconds
+    # (300s default = 5 cycles), which is well under any SLA driven by the
+    # alerts pipeline. The cache is in-memory only — restart drops it, so the
+    # very first cycle after upgrade pays the full cost.
+    if ($CacheTtlSeconds -gt 0 -and (Test-Path Variable:Script:DefenderThreatsCache)) {
+        $cached = $script:DefenderThreatsCache
+        $ageSec = ((Get-Date) - $cached.fetched_at).TotalSeconds
+        if ($ageSec -lt $CacheTtlSeconds) {
+            _LogCollect 'INFO' ("threats: cache hit, age=" + [int]$ageSec + "s count=" + $cached.payload.Count)
+            return $cached.payload
+        }
+    }
 
     $detections = @()
     try { $r = @(Get-MpThreatDetection -ErrorAction SilentlyContinue); if ($r) { $detections += $r } } catch {}
     try { $r = @(Get-MpThreat          -ErrorAction SilentlyContinue); if ($r) { $detections += $r } } catch {}
 
-    if ($detections.Count -eq 0) { return @() }
+    if ($detections.Count -eq 0) {
+        if ($CacheTtlSeconds -gt 0) {
+            $script:DefenderThreatsCache = @{ payload = @(); fetched_at = (Get-Date) }
+        }
+        return @()
+    }
     _LogCollect 'INFO' ("threats: raw count=" + $detections.Count)
 
     # v0.6.1: cache catalog lookups per ThreatID. Get-MpThreatDetection returns
@@ -290,6 +326,9 @@ function Get-DefenderThreatsPayload {
         }
     }
     _LogCollect 'INFO' ("threats: produced=" + $threats.Count)
+    if ($CacheTtlSeconds -gt 0) {
+        $script:DefenderThreatsCache = @{ payload = $threats; fetched_at = (Get-Date) }
+    }
     return $threats
 }
 

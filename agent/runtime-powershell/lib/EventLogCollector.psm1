@@ -70,24 +70,42 @@ function Get-DefenderEventLogsPayload {
     $lastId   = [int64]$state.last_record_id
     $firstRun = ($lastId -le 0)
 
-    # Primary filter — just the log itself. The log is already scoped to
-    # Defender, every event in it is relevant. Earlier versions applied an
-    # event-id allowlist on incremental runs, but that filtered out the most
-    # common Defender events (1150/1151 hourly health-check) so live tail
-    # appeared dead. Now we let everything in the log through and rely on the
-    # incremental RecordId to keep volume bounded.
-    $filter = @{ LogName = 'Microsoft-Windows-Windows Defender/Operational' }
-    if ($firstRun) {
-        $filter['StartTime'] = (Get-Date).AddDays(-$FirstRunBackfillDays)
-    }
-
-    $maxToFetch = $(if ($firstRun) { 5000 } else { 1000 })
+    # v0.7.15: hot WMI fix.
+    #
+    # Old code (every heartbeat): Get-WinEvent -MaxEvents 1000 then drop 999
+    # via in-memory RecordId compare. The MaxEvents=1000 forced the Defender
+    # event-log provider (hosted by WmiPrvSE) to enumerate + serialise 1000
+    # records on every minute, even when nothing new had landed. On a busy
+    # endpoint this single call accounted for the majority of WmiPrvSE CPU.
+    #
+    # New code: push the RecordId predicate into the query itself via
+    # FilterXml. The event-log subsystem evaluates the XPath against its on-
+    # disk index, so the provider only returns events strictly newer than
+    # the bookmark. Steady state: 0–2 events fetched. First run still uses
+    # the wide StartTime backfill.
+    $logName    = 'Microsoft-Windows-Windows Defender/Operational'
+    $maxToFetch = $(if ($firstRun) { 5000 } else { 200 })
     $events = @()
     try {
-        $events = @(Get-WinEvent -FilterHashtable $filter -MaxEvents $maxToFetch -ErrorAction Stop)
+        if ($firstRun) {
+            $filter = @{ LogName = $logName; StartTime = (Get-Date).AddDays(-$FirstRunBackfillDays) }
+            $events = @(Get-WinEvent -FilterHashtable $filter -MaxEvents $maxToFetch -ErrorAction Stop)
+        } else {
+            # Microsoft-Windows-EventLog FilterXml schema: select events whose
+            # System/EventRecordID is strictly greater than the bookmark.
+            $xml = "<QueryList><Query Id='0' Path='$logName'><Select Path='$logName'>*[System[EventRecordID&gt;$lastId]]</Select></Query></QueryList>"
+            $events = @(Get-WinEvent -FilterXml $xml -MaxEvents $maxToFetch -ErrorAction Stop)
+        }
         _ElLog 'INFO' ("Defender Operational fetched count=" + $events.Count + " firstRun=" + $firstRun)
-    } catch {
-        _ElLog 'WARN' ("Defender Operational query failed: " + $_.Exception.Message)
+    } catch [System.Exception] {
+        # Get-WinEvent throws 'No events were found' when the predicate matches
+        # nothing — that's the happy steady-state path, not a real error.
+        $msg = $_.Exception.Message
+        if ($msg -match 'No events were found' -or $msg -match 'were not found') {
+            _ElLog 'INFO' ("Defender Operational fetched count=0 firstRun=" + $firstRun)
+        } else {
+            _ElLog 'WARN' ("Defender Operational query failed: " + $msg)
+        }
     }
 
     # Fallback: if nothing came back from the Defender Operational log, also probe

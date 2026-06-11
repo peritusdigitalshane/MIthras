@@ -40,3 +40,4 @@ agent/contracts/*-private.pem.local
 # go in Passbolt per CLAUDE.md. This file is a personal convenience —
 # never commit it.
 credentials.md
+dist-agent/
