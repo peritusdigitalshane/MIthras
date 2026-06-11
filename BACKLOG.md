@@ -408,12 +408,17 @@ bigger scope, or a manual deploy.
   threshold rule (e.g. ≥10 fails/hour from one site), new
   `alert_type = 'wp_brute_force'`, hook into the existing
   `notify-alert` pipeline.
-- [ ] **Customer-report retry-send cron**. The pipeline now works
-  end-to-end (PDF generation + email delivery verified on report
-  `99a715e6-…`), but if `send-customer-report` fails after
-  `generate-customer-report` marked the row `ready`, nothing retries.
-  Add: a cron that picks up `status='ready' AND sent_at IS NULL`
-  rows older than N minutes and re-fires the send.
+- [x] ~~**Customer-report retry-send cron**~~. Shipped 2026-06-12:
+  `customer-report-retry-send` cron + `retry_unsent_customer_reports()`
+  RPC + `customer_reports.send_attempts` counter. Picks `status='ready'
+  AND sent_at IS NULL AND pdf_storage_path IS NOT NULL` rows whose
+  `updated_at` is older than 15 min, caps at 5 retries, gives up after
+  7 days. Plus a complementary change to `send-customer-report` so
+  terminal errors (`no_recipients_for_kind`, `no_valid_recipient_emails`,
+  `report_pdf_missing`) mark the row `failed` with the reason, so the
+  retry cron stops cycling rows that need operator intervention rather
+  than another transient retry. End-to-end verified against the 3 stale
+  weekly reports from 2026-06-08 (all now `failed:no_recipients_for_kind:weekly`).
 - [ ] **Customer-report missed window (Jun 1–6) — backfill?** The
   weekly/monthly enqueue crons failed silently for 6 days before
   `20260607020000_customer_reports_enqueue_fix.sql`. Customers got no

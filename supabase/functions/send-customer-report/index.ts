@@ -33,6 +33,16 @@ function jsonResponse(body: unknown, status: number, origin: string | null): Res
     });
 }
 
+// Move a row out of the retry-send cron's eligibility window. Called for
+// terminal failures (missing PDF, no recipients) so the cron stops cycling
+// rows that need operator intervention rather than another transient retry.
+async function markReportFailed(reportId: string, reason: string): Promise<void> {
+    await supabase.from("customer_reports").update({
+        status:          "failed",
+        last_send_error: reason,
+    }).eq("id", reportId);
+}
+
 interface SmtpSettings {
     host: string;
     port: number;
@@ -263,6 +273,9 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "report_not_ready", status: report.status }, 409, origin);
     }
     if (!report.pdf_storage_path) {
+        // Terminal — generate-customer-report never wrote the PDF. Mark the
+        // row failed so the retry-send cron stops cycling it.
+        await markReportFailed(reportId, "report_pdf_missing");
         return jsonResponse({ error: "report_pdf_missing" }, 409, origin);
     }
 
@@ -291,6 +304,10 @@ Deno.serve(async (req) => {
     const kindKey = kind === "weekly" ? "weekly" : kind === "quarterly" ? "quarterly" : "monthly";
     const recipients = (recipRes.data ?? []).filter((r: Record<string, unknown>) => Boolean(r[kindKey]));
     if (recipients.length === 0) {
+        // Terminal — the org has no one subscribed to this report kind. Mark
+        // failed so the retry cron skips it; admin can add a recipient and
+        // re-trigger via the dashboard "Send" button.
+        await markReportFailed(reportId, "no_recipients_for_kind:" + kind);
         return jsonResponse({ error: "no_recipients_for_kind", kind }, 409, origin);
     }
     // Validate every recipient address before passing it to RCPT TO: or the
@@ -300,6 +317,8 @@ Deno.serve(async (req) => {
         .map((r: Record<string, unknown>) => String(r.email).trim().toLowerCase())
         .filter((e) => isValidEmail(e));
     if (emails.length === 0) {
+        // Terminal — every recipient email failed format validation.
+        await markReportFailed(reportId, "no_valid_recipient_emails:" + kind);
         return jsonResponse({ error: "no_valid_recipient_emails", kind }, 409, origin);
     }
 
