@@ -76,6 +76,19 @@ interface TenantRow {
     scopes: string[];
     remediation_enabled: boolean;
     last_poll_at: string | null;
+    signin_audit_supported: boolean;
+}
+
+// Graph returns Authentication_RequestFromNonPremiumTenantOrB2CTenant on
+// /auditLogs/signIns and /directoryAudits when the tenant lacks Entra ID P1.
+function isNonPremiumError(msg: string): boolean {
+    return msg.includes("NonPremiumTenant") || msg.includes("NonPremium");
+}
+
+async function markSigninAuditUnsupported(tenantId: string): Promise<void> {
+    await supabase.from("m365_tenants")
+        .update({ signin_audit_supported: false })
+        .eq("id", tenantId);
 }
 
 async function ensureFreshToken(tenant: TenantRow): Promise<string> {
@@ -151,9 +164,13 @@ async function pollSignInEvents(tenant: TenantRow, accessToken: string, sinceIso
             total += rows.length;
         }
     } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Capability flag: a NonPremium 403 means this tenant lacks Entra ID
+        // Premium. Persist so future cycles skip the request entirely.
+        if (isNonPremiumError(msg)) await markSigninAuditUnsupported(tenant.id);
         // runSection() already prepends the section label (`signins:`) — re-prepending
         // here doubled it (signins:signins:graph_403:…) in last_poll_error and logs.
-        throw e instanceof Error ? e : new Error(String(e));
+        throw e instanceof Error ? e : new Error(msg);
     }
     return total;
 }
@@ -193,8 +210,10 @@ async function pollAuditEvents(tenant: TenantRow, accessToken: string, sinceIso:
             total += rows.length;
         }
     } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (isNonPremiumError(msg)) await markSigninAuditUnsupported(tenant.id);
         // runSection() already prepends the section label — see signins comment above.
-        throw e instanceof Error ? e : new Error(String(e));
+        throw e instanceof Error ? e : new Error(msg);
     }
     return total;
 }
@@ -511,10 +530,17 @@ async function pollTenant(tenant: TenantRow): Promise<Record<string, unknown>> {
 
     // Each Graph section runs independently. P1-only endpoints
     // (signins / directoryAudits) fail with Authentication_RequestFromNonPremiumTenantOrB2
-    // on tenants without Entra ID Premium; that error is recorded but the
-    // other sections still run.
-    const signinResult = await runSection("signins", () => pollSignInEvents(tenant, accessToken, since));
-    const auditResult  = await runSection("audit",   () => pollAuditEvents(tenant, accessToken, since));
+    // on tenants without Entra ID Premium; the first time that happens we
+    // persist signin_audit_supported=false and skip these two requests
+    // thereafter — both to spare the noisy 5-min warn log and to save a
+    // Graph round-trip per cycle. Flip the column back to true to re-probe
+    // after a Premium upgrade.
+    const signinResult = tenant.signin_audit_supported
+        ? await runSection("signins", () => pollSignInEvents(tenant, accessToken, since))
+        : { ok: true as const, value: 0 };
+    const auditResult  = tenant.signin_audit_supported
+        ? await runSection("audit",   () => pollAuditEvents(tenant, accessToken, since))
+        : { ok: true as const, value: 0 };
 
     // Mailbox-rule sweep user list — only consult sign-in events if we
     // actually got any. Otherwise fall back to stale + first-poll seed.
@@ -563,8 +589,12 @@ async function pollTenant(tenant: TenantRow): Promise<Record<string, unknown>> {
     return {
         ok: errors.length === 0,
         tenant_id: tenant.tenant_id,
-        sign_ins:      signinResult.ok ? signinResult.value : "skipped",
-        audit_events:  auditResult.ok  ? auditResult.value  : "skipped",
+        sign_ins:      !tenant.signin_audit_supported
+            ? "no_premium"
+            : signinResult.ok ? signinResult.value : "skipped",
+        audit_events:  !tenant.signin_audit_supported
+            ? "no_premium"
+            : auditResult.ok ? auditResult.value : "skipped",
         mailbox_rules: mailboxResult.ok ? mailboxResult.value : "skipped",
         oauth_grants:  oauthResult.ok  ? oauthResult.value  : "skipped",
         users_swept:   users.length,
@@ -618,14 +648,14 @@ Deno.serve(async (req) => {
     if (targetTenantPk) {
         const { data } = await supabase
             .from("m365_tenants")
-            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at")
+            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
             .eq("id", targetTenantPk).eq("consent_state", "active").maybeSingle();
         if (!data) return jsonResponse({ error: "tenant_not_found_or_inactive" }, 404, origin);
         tenants = [data as TenantRow];
     } else {
         const { data } = await supabase
             .from("m365_tenants")
-            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at")
+            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
             .eq("consent_state", "active");
         tenants = (data ?? []) as TenantRow[];
     }

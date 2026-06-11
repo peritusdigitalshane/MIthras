@@ -430,12 +430,13 @@ bigger scope, or a manual deploy.
   protocol-key mismatch + wildcard bind addr), but the runtime is
   pre-Mithras and won't pick up new modules. Either upgrade or
   decommission.
-- [ ] **m365 ITDR Premium-licence polling silencing**. Every poll
-  cycle for the connected non-premium tenant logs a `[Warning]
-  m365_section_failed[signins]` (≈12/30min). Functionally fine —
-  other sections still run — but noisy. Could persist a tenant-level
-  capability flag (`signin_audit_supported = false`) and skip the
-  request when known-false.
+- [x] ~~**m365 ITDR Premium-licence polling silencing**~~. Shipped
+  2026-06-12: `m365_tenants.signin_audit_supported` column +
+  poller catches `NonPremiumTenant` 403 and flips the flag, future
+  cycles skip both `/auditLogs/signIns` and `/directoryAudits`
+  entirely. Flag flipped on the one connected non-premium tenant
+  on first poll after deploy. Operator can flip it back to `true`
+  to re-probe after a Premium upgrade.
 - [ ] **Agent .exe Mithras brand (task #131)**. Still pending — needs
   the C# launcher work to embed the icon + signature.
 
