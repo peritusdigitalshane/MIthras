@@ -1,0 +1,47 @@
+# Separate compose project for the Mithras AI SOC orchestration worker.
+# Joins the existing supabase_default network (created by /opt/peritus-supabase)
+# as an external attachment so we don't touch the upstream compose file.
+#
+# Operations:
+#   docker compose build         # build the worker image (~30s, only when worker.ts changes)
+#   docker compose up -d         # start the worker
+#   docker compose logs -f       # tail
+#   docker compose restart       # graceful restart, lets in-flight cycle finish first
+#   docker compose down          # stop + remove
+
+services:
+  ai-soc-worker:
+    build: .
+    image: peritus/ai-soc-worker:latest
+    container_name: peritus-ai-soc-worker
+    restart: unless-stopped
+    networks:
+      - supabase_default
+    environment:
+      # Service-role JWT to read the org/alert tables. Reuses the same
+      # secret stored in /opt/peritus-supabase/.env (the worker only needs
+      # read access to alerts + ai_triage_decisions; it does NOT need the
+      # postgres password directly).
+      SUPABASE_URL:              ${SUPABASE_URL:?must be set in .env or shell}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?must be set in .env or shell}
+      # Shared secret the orchestrator validates as 'x-mithras-soc-secret'.
+      # This is the same value stored in platform_settings.ai_soc_poll_secret.
+      AI_SOC_POLL_SECRET:        ${AI_SOC_POLL_SECRET:?must be set in .env or shell}
+      # Direct path to the orchestrator via the docker-internal DNS name.
+      # Bypasses Kong + pg_net entirely.
+      ORCH_URL:                  ${ORCH_URL:-http://supabase-kong:8000/functions/v1/ai-soc-orchestrate}
+      POLL_INTERVAL_MS:          ${POLL_INTERVAL_MS:-15000}
+      MAX_PER_CYCLE:             ${MAX_PER_CYCLE:-3}
+      ORCH_TIMEOUT_MS:           ${ORCH_TIMEOUT_MS:-180000}
+      ALERT_LOOKBACK_MIN:        ${ALERT_LOOKBACK_MIN:-60}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # Match the network created by the supabase compose project. The
+  # `external: true` tells compose not to try to create it.
+  supabase_default:
+    external: true
