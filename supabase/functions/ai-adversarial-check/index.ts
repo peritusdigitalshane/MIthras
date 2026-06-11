@@ -119,6 +119,18 @@ interface AlertCtx {
     recentSysmon: Array<Record<string, unknown>>;
     m365SignIns?: Array<Record<string, unknown>>;
     m365Audit?: Array<Record<string, unknown>>;
+    wpSiteEvents?: Array<Record<string, unknown>>;
+    wpAuditFindings?: Array<Record<string, unknown>>;
+    wpCrossTenantPattern?: { actor_ip: string; site_count: number; org_count: number } | null;
+}
+
+function extractSiteId(message: unknown): string | null {
+    const m = String(message ?? "").match(/site_id=([0-9a-f-]{36})/i);
+    return m ? m[1] : null;
+}
+function extractActorIp(message: unknown): string | null {
+    const m = String(message ?? "").match(/actor_ip=([0-9a-fA-F:.]+)/);
+    return m ? m[1] : null;
 }
 
 async function gatherContext(alertId: string): Promise<AlertCtx | null> {
@@ -165,6 +177,39 @@ async function gatherContext(alertId: string): Promise<AlertCtx | null> {
             .gte("event_time", since).lte("event_time", until)
             .order("event_time", { ascending: false }).limit(30);
         ctx.recentSysmon = sys ?? [];
+    }
+
+    if (typeof alert.alert_type === "string" &&
+        (alert.alert_type.startsWith("wordpress_") || alert.alert_type.startsWith("site_"))) {
+        const siteId = extractSiteId(alert.message);
+        const actorIp = extractActorIp(alert.message);
+        if (siteId) {
+            const { data: events } = await supabase
+                .from("site_event_logs")
+                .select("id, event_type, severity, actor_user_login, actor_ip, summary, event_time")
+                .eq("site_id", siteId)
+                .gte("event_time", since).lte("event_time", until)
+                .order("event_time", { ascending: false }).limit(50);
+            ctx.wpSiteEvents = events ?? [];
+            const { data: findings } = await supabase
+                .from("site_audit_findings")
+                .select("id, category, severity, title, recommendation, first_seen_at, last_seen_at")
+                .eq("site_id", siteId).eq("status", "open")
+                .order("severity", { ascending: false }).limit(20);
+            ctx.wpAuditFindings = findings ?? [];
+        }
+        if (actorIp) {
+            const { count: siteHits } = await supabase
+                .from("site_event_logs").select("site_id", { count: "exact", head: false })
+                .eq("actor_ip", actorIp).eq("event_type", "login_failed")
+                .gte("event_time", since);
+            const { data: tenantsHit } = await supabase
+                .from("site_event_logs").select("organization_id")
+                .eq("actor_ip", actorIp).eq("event_type", "login_failed")
+                .gte("event_time", since).limit(100);
+            const distinctOrgs = new Set((tenantsHit ?? []).map(r => String(r.organization_id))).size;
+            ctx.wpCrossTenantPattern = { actor_ip: actorIp, site_count: siteHits ?? 0, org_count: distinctOrgs };
+        }
     }
 
     if (typeof alert.alert_type === "string" && alert.alert_type.startsWith("m365_")) {
@@ -266,11 +311,30 @@ function buildUserPrompt(
             out.push(`  m365_audit_events.id=${e.id} activity="${trim(e.activity_display_name)}" by=${e.initiated_by_user_upn} result=${e.result}`);
         }
     }
+    if (ctx.wpSiteEvents?.length) {
+        out.push(`## WordPress site events`);
+        out.push("<<UNTRUSTED TELEMETRY>>");
+        for (const e of ctx.wpSiteEvents) {
+            out.push(`  site_event_logs.id=${e.id} type=${e.event_type} sev=${e.severity} user=${e.actor_user_login ?? "—"} ip=${e.actor_ip ?? "—"} summary="${trim(e.summary, 200)}"`);
+        }
+        out.push("<<END UNTRUSTED TELEMETRY>>");
+    }
+    if (ctx.wpAuditFindings?.length) {
+        out.push(`## Open site audit findings`);
+        for (const f of ctx.wpAuditFindings) {
+            out.push(`  site_audit_findings.id=${f.id} cat=${f.category} sev=${f.severity} title="${trim(f.title)}"`);
+        }
+    }
+    if (ctx.wpCrossTenantPattern) {
+        out.push(`## Cross-tenant pattern`);
+        out.push(`  actor_ip=${ctx.wpCrossTenantPattern.actor_ip} sites=${ctx.wpCrossTenantPattern.site_count} orgs=${ctx.wpCrossTenantPattern.org_count}`);
+    }
     out.push("");
     out.push(`## Available citation IDs`);
     out.push(`Cite ONLY IDs from the lists above. Tables: alerts, endpoints, endpoint_status,`);
     out.push(`endpoint_threats, endpoint_event_logs, sysmon_events, firewall_audit_logs,`);
-    out.push(`m365_sign_in_events, m365_audit_events, m365_mailbox_rules, m365_oauth_grants, incidents`);
+    out.push(`m365_sign_in_events, m365_audit_events, m365_mailbox_rules, m365_oauth_grants,`);
+    out.push(`incidents, site_event_logs, site_audit_findings`);
     out.push("");
     out.push(`Refute now (or honestly fail to refute). Output only the JSON.`);
     return out.join("\n");

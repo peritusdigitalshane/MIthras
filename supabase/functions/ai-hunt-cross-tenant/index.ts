@@ -135,6 +135,17 @@ interface IpCluster {
     sample_events: Array<{ port: number; protocol: string; direction: string; service: string }>;
 }
 
+// Cross-tenant WordPress credential stuffing: same IP login-failed events
+// across 2+ tenants in the lookback window. Highest-signal hunt finding —
+// almost never benign at this scale.
+interface WpStuffingCluster {
+    ip: string;
+    tenant_ids: string[];
+    site_count: number;
+    event_count: number;
+    sample_users: string[];
+}
+
 async function detectCrossTenantIps(): Promise<IpCluster[]> {
     const since = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
     // For v1 we always use the inline aggregator. A pl/pgsql helper RPC
@@ -147,6 +158,59 @@ async function detectCrossTenantIps(): Promise<IpCluster[]> {
 // the window and clusters in-process — fine for low-volume tenants, slower
 // at scale. The helper RPC ships in a follow-up migration; this lets us
 // run today.
+// WordPress credential-stuffing clustering: same actor_ip across 2+ tenants
+// with login_failed events. Different table, different finding kind from the
+// firewall IP clustering — both feed the same hunt_findings catalog.
+async function detectCrossTenantWpStuffing(since: string): Promise<WpStuffingCluster[]> {
+    const { data, error } = await supabase
+        .from("site_event_logs")
+        .select("organization_id, site_id, actor_ip, actor_user_login")
+        .gte("event_time", since)
+        .eq("event_type", "login_failed")
+        .not("actor_ip", "is", null)
+        .limit(10000);
+    if (error) throw error;
+
+    const byIp = new Map<string, WpStuffingCluster>();
+    for (const row of (data ?? []) as Array<Record<string, any>>) {
+        const ip = String(row.actor_ip ?? "").trim();
+        if (!ip) continue;
+        let cluster = byIp.get(ip);
+        if (!cluster) {
+            cluster = { ip, tenant_ids: [], site_count: 0, event_count: 0, sample_users: [] };
+            byIp.set(ip, cluster);
+        }
+        cluster.event_count++;
+        const orgId = String(row.organization_id);
+        const siteId = String(row.site_id);
+        if (!cluster.tenant_ids.includes(orgId)) cluster.tenant_ids.push(orgId);
+        // Track distinct sites (use sample_users array as a stand-in for sites for now;
+        // we re-count after the loop). Simpler: track in a Set per-cluster.
+        if (cluster.sample_users.length < 8 && row.actor_user_login &&
+            !cluster.sample_users.includes(String(row.actor_user_login))) {
+            cluster.sample_users.push(String(row.actor_user_login));
+        }
+    }
+
+    // Compute distinct site count per cluster in a second pass — cleaner than
+    // co-mingling with sample_users tracking above.
+    const siteSetByIp = new Map<string, Set<string>>();
+    for (const row of (data ?? []) as Array<Record<string, any>>) {
+        const ip = String(row.actor_ip ?? "").trim();
+        if (!ip) continue;
+        let set = siteSetByIp.get(ip);
+        if (!set) { set = new Set(); siteSetByIp.set(ip, set); }
+        set.add(String(row.site_id));
+    }
+    for (const [ip, set] of siteSetByIp) {
+        const c = byIp.get(ip);
+        if (c) c.site_count = set.size;
+    }
+
+    return Array.from(byIp.values())
+        .filter(c => c.tenant_ids.length >= MIN_TENANTS_FOR_FINDING && c.event_count >= MIN_EVENTS_FOR_FINDING);
+}
+
 async function detectCrossTenantIpsInline(since: string): Promise<IpCluster[]> {
     // Pull a bounded set; if there's a noisy IP this still finds it.
     const { data, error } = await supabase
@@ -187,6 +251,51 @@ async function detectCrossTenantIpsInline(since: string): Promise<IpCluster[]> {
 // ============================================================================
 // Persist / upsert findings
 // ============================================================================
+
+async function upsertWpStuffingFinding(cluster: WpStuffingCluster, windowStart: string, windowEnd: string): Promise<{
+    finding_id: string;
+    is_new: boolean;
+}> {
+    const { data: existing } = await supabase
+        .from("hunt_findings")
+        .select("id, affected_tenant_ids, sample_event_count")
+        .eq("finding_kind", "cross_tenant_ip")  // re-use IP finding kind; v2 can add wp_credential_stuffing
+        .filter("shared_indicator->>value", "eq", cluster.ip)
+        .eq("status", "open")
+        .maybeSingle();
+
+    if (existing) {
+        const mergedTenants = Array.from(new Set([...(existing.affected_tenant_ids ?? []), ...cluster.tenant_ids]));
+        await supabase.from("hunt_findings").update({
+            affected_tenant_ids: mergedTenants,
+            tenant_count: mergedTenants.length,
+            sample_event_count: (existing.sample_event_count ?? 0) + cluster.event_count,
+            event_window_end: windowEnd,
+            updated_at: new Date().toISOString(),
+        }).eq("id", existing.id);
+        return { finding_id: existing.id as string, is_new: false };
+    }
+
+    const { data: row, error } = await supabase.from("hunt_findings").insert({
+        finding_kind:       "cross_tenant_ip",
+        shared_indicator:   {
+            value: cluster.ip,
+            kind: "ip",
+            source: "wp_credential_stuffing",
+            site_count: cluster.site_count,
+            sample_users: cluster.sample_users,
+        },
+        affected_tenant_ids: cluster.tenant_ids,
+        tenant_count:       cluster.tenant_ids.length,
+        sample_event_count: cluster.event_count,
+        event_window_start: windowStart,
+        event_window_end:   windowEnd,
+        severity:           cluster.tenant_ids.length >= 3 ? "critical" : "high",
+        status:             "open",
+    }).select("id").single();
+    if (error || !row) throw error ?? new Error("insert returned no row");
+    return { finding_id: row.id as string, is_new: true };
+}
 
 async function upsertFinding(cluster: IpCluster, windowStart: string, windowEnd: string): Promise<{
     finding_id: string;
@@ -294,18 +403,24 @@ Deno.serve(async (req) => {
     const windowEnd   = new Date().toISOString();
     const windowStart = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
 
-    let clusters: IpCluster[];
+    let firewallClusters: IpCluster[] = [];
+    let wpClusters: WpStuffingCluster[] = [];
     try {
-        clusters = await detectCrossTenantIps();
+        firewallClusters = await detectCrossTenantIps();
     } catch (e) {
-        return jsonResponse({ error: "detection_failed", details: e instanceof Error ? e.message : String(e) }, 500, origin);
+        console.error("hunt_firewall_detection_failed", e instanceof Error ? e.message : String(e));
+    }
+    try {
+        wpClusters = await detectCrossTenantWpStuffing(windowStart);
+    } catch (e) {
+        console.error("hunt_wp_detection_failed", e instanceof Error ? e.message : String(e));
     }
 
     let newCount   = 0;
     let updateCount = 0;
     let enrichCount = 0;
 
-    for (const cluster of clusters) {
+    for (const cluster of firewallClusters) {
         try {
             const { finding_id, is_new } = await upsertFinding(cluster, windowStart, windowEnd);
             if (is_new) {
@@ -322,9 +437,36 @@ Deno.serve(async (req) => {
         }
     }
 
+    for (const cluster of wpClusters) {
+        try {
+            const { finding_id, is_new } = await upsertWpStuffingFinding(cluster, windowStart, windowEnd);
+            if (is_new) {
+                newCount++;
+                if (enrichCount < MAX_LLM_ENRICHMENTS_PER_RUN) {
+                    // Reuse enrichFinding by adapting the cluster shape.
+                    await enrichFinding(finding_id, {
+                        ip: cluster.ip,
+                        tenant_ids: cluster.tenant_ids,
+                        event_count: cluster.event_count,
+                        sample_events: cluster.sample_users.map((u) => ({
+                            port: 443, protocol: "tcp", direction: "wp_login",
+                            service: `user:${u}`,
+                        })),
+                    });
+                    enrichCount++;
+                }
+            } else {
+                updateCount++;
+            }
+        } catch (e) {
+            console.error("hunt_wp_finding_upsert_failed", { ip: cluster.ip, error: e instanceof Error ? e.message : String(e) });
+        }
+    }
+
     return jsonResponse({
         ok: true,
-        clusters_detected: clusters.length,
+        firewall_clusters: firewallClusters.length,
+        wp_stuffing_clusters: wpClusters.length,
         new_findings: newCount,
         updated_findings: updateCount,
         llm_enrichments: enrichCount,
