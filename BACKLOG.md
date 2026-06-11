@@ -402,12 +402,14 @@ bigger scope, or a manual deploy.
   `invalid child element 'CertPublisher'` and no endpoint can ever
   enforce. Requires: build new agent ZIP, bump `agent_versions`,
   push `upgrade_agent` commands to the 3 audit-assigned endpoints.
-- [ ] **WordPress brute-force detection wiring**. 60 `login_failed`
-  events on `dev6.peritusdigital.com.au` in last 24h generated 0
-  alerts. No trigger or cron converts site events into alerts. Build:
-  threshold rule (e.g. ≥10 fails/hour from one site), new
-  `alert_type = 'wp_brute_force'`, hook into the existing
-  `notify-alert` pipeline.
+- [x] ~~**WordPress brute-force detection wiring**~~. Already shipped
+  in `20260611700000_wordpress_alert_detector.sql` — `detect_wordpress_alerts()`
+  RPC runs every 2 min via cron job `wordpress-alert-detector`, covers
+  4 patterns: fast brute force (≥5 fails/5min), slow brute force
+  (≥5 fails/60min), credential stuffing (same IP 2+ sites/15min),
+  plugin activation. Plus an inline trigger on `site_audit_findings`
+  for critical-severity findings. Verified live: 4 brute-force +
+  2 critical-finding alerts already fired against prod data.
 - [x] ~~**Customer-report retry-send cron**~~. Shipped 2026-06-12:
   `customer-report-retry-send` cron + `retry_unsent_customer_reports()`
   RPC + `customer_reports.send_attempts` counter. Picks `status='ready'
@@ -424,12 +426,15 @@ bigger scope, or a manual deploy.
   `20260607020000_customer_reports_enqueue_fix.sql`. Customers got no
   reports for that window. Backfilling would deliver PDFs with stale
   dates; explicit non-backfill is also a fine choice. Decide.
-- [ ] **PDF builder failures investigation**. 6 of 7 `ready` reports
-  pre-fix had no `pdf_storage_path` — `buildReportPdf` silently
-  errored, log was just `console.error("pdf render failed:", …)`.
-  Test fresh-queue verified the path works post-fix-deploy, but the
-  earlier failures' root cause (likely a font/asset load that the
-  deno isolate's sandbox blocked at some point) wasn't traced.
+- [x] ~~**PDF builder failures investigation**~~. Shipped 2026-06-12:
+  the root cause was silent-fail-by-design — `processQueuedRow` caught
+  `buildReportPdf` errors and only `console.error`'d. Added
+  `customer_reports.pdf_render_error` column, updated generate-customer-report
+  to persist both render and upload errors so operators can see what
+  went wrong without grepping function logs. Cleaned up the 5 ancient
+  zombie rows from 2026-05-29 to status='failed' with reason. Original
+  font/asset failure root cause is now unrecoverable (logs gone) but
+  any future failures will land with diagnostic data attached.
 - [ ] **Linux agent on docker02 still v0.1.0**. Heartbeats are now
   clean (edge-function coercion handles its uptime float +
   protocol-key mismatch + wildcard bind addr), but the runtime is

@@ -397,6 +397,7 @@ async function processQueuedRow(row: Record<string, unknown>): Promise<{ ok: boo
         let path: string;
         let pdfPath: string | null = null;
         let pdfBytes: Uint8Array | null = null;
+        let pdfRenderError: string | null = null;
 
         if (siteId) {
             // Per-site WordPress security report. PDF rendering is not (yet) wired
@@ -426,8 +427,9 @@ async function processQueuedRow(row: Record<string, unknown>): Promise<{ ok: boo
             try {
                 pdfBytes = await buildReportPdf(org.name as string, summary, kind, execSummary);
             } catch (pdfErr) {
-                // PDF rendering must not break the HTML path — log and continue.
-                console.error("pdf render failed:", pdfErr instanceof Error ? pdfErr.message : pdfErr);
+                // PDF rendering must not break the HTML path — record + continue.
+                pdfRenderError = "render:" + (pdfErr instanceof Error ? pdfErr.message : String(pdfErr));
+                console.error("pdf render failed:", pdfRenderError);
                 pdfBytes = null;
                 pdfPath  = null;
             }
@@ -444,17 +446,19 @@ async function processQueuedRow(row: Record<string, unknown>): Promise<{ ok: boo
                 .upload(pdfPath, new Blob([pdfBytes], { type: "application/pdf" }),
                     { upsert: true, contentType: "application/pdf" });
             if (pdfUpErr) {
-                console.error("pdf storage upload failed:", pdfUpErr.message);
+                pdfRenderError = "upload:" + pdfUpErr.message;
+                console.error("pdf storage upload failed:", pdfRenderError);
                 pdfPath = null;
             }
         }
 
         await supabase.from("customer_reports").update({
-            status:           "ready",
-            storage_path:     path,
-            pdf_storage_path: pdfPath,
-            summary:          summary,
-            generated_at:     new Date().toISOString(),
+            status:            "ready",
+            storage_path:      path,
+            pdf_storage_path:  pdfPath,
+            pdf_render_error:  pdfRenderError,
+            summary:           summary,
+            generated_at:      new Date().toISOString(),
         }).eq("id", id);
 
         // Best-effort auto-send to configured recipients. Don't fail the row
