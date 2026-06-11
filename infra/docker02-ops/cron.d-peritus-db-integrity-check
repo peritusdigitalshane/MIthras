@@ -1,0 +1,3 @@
+# Peritus DB integrity heartbeat. See /opt/peritus-monitoring/db-integrity-check.sh
+MAILTO=accounts@peritusdigital.com.au
+*/5 * * * * root /opt/peritus-monitoring/db-integrity-check.sh >> /var/log/peritus-db-integrity.log 2>&1

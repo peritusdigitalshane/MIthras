@@ -1,0 +1,42 @@
+# Peritus customisations on top of upstream supabase/docker compose.
+#
+# CRITICAL: this file MUST be included with every docker compose invocation
+# against /opt/peritus-supabase/. The base docker-compose.yml deliberately
+# references undefined named volumes (peritus-*-must-use-override-yml) so
+# that any invocation missing this override fails at config-validation
+# time, BEFORE containers are started, preventing the silent-empty-volume
+# data-loss class of bug.
+#
+# Run via:
+#   cd /opt/peritus-supabase && docker compose ... (auto-includes this file)
+# Or explicitly:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml ...
+#
+# Vultr production: Studio bound to 127.0.0.1:3002 (avoid 3000 conflicts),
+# Kong loopback via KONG_HTTP_PORT=127.0.0.1:9000 in .env,
+# supavisor host port publishes commented out in base compose.
+
+services:
+  db:
+    volumes:
+      - /var/lib/peritus-supabase/db:/var/lib/postgresql/data:Z
+  storage:
+    volumes:
+      - /var/lib/peritus-supabase/storage:/var/lib/storage:z
+  imgproxy:
+    volumes:
+      - /var/lib/peritus-supabase/storage:/var/lib/storage:z
+  functions:
+    volumes:
+      - /opt/peritus-functions:/home/deno/functions:ro,z
+    environment:
+      M365_STATE_SECRET: ${M365_STATE_SECRET}
+      M365_POLL_SECRET: ${M365_POLL_SECRET}
+      APP_BASE_URL: ${APP_BASE_URL:-https://www.mithras.com.au}
+      M365_NONCE_COOKIE_DOMAIN: ${M365_NONCE_COOKIE_DOMAIN:-mithras.com.au}
+      AI_SOC_POLL_SECRET: ${AI_SOC_POLL_SECRET}
+      MITHRAS_CRON_SECRET: ${MITHRAS_CRON_SECRET}
+      AI_SOC_INVESTIGATION_MODEL: ${AI_SOC_INVESTIGATION_MODEL:-gpt-4o-mini}
+  studio:
+    ports:
+      - "127.0.0.1:3002:3000"
