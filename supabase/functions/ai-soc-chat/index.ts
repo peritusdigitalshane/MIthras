@@ -221,7 +221,22 @@ Deno.serve(async (req) => {
     if (!message) return jsonResponse({ error: "message_required" }, 400, origin);
     if (message.length > 2000) return jsonResponse({ error: "message_too_long" }, 400, origin);
 
+    // === 0. Authorisation on the org scope ===
+    // The caller can pass organization_id to focus the SOC context on a single
+    // org. A non-super-admin must be a member of that org — otherwise this
+    // would be an IDOR letting any authenticated user read another tenant's
+    // alerts/incidents/endpoints via the chat context.
+    if (scopedOrgId && !authed.isSuper && !authed.orgIds.includes(scopedOrgId)) {
+        return jsonResponse({ error: "forbidden" }, 403, origin);
+    }
+
     // === 1. Resolve or create the chat session ===
+    // Sessions are strictly per-user. Super-admins do NOT get to resume
+    // another user's session through this endpoint — that would let them
+    // write user/assistant turns attributed to the session owner, which
+    // breaks audit attribution and pollutes the victim's chat history on
+    // their next page load. If audit access to other users' chats is ever
+    // needed, expose it as a separate read-only admin endpoint.
     let sessionId: string;
     if (sessionIdInput) {
         const { data: existing } = await supabase
@@ -229,7 +244,7 @@ Deno.serve(async (req) => {
             .select("id, user_id")
             .eq("id", sessionIdInput)
             .maybeSingle();
-        if (!existing || (existing.user_id !== authed.userId && !authed.isSuper)) {
+        if (!existing || existing.user_id !== authed.userId) {
             return jsonResponse({ error: "session_not_found" }, 404, origin);
         }
         sessionId = existing.id;
