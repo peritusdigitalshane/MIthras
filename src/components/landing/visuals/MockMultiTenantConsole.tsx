@@ -1,124 +1,169 @@
-import { Building2, AlertTriangle, CheckCircle2, Activity } from "lucide-react";
+import {
+  ShieldCheck, Plus, Building2, Monitor, AlertTriangle, DollarSign,
+  ArrowUp, ArrowDown,
+} from "lucide-react";
 
 /**
- * MSP-focused mock — a list of customer orgs, each with their own posture
- * summary, alert count, AI-handled %, and runaway-revenue tile. Communicates
- * "you manage many customers from one pane" without a real screenshot.
+ * Mirror of the real /partner page (PartnerDashboard.tsx) with synthetic data.
+ * Structure matches the real layout:
+ *   - PortalHero with eyebrow / title / subtitle / status / "Add customer" action
+ *   - 4-tile PortalStatCard strip
+ *   - "Top customers by endpoint count" table card
+ *
+ * No real customer names — these are obvious fakes.
  */
 
-const ORGS: Array<{
-  name: string;
-  endpoints: number;
-  posture: number; // %
-  alerts24h: number;
-  autoHandled: number; // %
-  mrr: string;
-  tone: "ok" | "watch" | "act";
-}> = [
-  { name: "ACME Corp",             endpoints: 142, posture: 96, alerts24h: 47, autoHandled: 84, mrr: "$1,562", tone: "ok"    },
-  { name: "Westfield Health",      endpoints:  88, posture: 92, alerts24h: 23, autoHandled: 78, mrr: "$968",   tone: "watch" },
-  { name: "Northern Logistics",    endpoints:  64, posture: 99, alerts24h:  8, autoHandled: 92, mrr: "$704",   tone: "ok"    },
-  { name: "Sundance Studios",      endpoints:  41, posture: 88, alerts24h: 14, autoHandled: 80, mrr: "$451",   tone: "act"   },
-  { name: "Lakeside Realty",       endpoints:  31, posture: 94, alerts24h:  6, autoHandled: 89, mrr: "$341",   tone: "ok"    },
-  { name: "Bayside Bookkeeping",   endpoints:  18, posture: 100,alerts24h:  2, autoHandled: 100,mrr: "$198",   tone: "ok"    },
-  { name: "Coastal Chartered",     endpoints:  27, posture: 87, alerts24h: 12, autoHandled: 75, mrr: "$297",   tone: "act"   },
-  { name: "Pinnacle Plumbing",     endpoints:  12, posture: 95, alerts24h:  3, autoHandled: 100,mrr: "$132",   tone: "ok"    },
+const TOP_CUSTOMERS = [
+  { name: "ACME Corp",          endpoints: 142, plan: "Pro",      mrr: "$1,562" },
+  { name: "Westfield Health",   endpoints:  88, plan: "Pro",      mrr: "$968"   },
+  { name: "Northern Logistics", endpoints:  64, plan: "Standard", mrr: "$704"   },
+  { name: "Sundance Studios",   endpoints:  41, plan: "Pro",      mrr: "$451"   },
+  { name: "Lakeside Realty",    endpoints:  31, plan: "Standard", mrr: "$341"   },
+  { name: "Coastal Chartered",  endpoints:  27, plan: "Standard", mrr: "$297"   },
+  { name: "Bayside Bookkeeping",endpoints:  18, plan: "Standard", mrr: "$198"   },
+  { name: "Pinnacle Plumbing",  endpoints:  12, plan: "Lite",     mrr: "$132"   },
 ];
 
 export function MockMultiTenantConsole() {
-  const total = ORGS.reduce((s, o) => s + o.endpoints, 0);
-  const alerts = ORGS.reduce((s, o) => s + o.alerts24h, 0);
-  const totalMrr = ORGS.reduce((s, o) => s + Number(o.mrr.replace(/[^0-9]/g, "")), 0);
-
   return (
-    <div className="p-4 sm:p-5 space-y-4 text-foreground/95">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-semibold flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            Your customers
-          </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">All customer orgs · single console · scoped per-customer</p>
-        </div>
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-[10px] font-mono text-emerald-300">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
-            <span className="relative rounded-full bg-emerald-500 h-1.5 w-1.5" />
-          </span>
-          AGENTS WATCHING
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Tile label="Customers"     value={ORGS.length.toString()}  />
-        <Tile label="Endpoints"     value={total.toString()}          />
-        <Tile label="Alerts (24h)"  value={alerts.toString()}         tone="warn" />
-        <Tile label="MRR"           value={`$${totalMrr.toLocaleString()}`} tone="ok" />
-      </div>
-
-      <div className="rounded-lg border border-border/40 bg-card/30 overflow-hidden">
-        <div className="grid grid-cols-12 gap-2 px-3 py-2 border-b border-border/40 bg-card/40 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-          <span className="col-span-3">Organisation</span>
-          <span className="col-span-1 text-right">Endpoints</span>
-          <span className="col-span-2 text-right">Posture</span>
-          <span className="col-span-2 text-right">Alerts 24h</span>
-          <span className="col-span-2 text-right">AI handled</span>
-          <span className="col-span-2 text-right">MRR</span>
-        </div>
-        <div className="divide-y divide-border/30 text-[11px] font-mono">
-          {ORGS.map((o) => (
-            <div key={o.name} className="grid grid-cols-12 gap-2 px-3 py-1.5 hover:bg-primary/5 items-center">
-              <div className="col-span-3 flex items-center gap-2 truncate">
-                <ToneIcon tone={o.tone} />
-                <span className="text-foreground/90 truncate">{o.name}</span>
-              </div>
-              <span className="col-span-1 text-right text-muted-foreground tabular-nums">{o.endpoints}</span>
-              <span className="col-span-2 text-right">
-                <PostureBar pct={o.posture} />
-              </span>
-              <span className="col-span-2 text-right tabular-nums">
-                <span className={o.alerts24h > 30 ? "text-amber-300" : "text-foreground/80"}>{o.alerts24h}</span>
-              </span>
-              <span className="col-span-2 text-right tabular-nums text-emerald-300/80">{o.autoHandled}%</span>
-              <span className="col-span-2 text-right tabular-nums text-foreground/80">{o.mrr}</span>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* PortalHero */}
+      <div className="relative overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-primary/10 pointer-events-none" />
+        <div className="relative p-5 sm:p-6 flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-2 min-w-0">
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-indigo-400">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Partner portal
             </div>
-          ))}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Coastal Tech &mdash; Reseller</h1>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Manage your customers, deploy the Mithras agent, and track wholesale billing in one place.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 text-[11px] font-medium text-emerald-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Active
+            </span>
+            <button className="inline-flex items-center gap-1 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow-sm">
+              <Plus className="h-4 w-4 mr-1" /> Add customer
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4-tile PortalStatCard strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PortalStat label="Customers"        value="14" hint="Organisations under your account" icon={<Building2 className="h-4 w-4" />} delta={+8}  />
+        <PortalStat label="Active endpoints" value="487" hint="Across all customer orgs"          icon={<Monitor   className="h-4 w-4" />} delta={+12} />
+        <PortalStat label="Open alerts (24h)" value="23" hint="119 already auto-resolved"          icon={<AlertTriangle className="h-4 w-4" />} delta={-18} good />
+        <PortalStat label="Wholesale MRR"    value="$4,653" hint="At your reseller rate"          icon={<DollarSign className="h-4 w-4" />} delta={+9}  />
+      </div>
+
+      {/* Main row — top customers table + credits summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div className="px-4 py-3 border-b border-border/40">
+            <div className="text-base font-semibold leading-none tracking-tight">Top customers by endpoint count</div>
+            <p className="text-xs text-muted-foreground mt-1">Your biggest deployments, sorted by active agent count.</p>
+          </div>
+          <div className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/40 bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Customer</th>
+                  <th className="text-right p-3 font-medium">Endpoints</th>
+                  <th className="text-left p-3 font-medium">Plan</th>
+                  <th className="text-right p-3 font-medium">MRR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TOP_CUSTOMERS.map((c) => (
+                  <tr key={c.name} className="border-b border-border/40 last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3 font-medium">{c.name}</td>
+                    <td className="p-3 text-right tabular-nums">{c.endpoints}</td>
+                    <td className="p-3 text-xs text-muted-foreground">{c.plan}</td>
+                    <td className="p-3 text-right tabular-nums text-foreground/90">{c.mrr}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div className="px-4 py-3 border-b border-border/40">
+            <div className="text-base font-semibold leading-none tracking-tight flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Credit pool
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Balance</div>
+              <div className="text-3xl font-bold tabular-nums">126</div>
+              <div className="text-xs text-muted-foreground">credits · 1 credit = 1 endpoint × 1 month</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Runway</div>
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: "73%" }} />
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-1">~3.4 months at current pace</div>
+            </div>
+            <div className="pt-2 border-t border-border/40">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">This month</div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Consumed</span>
+                <span className="font-mono">487 cr</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">From distributor</span>
+                <span className="font-mono text-emerald-500">+ 500 cr</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Tile({ label, value, tone = "info" }: { label: string; value: string; tone?: "info" | "ok" | "warn" }) {
-  const valCls =
-    tone === "ok"   ? "text-emerald-300" :
-    tone === "warn" ? "text-amber-300"   :
-                      "text-foreground/90";
+// ---------------------------------------------------------------------------
+// PortalStat — visual match of the real PortalStatCard component
+// ---------------------------------------------------------------------------
+
+function PortalStat({
+  label, value, hint, icon, delta, good,
+}: {
+  label: string; value: string; hint: string; icon: React.ReactNode;
+  delta: number; good?: boolean;
+}) {
+  // Default: positive delta = good (more endpoints / MRR / customers).
+  // Pass `good` to flip semantics (fewer alerts = good).
+  const isGood = good ? delta < 0 : delta > 0;
+  const cls = isGood
+    ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
+    : "text-rose-500 border-rose-500/40 bg-rose-500/10";
+  const Icon = delta > 0 ? ArrowUp : ArrowDown;
   return (
-    <div className="rounded-lg border border-border/40 bg-card/30 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className={`text-lg font-semibold tabular-nums ${valCls}`}>{value}</div>
+    <div className="relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/0 to-primary/5 pointer-events-none" />
+      <div className="relative p-5 space-y-3">
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span className="text-xs uppercase tracking-wider font-medium">{label}</span>
+          <span className="opacity-60">{icon}</span>
+        </div>
+        <div className="flex items-baseline gap-3">
+          <div className="text-3xl font-bold tabular-nums tracking-tight">{value}</div>
+          <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md border text-xs font-medium tabular-nums ${cls}`}>
+            <Icon className="h-3 w-3" />
+            {Math.abs(delta)}%
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-snug">{hint}</p>
+      </div>
     </div>
-  );
-}
-
-function ToneIcon({ tone }: { tone: "ok" | "watch" | "act" }) {
-  if (tone === "ok")    return <CheckCircle2 className="h-3 w-3 text-emerald-400 flex-shrink-0" />;
-  if (tone === "watch") return <Activity      className="h-3 w-3 text-amber-400 flex-shrink-0" />;
-  return                       <AlertTriangle className="h-3 w-3 text-red-400 flex-shrink-0" />;
-}
-
-function PostureBar({ pct }: { pct: number }) {
-  const cls =
-    pct >= 95 ? "bg-emerald-500/70" :
-    pct >= 90 ? "bg-amber-500/70"   :
-                "bg-red-500/70";
-  return (
-    <span className="inline-flex items-center gap-1.5 justify-end">
-      <span className="w-12 h-1 rounded-full bg-background/60 overflow-hidden">
-        <span className={`block h-full rounded-full ${cls}`} style={{ width: `${pct}%` }} />
-      </span>
-      <span className="text-foreground/80 tabular-nums w-6 text-right">{pct}%</span>
-    </span>
   );
 }

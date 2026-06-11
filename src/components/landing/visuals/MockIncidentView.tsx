@@ -1,136 +1,107 @@
-import { Bot, ExternalLink, Sparkles, Shield, Clock, Cpu, Brain, FileSearch } from "lucide-react";
+import { ShieldAlert, Clock, CheckCircle } from "lucide-react";
 
 /**
- * Mock /soc/incidents/:id detail page. Two columns: timeline of agent activity
- * on the left, evidence + playbook on the right. Same vocabulary as the real
- * ai_incident_commander + ai_investigations output.
+ * Mirror of the real /incidents page (Incidents.tsx) with synthetic data.
+ * Same shape MSP buyers see on day one: header + 4-tile KPI strip + Open /
+ * Closed tabs + Card-wrapped table.
+ *
+ * Severity colour-classes match the platform's helper severityClasses():
+ *   Severe   → status-critical
+ *   High     → orange-500
+ *   Moderate → amber-500
+ *   Low      → muted
+ *   Unknown  → amber ring (triage required)
  */
+
+const OPEN_ROWS: Array<{
+  id: string;
+  title: string;
+  kind: "threat" | "alert" | "posture_drift" | "vuln_critical";
+  severity: "Severe" | "High" | "Moderate" | "Low" | "Unknown";
+  endpoint: string;
+  sla: { state: "breached" | "due"; text: string };
+  status: "Open" | "Triaging" | "In progress";
+  assignee?: string;
+}> = [
+  { id: "INC-2418", title: "Trojan:Win32/Wacatac.B!ml on WH-04",         kind: "threat",         severity: "Severe",  endpoint: "WH-04",                   sla: { state: "due", text: "due in 41m" },   status: "In progress", assignee: "Emma C" },
+  { id: "INC-2417", title: "WordPress brute force on dev6 — 5 sites",     kind: "alert",          severity: "High",    endpoint: "dev6.peritusdigital.com.au", sla: { state: "due", text: "due in 2h 18m" }, status: "Triaging",    assignee: "AI Commander" },
+  { id: "INC-2416", title: "Critical CVE-2026-0142 — PHP 8.1 RCE",        kind: "vuln_critical",  severity: "Severe",  endpoint: "DEV-WEB-02",              sla: { state: "breached", text: "breached 12m ago" }, status: "Open" },
+  { id: "INC-2415", title: "12 failed LDAP logons on DC01",               kind: "alert",          severity: "High",    endpoint: "DC01",                    sla: { state: "due", text: "due in 3h 51m" }, status: "Triaging" },
+  { id: "INC-2414", title: "Posture drift — Defender RTP disabled",       kind: "posture_drift",  severity: "Moderate",endpoint: "ACME-LAP-04",             sla: { state: "due", text: "due in 18h" },   status: "Open" },
+  { id: "INC-2413", title: "Unknown threat — Suspicious LSASS access",    kind: "threat",         severity: "Unknown", endpoint: "WIN10-LAP18",             sla: { state: "due", text: "due in 22h" },   status: "Open" },
+];
+
 export function MockIncidentView() {
+  const openCount     = OPEN_ROWS.length;
+  const breachedCount = OPEN_ROWS.filter((r) => r.sla.state === "breached").length;
+  const closedCount   = 47;
+  const severeCount   = OPEN_ROWS.filter((r) => r.severity === "Severe").length;
+
   return (
-    <div className="p-4 sm:p-5 text-foreground/95 space-y-4">
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground mb-1">
-          <span>INC-2418</span>
-          <span className="opacity-50">·</span>
-          <span>ACME Corp</span>
-          <span className="opacity-50">·</span>
-          <span>opened 24s ago</span>
-        </div>
-        <h3 className="text-base font-semibold flex items-center gap-2">
-          <Shield className="h-4 w-4 text-red-400" />
-          Active brute-force attempt on dev6.peritusdigital.com.au
-        </h3>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10 text-[10px] uppercase tracking-wider text-red-300 font-mono">HIGH</span>
-          <span className="px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-[10px] uppercase tracking-wider text-primary font-mono">AUTO-CONTAINED</span>
-          <span className="px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-[10px] uppercase tracking-wider text-emerald-300 font-mono">CUSTOMER NOTIFIED</span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <ShieldAlert className="h-6 w-6 text-primary" /> Incidents
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Severe/High Defender threats and Critical/High alerts auto-open an incident. SLA: Severe/Critical 1h, High 4h.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Timeline */}
-        <div className="lg:col-span-7 space-y-3">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Agent timeline</div>
-          <TimelineRow
-            agent="Triage"
-            icon={Brain}
-            elapsed="+0.0s"
-            verdict="TP · 0.94"
-            body="5 failed logins for &quot;mithras-test&quot; within 3m32s; source IP not in allow-list. Verdict: true_positive."
-            cost="$0.004"
-            citations={4}
-          />
-          <TimelineRow
-            agent="Verify"
-            icon={Shield}
-            elapsed="+2.1s"
-            verdict="agrees"
-            body="Cross-checked against site_event_logs (7 cites). Pattern matches wordpress_brute_force playbook."
-            cost="$0.002"
-            citations={7}
-          />
-          <TimelineRow
-            agent="Adversarial"
-            icon={Bot}
-            elapsed="+3.6s"
-            verdict="cannot refute"
-            body="Tried 3 benign explanations (forgot password, password manager autofill, security audit). None match the IP behaviour profile."
-            cost="$0.002"
-            citations={2}
-          />
-          <TimelineRow
-            agent="Investigate"
-            icon={FileSearch}
-            elapsed="+5.4s"
-            verdict="campaign"
-            body="Same source IP (198.51.100.42) hit 4 other tenant sites in the last 24h. Coordinated credential stuffing campaign."
-            cost="$0.011"
-            citations={12}
-          />
-          <TimelineRow
-            agent="Commander"
-            icon={Sparkles}
-            elapsed="+8.7s"
-            verdict="auto-fired"
-            body="Block 198.51.100.42 at perimeter, force MFA reset for mithras-test, watch dev6 for 24h, notify ACME admin."
-            cost="$0.008"
-            citations={5}
-            tone="ok"
-          />
-        </div>
-
-        {/* Right column: evidence + playbook */}
-        <div className="lg:col-span-5 space-y-3">
-          <PlaybookCard />
-          <EvidenceCard />
-        </div>
+      {/* KPI strip — 4 tiles to match the real layout */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MockStatCard title="Open"             value={openCount.toString()} />
+        <MockStatCard title="SLA breached"     value={breachedCount.toString()} valueClass="text-red-500" />
+        <MockStatCard title="Closed (this view)" value={closedCount.toString()} />
+        <MockStatCard title="Severe open"      value={severeCount.toString()} valueClass="text-red-500" />
       </div>
-    </div>
-  );
-}
 
-function TimelineRow({
-  agent, icon: Icon, elapsed, verdict, body, cost, citations, tone = "info",
-}: {
-  agent: string;
-  icon: React.ComponentType<{ className?: string }>;
-  elapsed: string; verdict: string; body: string; cost: string; citations: number;
-  tone?: "info" | "ok";
-}) {
-  const accent =
-    tone === "ok" ? "border-emerald-500/40 bg-emerald-500/5"
-                  : "border-border/40 bg-card/40";
-  const iconCls =
-    tone === "ok" ? "bg-emerald-500/15 text-emerald-300"
-                  : "bg-primary/15 text-primary";
-  return (
-    <div className={`relative rounded-lg border ${accent} p-3`}>
-      <div className="flex items-start gap-3">
-        <div className={`h-7 w-7 rounded-md ${iconCls} flex items-center justify-center flex-shrink-0`}>
-          <Icon className="h-3.5 w-3.5" />
+      {/* Tabs */}
+      <div className="space-y-3">
+        <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted/60 p-1 text-muted-foreground">
+          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium bg-background text-foreground shadow-sm">
+            Open ({openCount})
+          </span>
+          <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium">
+            Closed ({closedCount})
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2 text-[12px] font-semibold">
-              <span>{agent}</span>
-              <span className="text-[10px] font-mono text-muted-foreground">{elapsed}</span>
-            </div>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-              tone === "ok"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-primary/30 bg-primary/10 text-primary"
-            }`}>
-              {verdict}
-            </span>
-          </div>
-          <p className="text-[11px] leading-relaxed text-foreground/85">{body}</p>
-          <div className="mt-1.5 flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Cpu className="h-2.5 w-2.5" />gpt-5-mini</span>
-            <span>{cost}</span>
-            <span className="inline-flex items-center gap-1">
-              <ExternalLink className="h-2.5 w-2.5" />{citations} citations
-            </span>
+
+        {/* Card-wrapped incident table */}
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/40 bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left p-3 font-medium">Severity</th>
+                  <th className="text-left p-3 font-medium">Incident</th>
+                  <th className="text-left p-3 font-medium">Kind</th>
+                  <th className="text-left p-3 font-medium">Endpoint</th>
+                  <th className="text-left p-3 font-medium">Status</th>
+                  <th className="text-left p-3 font-medium">SLA</th>
+                  <th className="text-left p-3 font-medium">Assignee</th>
+                </tr>
+              </thead>
+              <tbody>
+                {OPEN_ROWS.map((r) => (
+                  <tr key={r.id} className="border-b border-border/40 last:border-b-0 hover:bg-muted/30">
+                    <td className="p-3"><SeverityBadge sev={r.severity} /></td>
+                    <td className="p-3">
+                      <div className="font-medium text-foreground truncate max-w-[280px]">{r.title}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">{r.id}</div>
+                    </td>
+                    <td className="p-3 text-xs text-muted-foreground font-mono">{r.kind}</td>
+                    <td className="p-3 text-xs text-muted-foreground truncate max-w-[160px]">{r.endpoint}</td>
+                    <td className="p-3"><StatusBadge status={r.status} /></td>
+                    <td className="p-3"><SlaCell sla={r.sla} /></td>
+                    <td className="p-3 text-xs text-muted-foreground">{r.assignee ?? <span className="text-muted-foreground/60">unassigned</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -138,60 +109,56 @@ function TimelineRow({
   );
 }
 
-function PlaybookCard() {
-  const steps = [
-    { label: "block IP at perimeter", done: true,  meta: "agent-issued" },
-    { label: "force MFA reset",       done: true,  meta: "Microsoft Graph" },
-    { label: "open ACME ticket",      done: true,  meta: "INC-2418" },
-    { label: "monitor for 24h",       done: false, meta: "next check 01:14" },
-    { label: "auto-rollback @ 04:14", done: false, meta: "if no confirm" },
-  ];
+// ---------------------------------------------------------------------------
+// Building blocks
+// ---------------------------------------------------------------------------
+
+function MockStatCard({ title, value, valueClass }: { title: string; value: string; valueClass?: string }) {
   return (
-    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] uppercase tracking-wider text-primary font-semibold">Playbook · 5 steps</div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
-          <Clock className="h-2.5 w-2.5" />2 of 5 pending
-        </span>
+    <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+      <div className="px-4 pt-3 pb-1">
+        <div className="text-sm text-foreground/80">{title}</div>
       </div>
-      <ul className="space-y-1.5 text-[11px]">
-        {steps.map((s) => (
-          <li key={s.label} className="flex items-center gap-2">
-            <span className={`h-3 w-3 rounded-full flex items-center justify-center flex-shrink-0 ${
-              s.done ? "bg-emerald-500/30 text-emerald-300" : "border border-border/60 text-muted-foreground"
-            }`}>
-              {s.done ? "✓" : ""}
-            </span>
-            <span className={s.done ? "text-foreground/90" : "text-foreground/70"}>{s.label}</span>
-            <span className="text-[10px] font-mono text-muted-foreground ml-auto">{s.meta}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="px-4 pb-3">
+        <div className={`text-2xl font-semibold tabular-nums ${valueClass ?? ""}`}>{value}</div>
+      </div>
     </div>
   );
 }
 
-function EvidenceCard() {
-  const evidence = [
-    { kind: "site_event_logs",       count: 7  },
-    { kind: "endpoint_event_logs",   count: 4  },
-    { kind: "firewall_audit_logs",   count: 12 },
-    { kind: "m365_sign_in_events",   count: 0  },
-    { kind: "sysmon_events",         count: 6  },
-  ];
+function SeverityBadge({ sev }: { sev: "Severe" | "High" | "Moderate" | "Low" | "Unknown" }) {
+  // Same map as severityClasses() in Incidents.tsx
+  const cls =
+    sev === "Severe"   ? "bg-red-500/20 text-red-500 border-red-500/40" :
+    sev === "High"     ? "bg-orange-500/20 text-orange-500 border-orange-500/40" :
+    sev === "Moderate" ? "bg-amber-500/20 text-amber-500 border-amber-500/40" :
+    sev === "Unknown"  ? "bg-amber-500/10 text-amber-600 border-amber-500/30" :
+                         "bg-muted text-muted-foreground border-muted-foreground/40";
   return (
-    <div className="rounded-lg border border-border/40 bg-card/30 p-3">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Evidence cited</div>
-      <ul className="space-y-1 text-[11px] font-mono">
-        {evidence.map((e) => (
-          <li key={e.kind} className="flex items-center justify-between">
-            <span className="text-foreground/85">{e.kind}</span>
-            <span className={e.count > 0 ? "text-emerald-300/80" : "text-muted-foreground/60"}>
-              {e.count > 0 ? `${e.count} rows` : "—"}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <span className={`inline-block px-2 py-0.5 rounded border text-[10px] uppercase tracking-wider font-medium ${cls}`}>
+      {sev}
+    </span>
   );
+}
+
+function StatusBadge({ status }: { status: "Open" | "Triaging" | "In progress" | "Resolved" }) {
+  if (status === "Resolved") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border/60 text-[11px] text-emerald-500">
+        <CheckCircle className="h-3 w-3" /> {status}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted text-[11px]">
+      <Clock className="h-3 w-3" /> {status}
+    </span>
+  );
+}
+
+function SlaCell({ sla }: { sla: { state: "breached" | "due"; text: string } }) {
+  if (sla.state === "breached") {
+    return <span className="text-xs text-red-500 font-medium">{sla.text}</span>;
+  }
+  return <span className="text-xs text-muted-foreground">{sla.text}</span>;
 }
