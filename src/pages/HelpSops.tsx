@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   BookOpen, Search, Clock, ChevronRight, ArrowLeft, Tag, Users,
   ShieldCheck, Briefcase, Building2, Home, Bot,
@@ -244,13 +245,14 @@ function SopDetail({ audience, slug }: { audience: SopAudience; slug: string }) 
 
   return (
     <MainLayout>
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-2 space-y-8">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link to={`/help/sops/${audience}`}><ArrowLeft className="h-4 w-4 mr-1" /> {AUDIENCE_LABELS[audience]}</Link>
         </Button>
 
-        <div>
-          <div className="flex items-center gap-2 mb-2">
+        {/* Document header */}
+        <header className="space-y-3 pb-6 border-b border-border/40">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
               {AUDIENCE_LABELS[audience]}
             </Badge>
@@ -261,19 +263,92 @@ function SopDetail({ audience, slug }: { audience: SopAudience; slug: string }) 
               <span className="text-xs text-muted-foreground">· updated {sop.updatedAt}</span>
             )}
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">{sop.title}</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">{sop.title}</h1>
           {sop.description && (
-            <p className="text-base text-muted-foreground mt-2">{sop.description}</p>
+            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">{sop.description}</p>
           )}
-        </div>
+        </header>
 
-        <Card>
-          <CardContent className="py-6">
-            <article className="prose prose-sm sm:prose-base dark:prose-invert max-w-none prose-headings:font-semibold prose-h2:text-lg prose-h3:text-base prose-a:text-primary">
-              <ReactMarkdown>{sop.content}</ReactMarkdown>
-            </article>
-          </CardContent>
-        </Card>
+        {/* Document body */}
+        <article className="sop-body text-[15px] sm:text-base leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({ children }) => (
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-12 mb-4 pb-2 border-b border-border/40">{children}</h1>
+              ),
+              h2: ({ children }) => (
+                <h2 className="text-xl sm:text-2xl font-semibold tracking-tight mt-10 mb-3 text-foreground">{children}</h2>
+              ),
+              h3: ({ children }) => (
+                <h3 className="text-lg sm:text-xl font-semibold mt-8 mb-2 text-foreground">{children}</h3>
+              ),
+              p: ({ children }) => (
+                <p className="my-4 leading-relaxed text-foreground/90">{children}</p>
+              ),
+              ul: ({ children }) => (
+                <ul className="my-4 ml-6 list-disc space-y-2 marker:text-muted-foreground">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="my-4 ml-6 list-decimal space-y-2 marker:text-muted-foreground marker:font-medium">{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li className="leading-relaxed pl-1 [&>p]:my-1">{children}</li>
+              ),
+              code: ({ children, className }) => {
+                const isBlock = className?.includes("language-");
+                if (isBlock) {
+                  return (
+                    <code className={`${className} text-sm`}>{children}</code>
+                  );
+                }
+                return (
+                  <code className="px-1.5 py-0.5 rounded bg-muted/60 border border-border/40 font-mono text-[0.875em] text-primary/90 whitespace-nowrap">
+                    {children}
+                  </code>
+                );
+              },
+              pre: ({ children }) => (
+                <pre className="my-6 p-4 rounded-lg bg-muted/40 border border-border/40 overflow-x-auto text-sm leading-relaxed">{children}</pre>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-foreground">{children}</strong>
+              ),
+              em: ({ children }) => (
+                <em className="italic text-foreground/95">{children}</em>
+              ),
+              a: ({ children, href }) => (
+                <a href={href} className="text-primary underline underline-offset-2 hover:text-primary/80">{children}</a>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="my-5 pl-4 border-l-4 border-primary/40 bg-primary/5 py-3 pr-4 rounded-r-md italic text-foreground/85">
+                  {children}
+                </blockquote>
+              ),
+              hr: () => <hr className="my-10 border-border/40" />,
+              table: ({ children }) => (
+                <div className="my-6 overflow-x-auto rounded-lg border border-border/40">
+                  <table className="w-full text-sm">{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => <thead className="bg-muted/40 border-b border-border/40">{children}</thead>,
+              th: ({ children }) => (
+                <th className="px-4 py-2.5 text-left font-semibold text-foreground">{children}</th>
+              ),
+              td: ({ children }) => (
+                <td className="px-4 py-2.5 border-t border-border/30 align-top">{children}</td>
+              ),
+            }}
+          >
+            {sop.content}
+          </ReactMarkdown>
+        </article>
+
+        {/* Document footer */}
+        <footer className="pt-8 mt-12 border-t border-border/40 text-xs text-muted-foreground space-y-1">
+          <p>This is a controlled operational procedure. Owned by Mithras Customer Operations. Reviewed quarterly.</p>
+          {sop.updatedAt && <p>Last reviewed {sop.updatedAt}.</p>}
+        </footer>
       </div>
     </MainLayout>
   );
