@@ -18,11 +18,11 @@ Without Premium, the M365 ITDR poller logs these as `no_premium` and skips them.
 
 ## Prerequisites
 - The customer has confirmed (in writing) the SKU upgrade is complete.
-- You have super-admin scope and access to `/admin/m365`.
+- You have super-admin scope and access to `/m365`.
 
 ## Steps
 
-1. Open **`/admin/m365`** and find the customer's tenant row.
+1. Open **`/m365`** and find the customer's tenant row.
 2. Click the tenant. You'll see the **Capability flags** card with the current state of:
    - `signin_audit_supported` (typically `false`)
    - `directory_audit_supported` (typically `false`)
@@ -31,7 +31,7 @@ Without Premium, the M365 ITDR poller logs these as `no_premium` and skips them.
    - **403** → the tenant does NOT have Premium yet (or the app doesn't have the right Graph permission scopes). Don't flip the flag manually.
    - **401** → OAuth token is expired or the app registration is missing. Re-run the customer's OAuth flow first.
 4. After a successful probe, the row shows ✅ for the relevant flag.
-5. Wait for the next ITDR poll cycle (every 5 min). Verify in `/admin/m365/<tenant_id>/activity` that `signins_polled` is no longer `no_premium` — it should now show the actual count of sign-ins ingested.
+5. Wait for the next ITDR poll cycle (every 5 min). Verify in `/m365` that `signins_polled` is no longer `no_premium` — it should now show the actual count of sign-ins ingested.
 
 ## Manual flag flip (rare)
 
@@ -39,16 +39,16 @@ If the probe consistently fails with a transient error but you have confirmation
 
 1. From the same tenant detail, click **Edit capability flags**.
 2. Tick `signin_audit_supported` and/or `directory_audit_supported`.
-3. Add a reason note. This lands in `m365_tenants_audit` with your user id.
+3. Add a reason note. This lands in `activity_logs` with your user id.
 4. Click **Save**.
 
 The next poll will attempt to fetch. If it 403s, the flag auto-flips back to `false` and you'll see an entry in `platform_health_findings` as an open finding.
 
 ## Verify
 - Tenant detail shows both flags green.
-- `/admin/m365/<tenant_id>/activity` shows `signins_polled > 0` within 5 min.
+- `/m365` shows `signins_polled > 0` within 5 min.
 - The customer's `/m365/posture` page now shows the "Recent sign-ins" card with data.
-- The audit-log entry for the flag flip is in `m365_tenants_audit`.
+- The audit-log entry for the flag flip is in `activity_logs`.
 
 ## Troubleshooting
 - **Probe returned 200 but next poll still says `no_premium`.** Stale cache. Restart the `peritus-edge-functions` container — it caches tenant config for 5 min.

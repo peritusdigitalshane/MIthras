@@ -46,7 +46,7 @@ If a force-rollback affects **3+ customers in 60 minutes** with the same root ca
 - The endpoint detail page shows the inverse command queued and executed.
 - The customer received the rollback email (check audit log).
 - The triage decision's `operator_verdict` column is set if you reclassified.
-- The audit log at `/admin/audit-logs` shows `force_rollback` with full context.
+- The audit log at `/activity` shows `force_rollback` with full context.
 
 ## Troubleshooting
 - **Force-rollback dialog is greyed out.** Action is already in `customer_confirmed` state — the customer accepted it. Talk to them first.

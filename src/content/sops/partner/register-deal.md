@@ -45,7 +45,7 @@ Deal registration is what stops two resellers walking the same opportunity into 
 ## Verify
 - Your registered deal shows on `/partner/deals` with status **registered** + a margin lock chip showing the percentage.
 - The expiry date is **90 days** from registration.
-- After conversion, the new customer org appears in `/partner/customers` with the protected pricing reflected in their MRR row.
+- After conversion, the new customer org appears in `/my-customers` with the protected pricing reflected in their MRR row.
 
 ## Troubleshooting
 - **"Customer already registered."** Another reseller (or you, previously) has registered the same org. Contact your disty for mediation — they have visibility across the channel.

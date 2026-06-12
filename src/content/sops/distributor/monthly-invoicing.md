@@ -25,7 +25,7 @@ Once per month — typically on the **3rd business day** of the new month. You'r
    - **Subtotal**
    - **Credits applied** — any prior-period overpayments or deal-conversion credits
    - **Total due to Peritus**
-4. Cross-check against `/distributor/licences` — total cuts to resellers this month should match the subtotal.
+4. Cross-check against `/distributor/credits` — total cuts to resellers this month should match the subtotal.
 5. If the numbers look right, click **Mark as sent**. This locks the invoice (no further line-item changes) and emails a copy to your billing contact + Peritus accounts.
 
 ## Steps — invoicing your resellers
@@ -41,12 +41,12 @@ If you bill outside Mithras (Xero / QuickBooks / etc.), just export the consumpt
 
 ## Verify
 - Your draft invoice closes the month: `/distributor` MRR card matches `subtotal` on the invoice.
-- After **Mark as sent**, the audit log at `/admin/audit-logs` (super-admin view) shows `invoice_sent` with your user id.
+- After **Mark as sent**, the audit log at `/activity` (super-admin view) shows `invoice_sent` with your user id.
 - Reseller-side: open one of your resellers' `/partner/invoices` and confirm the invoice shows up there.
 
 ## Troubleshooting
 - **A reseller's line items look wrong.** Most commonly because a customer was decommissioned mid-month — the system pro-rates credits to the day of decommissioning. Verify in `/distributor/resellers` → reseller detail → activity.
-- **Credits applied feels wrong.** Open the credit-transaction ledger in `/distributor/licences`. Any transaction with `category='credit_refund'` flows back into the next invoice.
+- **Credits applied feels wrong.** Open the credit-transaction ledger in `/distributor/credits`. Any transaction with `category='credit_refund'` flows back into the next invoice.
 - **You sent the wrong invoice.** Within **24 hours**, click **Void & re-draft** — it reverses the send and re-opens for editing. Beyond 24h, contact Peritus accounts to issue a credit note.
 
 ## Related

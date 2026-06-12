@@ -1,7 +1,7 @@
 ---
-title: Investigate a cross-tenant campaign
+title: Investigate a cross-tenant pattern
 audience: soc_operator
-description: When you spot a pattern that might span multiple customer organisations, how to confirm, document, and respond from the SOC console.
+description: When you spot the same indicator across multiple customer organisations, how to confirm the pattern, document it, and trigger a coordinated response from the SOC console + threat-hunting surface.
 order: 4
 estimated_minutes: 15
 updated_at: 2026-06-12
@@ -9,67 +9,64 @@ tags: ai-soc, hunting, threat-intel
 ---
 
 ## When to use this
-You notice the same indicator across multiple customers in a short window — same malicious URL, same hash, same C2 IP, same attacker handle in event logs. This is a **campaign**, not an isolated alert, and the response is different.
+You notice the same indicator across multiple customers in a short window — same malicious URL, same hash, same C2 IP, same attacker handle in event logs. This is a **pattern that may span tenants**, not an isolated alert, and the response is different.
 
-## The SOC console view
-**`/soc`** is the cross-tenant operator console. Unlike the regular `/incidents` page (per-org), `/soc` aggregates across every customer organisation you have super-admin scope to.
+## Where to work
+Two surfaces, side by side:
 
-Useful columns:
-- **Org** — which customer the row belongs to.
-- **Indicator** — the IOC the agent flagged.
-- **First seen / last seen** — timing per row.
-- **Agent verdict** + **operator verdict** — current state.
+- **`/soc`** — the cross-tenant SOC console. Aggregates alerts, triage verdicts, and incidents across every customer organisation you have super-admin scope to. Filterable by org, severity, IOC.
+- **`/threat-hunting`** — the manual investigation surface. Lets you run cross-tenant KQL-style queries against `endpoint_event_logs`, `firewall_audit_logs`, and `endpoint_threats`.
+
+The SOC chat panel inside `/soc` is your fastest way to ask cross-tenant questions in natural language ("How many endpoints across all orgs hit this hash in the last 7 days?"). It enforces a citation allowlist — you can trust the chip-referenced rows.
 
 ## Steps
 
-1. Open **`/soc`**.
-2. Filter to the suspect indicator (URL, hash, IP) using the search box. The platform indexes IOCs across `endpoint_threats`, `firewall_audit_logs`, `vulnerability_findings`, and AI verdict trails.
-3. Group the matches by **organisation** — you want to see how many customers and how many endpoints in each.
+### 1. Confirm the pattern is real
 
-### Confirm the campaign
+Open **`/soc`**. Filter by the suspect indicator (search box). Count distinct organisations.
 
-A campaign is real when:
+A pattern is significant when:
 - The indicator hits **3+ organisations** within a **48h** window, AND
-- The indicator isn't a known commodity (e.g., generic curl UA from a benign scan).
+- The indicator isn't a known commodity (e.g., generic curl UA from a benign scan, public-internet baseline noise).
 
-Use the AI SOC chat panel (`/soc/chat`) to ask: *"Across all orgs, summarise activity related to <indicator> in the last 7 days. Include endpoint counts and the top techniques observed."* The chat agent will return citations to the underlying rows.
+If unsure, use the SOC chat panel: *"Across all orgs, summarise activity related to `<indicator>` in the last 7 days. Include endpoint counts and the top techniques observed."* Cited rows in the response are linkable to source.
 
-### Document the campaign
+### 2. Pivot in /threat-hunting
 
-For each campaign you confirm:
+For deeper detail, switch to `/threat-hunting`:
+- Run a query like `endpoint_threats | where indicator_hash == '<hash>' | summarize count() by organization_id`
+- Cross-reference timestamps to spot whether the activity is concentrated in a window or spread.
+- Save the query — it shows up in your saved-queries panel for re-use.
 
-1. Open **`/soc/threat-intel`** → **New campaign**.
-2. Fill:
-   - **Name** — short and memorable (`'Operation Brassiere'`, `'CookieStuff April'`).
-   - **First confirmed at** — when you spotted it.
-   - **Primary indicator** — IOC type + value.
-   - **TTPs observed** — MITRE ATT&CK technique IDs (T1190, T1059, etc.).
-   - **Affected orgs** — pre-populated; deselect any false positives.
-3. **Save**. The platform creates a campaign record and links every related alert.
+### 3. Document the pattern
 
-### Push the response
+There's no dedicated campaign object yet — track the investigation as a note attached to an incident. Pick the highest-severity incident already opened against this indicator (or open a manual one via the AdminHealth flow for a meta-tracker), and:
+
+- Title the incident clearly (`'pattern-<indicator>-<date>'`).
+- In the resolution notes, list the affected org IDs + endpoint counts.
+- Link back to the saved threat-hunting query.
+
+### 4. Push the response
 
 You have three levers:
 
-- **Add IOC to global blocklist** — adds the IOC to the platform-wide IOC list. Every customer's agent gets it on next heartbeat. Use for confirmed-malicious IOCs only.
-- **Open per-org incidents** — bulk-creates incidents in each affected org's `/incidents`. Forces the SOC + reseller to triage.
-- **Notify affected resellers** — sends a campaign briefing email to the channel partner for each affected org. They handle customer comms.
-
-For high-confidence campaigns, all three. For medium-confidence, just bulk-create incidents and skip the global blocklist.
+- **Per-org incidents** — for every affected org, the AI SOC already opened an incident (or you can manually create one via `/incidents`). Each customer's reseller will see it.
+- **Update triage prompts** — if this is a pattern the AI missed, add example evidence to the triage prompt history so future alerts are caught early. Open a backlog item.
+- **Notify affected resellers** — manually email the channel partner for each affected org with a brief. The platform doesn't auto-fan-out campaign briefings yet.
 
 ## Verify
-- `/soc/threat-intel` shows your campaign with the correct affected-org count.
-- For each affected org, a new row appears in their `/incidents` page tagged with the campaign id.
-- The agent audit log shows global IOC adds with your user id.
+- Affected orgs each have an open incident in their `/incidents` page tied to the indicator.
+- Your saved threat-hunting query is in the **Recent** panel.
+- The audit log at `/activity` shows your investigation steps.
 
 ## When to escalate to Peritus leadership
-- The campaign affects **10+ customer orgs**, or
-- The campaign indicators match a publicly-disclosed nation-state operation, or
+- The pattern affects **10+ customer orgs**, or
+- The indicators match a publicly-disclosed nation-state operation, or
 - You've found a **0-day exploitation pattern** (the IOC is associated with a vulnerability with no patch).
 
-→ Direct message the on-call CISO contact (`/admin/contacts`) and CC the leadership Slack channel. Don't publish to customers until leadership has briefed channel partners.
+→ Direct message the on-call CISO contact and CC the leadership channel. Don't publish to customers until leadership has briefed channel partners.
 
 ## Related
-- [Triage new alert](/help/sops/soc_operator/triage-new-alert)
+- [Triage a new alert](/help/sops/soc_operator/triage-new-alert)
 - [Approve auto-response](/help/sops/soc_operator/approve-auto-response)
 - [Resolve incident](/help/sops/soc_operator/resolve-incident)

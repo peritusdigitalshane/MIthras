@@ -12,13 +12,13 @@ tags: onboarding, customer
 You've sold Mithras to a new MSP customer and need to provision their organisation so an IT admin on their side can deploy the agent.
 
 ## Prerequisites
-- You have credits in your pool (see `/partner/licences` — at least 1 endpoint × 1 month per device they plan to deploy).
+- You have credits in your pool (see `/partner/credits` — at least 1 endpoint × 1 month per device they plan to deploy).
 - You have the customer's primary IT contact email.
 - For deal-registered customers: the deal in `/partner/deals` must be in stage **won** (otherwise the create-customer button will be greyed out — you can convert it via the **Convert to customer** shortcut on the deals row).
 
 ## Steps
 
-1. Go to **`/my-customers`** (or `/partner/customers` — same page).
+1. Go to **`/my-customers`** (or `/my-customers` — same page).
 2. Click **Add customer**.
 3. Fill in:
    - Customer org name
@@ -34,7 +34,7 @@ You've sold Mithras to a new MSP customer and need to provision their organisati
 - Your pool decreased by the expected amount.
 
 ## Troubleshooting
-- **Customer create button is greyed out.** Check that your reseller balance isn't overdrawn (`/partner/licences`).
+- **Customer create button is greyed out.** Check that your reseller balance isn't overdrawn (`/partner/credits`).
 - **Activation email didn't arrive.** Have the customer click **Forgot password** at the login page using the email you entered.
 - **First endpoint won't enrol.** The customer's first-login wizard generates an enrolment code. Check the customer's `/deploy` page for a fresh one-liner that includes the enrolment code in the URL.
 

@@ -19,7 +19,7 @@ tags: notifications, reports, email
 
 ## Steps
 
-1. Go to **`/settings/notifications`** (or **Settings → Notification recipients** from the sidebar).
+1. Go to **`/settings`** (or **Settings → Notification recipients** from the sidebar).
 2. Click **Add recipient**.
 3. Enter:
    - **Email** — where the message lands.
@@ -39,7 +39,7 @@ tags: notifications, reports, email
 
 ## Troubleshooting
 - **Recipient says they didn't get the report.** Check the recipient's spam folder first. Then check `/customer-reports` — the row for that report shows `Sent` if SMTP succeeded, `Failed` with the error if not. If you see `Failed: smtp_disabled`, your reseller hasn't configured SMTP — contact them.
-- **One person is getting reports they don't want.** Open `/settings/notifications`, click the row, uncheck the report type, save.
+- **One person is getting reports they don't want.** Open `/settings`, click the row, uncheck the report type, save.
 - **Quarterly box is unchecked for everyone.** Quarterly reports are off by default — add at least one recipient with that box ticked.
 - **You want a "no reports, alerts only" recipient.** Leave all the report boxes unchecked and tick only **Critical alerts**.
 

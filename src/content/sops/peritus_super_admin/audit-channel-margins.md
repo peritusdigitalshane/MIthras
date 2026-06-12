@@ -42,7 +42,7 @@ For each customer: **Customer MRR – Reseller cost = Reseller margin.** **Resel
 
 For each distributor:
 
-1. Open `/admin/distributors`, pick the disty.
+1. Open `/admin/resellers`, pick the disty.
 2. Compare their `/distributor/invoices` total this month vs. our `/admin/invoices` total billed to them.
 3. The two should match within rounding (sub-$1 difference is OK; rounding inside per-customer pro-rating).
 

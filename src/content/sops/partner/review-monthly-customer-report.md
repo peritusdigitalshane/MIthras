@@ -14,7 +14,7 @@ On the **1st of every month** the platform auto-drafts a report for each of your
 A report you haven't reviewed is still automatically released **5 business days** after draft — better to be slightly opinionated than to miss the window.
 
 ## Where to look
-**`/partner/reports`** lists every report across every customer you manage. The current month sits at the top.
+**`/reports`** lists every report across every customer you manage. The current month sits at the top.
 
 ## What's in the report (auto-populated)
 - Endpoint count + uptime
@@ -29,7 +29,7 @@ A report you haven't reviewed is still automatically released **5 business days*
 
 ## Steps for review
 
-1. Open **`/partner/reports`**.
+1. Open **`/reports`**.
 2. Click a customer's `draft` row.
 3. Scroll through the report. Common things to add:
    - **Exec summary** — one or two sentences in plain English. This is what their executives will read.
@@ -51,7 +51,7 @@ A report you haven't reviewed is still automatically released **5 business days*
 
 ## Troubleshooting
 - **PDF render fails on Preview.** Most often a markdown table issue in your commentary. Strip the commentary, preview, and re-add piece by piece.
-- **Customer says they didn't receive the email.** Check `/admin/audit-logs` (have a super-admin do this if you can't) for `report_email_sent` with their address. SMTP failures are surfaced there.
+- **Customer says they didn't receive the email.** Check `/activity` (have a super-admin do this if you can't) for `report_email_sent` with their address. SMTP failures are surfaced there.
 - **Numbers in the report don't match what you remember.** The report locks to a **snapshot** at the moment of draft creation. Live `/customer/threats` numbers will drift higher; the report is historical.
 
 ## Related

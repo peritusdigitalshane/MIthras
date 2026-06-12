@@ -12,18 +12,18 @@ tags: credits, billing, channel
 A reseller has either run out of credits, will run out within their next billing cycle, or has explicitly requested a top-up.
 
 ## Prerequisites
-- Your own distributor balance has enough headroom (`/distributor/licences` shows your **available** number).
+- Your own distributor balance has enough headroom (`/distributor/credits` shows your **available** number).
 - You have a commercial agreement with the reseller covering the top-up amount.
 
 ## Steps
 
-1. Open **`/distributor/licences`**.
+1. Open **`/distributor/credits`**.
 2. Find the reseller in **Reseller health** — pay attention to:
    - Their **runway** chip (green = >1 month, amber = <1 month, red = overdrawn)
    - The **last cut** date
 3. In the **Cut credits to reseller** panel, pick the reseller, enter the amount, write a useful note (`"Monthly top-up — Q3 commitment"`).
 4. Click **Cut**. A `licence_transactions` row is written with `kind='disty_to_reseller'`.
-5. The reseller's pool is now bumped — their `/partner/licences` page refreshes automatically.
+5. The reseller's pool is now bumped — their `/partner/credits` page refreshes automatically.
 
 ## Verify
 - The new transaction appears at the top of the ledger with status `posted` and amount you entered.
@@ -31,9 +31,9 @@ A reseller has either run out of credits, will run out within their next billing
 - The reseller's runway chip recolours to green.
 
 ## Troubleshooting
-- **"insufficient_balance" error.** Your distributor pool is empty. Use the contact-Peritus tile on `/distributor/licences` to request more.
+- **"insufficient_balance" error.** Your distributor pool is empty. Use the contact-Peritus tile on `/distributor/credits` to request more.
 - **Cut succeeded but reseller can't see the change.** They may need to refresh — the React query refresh interval is 30 seconds.
-- **Wrong reseller credited.** Open the ledger row, copy the txn id, and contact Peritus support — credits can be reversed via `revoke_licence_transaction(txn_id)` RPC by a super-admin.
+- **Wrong reseller credited.** Open the ledger row, copy the txn id, and write a correcting transaction in the other direction. The ledger is append-only — a contra entry is the canonical fix. Contact Peritus support if the wrong reseller has already drawn down the credits.
 
 ## Related
 - [Onboard a new reseller](/help/sops/distributor/onboard-reseller)

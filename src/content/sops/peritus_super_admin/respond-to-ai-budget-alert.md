@@ -37,8 +37,8 @@ You got the "AI budget at 80%" or "AI budget at 100%" email from `ai-cost-monito
 
 ### If an org is runaway
 
-- Open the org's row in `/admin/distributors` → drill to the customer.
-- If the customer's endpoint count is consistent with prior months, the issue is **per-call cost** (model upgrade or noisy alerts). Look at their `triage_decisions` count vs. last month.
+- Open the org's row in `/admin/resellers` → drill to the customer.
+- If the customer's endpoint count is consistent with prior months, the issue is **per-call cost** (model upgrade or noisy alerts). Look at their `ai_triage_decisions` count vs. last month.
 - If endpoint count exploded, it's just growth — raise their per-org budget by the same factor.
 - If you can't tell, ping the reseller. They may know their customer added 50 new endpoints last week.
 
