@@ -1,28 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity, Bell, Brain, Bot, AlertTriangle, Monitor, Cloud, Lock,
   ShieldCheck, Sword, Sparkles, FileSearch, Cpu, Zap, ExternalLink,
-  CheckCircle2,
+  CheckCircle2, Database, Network, Ban, MailCheck, Eye, RotateCcw,
 } from "lucide-react";
 
 /**
- * Marketing hero centrepiece — looks like a real screenshot of the platform's
- * /soc page (SocConsole.tsx) with the multi-agent verdict trail
- * (MultiAgentVerdictTrail.tsx) wired up to a live demo animation.
+ * Marketing hero centrepiece — the showpiece animation. Wraps the real
+ * /soc page chrome (header + KPI strip) around a cinematic "Live
+ * investigation" panel that walks a single alert through the multi-agent
+ * pipeline in real time:
  *
- * Layout mirrors the real product exactly so visitors see the same surface on
- * day one of evaluation:
- *   - Browser-chrome shell (mac dots + URL) so it reads as a screenshot
- *   - SOC Console header (Activity icon + h1 + LivePulse) — matches SocConsole.tsx
- *   - 6-tile KPI strip — same tiles as the real page (Open alerts / AI triages
- *     today / Investigations today / Active threats / Endpoints online / M365)
- *   - "Live investigation" card — the multi-agent verdict trail with synthetic
- *     verdicts that cycle through Triage → Verify → Adversarial → Investigate
- *     → Commander on a 22s loop
- *   - Live alerts column on the right with real product styling
- *   - Fleet mini-grid below alerts — the demo endpoint going red/isolated
+ *   1. Alert capture banner slides in (red, with the source data)
+ *   2. Agent ribbon — 5 circular agent avatars connected by a flow line.
+ *      A "particle" travels between avatars as the alert hands off.
+ *   3. Active agent's reasoning streams in via typewriter effect.
+ *      Citation chips materialise as the reasoning text references them.
+ *   4. Refutation rows show counter-arguments being knocked down one by one.
+ *   5. Finale — playbook checklist builds up tick-by-tick as the Commander
+ *      dispatches actions, then a big "RESOLVED" stamp.
  *
- * All synthetic data, no real customer leaks.
+ * All synthetic data, no real customer references — runs on a ~25s loop.
  */
 
 const SEVERITY_DOT: Record<string, string> = {
@@ -32,49 +30,206 @@ const SEVERITY_DOT: Record<string, string> = {
   low:      "bg-blue-500",
 };
 
-const PIPELINE_STAGES = [
-  { id: "triage",       label: "Triage",       icon: Brain,       role: "Initial classification",        verdict: "true_positive", confidence: 0.94, model: "gpt-5-mini", latency: "1.8s", cost: "$0.004", summary: "5 failed logins for webadmin in 3m32s window. Source 198.51.100.42 not in allow-list. Verdict: true_positive.", durationMs: 1800 },
-  { id: "verification", label: "Verification", icon: ShieldCheck, role: "Independent re-classification", verdict: "true_positive", confidence: 0.88, model: "claude-sonnet", latency: "1.1s", cost: "$0.002", summary: "Cross-checked against 7 site_event_logs. Pattern matches wp_brute_force playbook. Agrees with Triage.", durationMs: 1400 },
-  { id: "adversarial",  label: "Adversarial",  icon: Sword,       role: "Refutation attempt",            verdict: "not_refuted",   confidence: 0.91, model: "gpt-5-mini", latency: "1.4s", cost: "$0.002", summary: "Tested 3 benign explanations (autofill, password manager, security audit). None survived endpoint context check.", durationMs: 1600 },
-  { id: "investigate",  label: "Investigate",  icon: FileSearch,  role: "Cross-tenant forensics",        verdict: "campaign",      confidence: 0.92, model: "claude-sonnet", latency: "3.2s", cost: "$0.011", summary: "Same source IP 198.51.100.42 hit 4 other tenant sites in last 24h. Coordinated credential-stuffing campaign confirmed.", durationMs: 2400 },
-  { id: "commander",    label: "Commander",    icon: Sparkles,    role: "Playbook + response",           verdict: "auto-fired",    confidence: 0.95, model: "gpt-5-mini", latency: "2.7s", cost: "$0.008", summary: "Block 198.51.100.42 at perimeter, force MFA reset for webadmin, watch the acme blog for 24h, notify ACME admin.", durationMs: 2200 },
-] as const;
+// ---------------------------------------------------------------------------
+// Pipeline definition — each stage has a typewriter body, refutations or
+// findings, citations that appear at character offsets, and a verdict
+// stamp at the end.
+// ---------------------------------------------------------------------------
+
+interface StageDef {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  role: string;
+  model: string;
+  body: string;             // the typewriter text
+  citations: string[];      // chip labels that fade in alongside the body
+  verdict: string;
+  confidence: number;
+  cost: string;
+  latency: string;
+  durationMs: number;       // typewriter duration (ms)
+  holdMs: number;           // pause after typewriter finishes
+  /** Optional inline list to render below body — refutations / findings. */
+  bulletKind?: "refute" | "find" | "playbook";
+  bullets?: Array<{ label: string; meta?: string; ok?: boolean }>;
+}
+
+const STAGES: StageDef[] = [
+  {
+    id: "triage",
+    label: "Triage",
+    icon: Brain,
+    role: "Initial classification",
+    model: "gpt-5-mini",
+    body:
+      "Pattern: 5 failed logons in 3m32s window from a single source IP. " +
+      "Cross-referencing tenant allow-list… 198.51.100.42 is not registered. " +
+      "Behavioural match against rule wp_brute_force_v3 → 0.94 confidence. " +
+      "No legitimate user behaviour matches this pattern. Verdict: true_positive.",
+    citations: ["site_event_logs ×5", "agent_secrets ×1"],
+    verdict: "true_positive",
+    confidence: 0.94,
+    cost: "$0.004",
+    latency: "1.8s",
+    durationMs: 4200,
+    holdMs: 600,
+  },
+  {
+    id: "verify",
+    label: "Verify",
+    icon: ShieldCheck,
+    role: "Independent re-classification",
+    model: "claude-sonnet-4-6",
+    body:
+      "Independent re-run with a different model. Pulling 7 supporting rows from " +
+      "site_event_logs… all share actor_ip 198.51.100.42 and actor_user_login " +
+      "webadmin. Pattern consistent with the wp_brute_force playbook. " +
+      "Agrees with Triage. No new doubts surfaced.",
+    citations: ["site_event_logs ×7", "wp_brute_force_v3"],
+    verdict: "agrees",
+    confidence: 0.88,
+    cost: "$0.002",
+    latency: "1.1s",
+    durationMs: 3600,
+    holdMs: 500,
+  },
+  {
+    id: "adversarial",
+    label: "Adversarial",
+    icon: Sword,
+    role: "Refutation attempt",
+    model: "gpt-5-mini",
+    body:
+      "Steel-manning the opposite verdict. Generating benign explanations and " +
+      "testing each against the available evidence:",
+    citations: [],
+    verdict: "not_refuted",
+    confidence: 0.91,
+    cost: "$0.002",
+    latency: "1.4s",
+    durationMs: 1800,
+    holdMs: 2400,
+    bulletKind: "refute",
+    bullets: [
+      { label: "Forgot password — would match m365_sign_in_events for a reset",                 meta: "0 events", ok: false },
+      { label: "Browser autofill flood — would show agent_commands push within window",        meta: "0 events", ok: false },
+      { label: "Scheduled security audit — would map to change_tickets in the window",         meta: "0 tickets", ok: false },
+    ],
+  },
+  {
+    id: "investigate",
+    label: "Investigate",
+    icon: FileSearch,
+    role: "Cross-tenant forensics",
+    model: "claude-sonnet-4-6",
+    body:
+      "Hunting laterally. Searching for the source IP across all tenant sites " +
+      "in the last 24h:",
+    citations: ["site_event_logs ×12", "endpoint_event_logs ×4"],
+    verdict: "campaign",
+    confidence: 0.92,
+    cost: "$0.011",
+    latency: "3.2s",
+    durationMs: 2100,
+    holdMs: 2400,
+    bulletKind: "find",
+    bullets: [
+      { label: "blog.acme-corp.example",        meta: "5 fails · webadmin",  ok: true },
+      { label: "store.fabrikam-studios.example", meta: "9 fails · admin",     ok: true },
+      { label: "intranet.contoso.example",      meta: "4 fails · admin",     ok: true },
+      { label: "portal.adatum.example",         meta: "3 fails · webmaster", ok: true },
+    ],
+  },
+  {
+    id: "commander",
+    label: "Commander",
+    icon: Sparkles,
+    role: "Playbook + response",
+    model: "gpt-5-mini",
+    body:
+      "Drafting response playbook. Selecting bounded actions allowed under the " +
+      "ACME response policy. Issuing commands and arming the customer-confirm " +
+      "rollback timer:",
+    citations: [],
+    verdict: "auto-fired",
+    confidence: 0.95,
+    cost: "$0.008",
+    latency: "2.7s",
+    durationMs: 1800,
+    holdMs: 3800,
+    bulletKind: "playbook",
+    bullets: [
+      { label: "Block 198.51.100.42 at perimeter",       meta: "03:14:14", ok: true },
+      { label: "Force MFA reset for webadmin",           meta: "03:14:18", ok: true },
+      { label: "Open INC-2418 for ACME",                  meta: "03:14:21", ok: true },
+      { label: "Watch blog.acme-corp.example for 24h",    meta: "armed",    ok: true },
+      { label: "Auto-rollback if no customer confirm 4h", meta: "armed",    ok: true },
+    ],
+  },
+];
 
 const LIVE_ALERTS: Array<{ severity: "critical" | "high" | "medium" | "low"; title: string; message: string; endpoint: string; alertType: string; age: string }> = [
-  { severity: "high",     title: "WordPress brute force on acme blog",  message: "5 failed logins for webadmin from 198.51.100.42",      endpoint: "blog.acme-corp.example", alertType: "wp_brute_force",       age: "2m ago" },
-  { severity: "critical", title: "Defender: Wacatac",                message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",      endpoint: "CH-04",                      alertType: "defender_signature",   age: "5m ago" },
-  { severity: "medium",   title: "Microseg block — outbound SMB",    message: "TCP/445 from NL-FS1 denied by rule pol_smb_lock",            endpoint: "NL-FS1",                     alertType: "microseg_block",       age: "9m ago" },
-  { severity: "medium",   title: "12 failed LDAP logons",            message: "Account svc-backup failed bind 12× in 4m",                    endpoint: "DC01",                       alertType: "ldap_failed_logon",    age: "14m ago" },
-  { severity: "low",      title: "M365 OAuth grant",                 message: "Tenant consent to ContactSync (Mail.ReadWrite)",              endpoint: "tenant_b",                   alertType: "m365_oauth_grant",     age: "22m ago" },
+  { severity: "high",     title: "WordPress brute force on acme blog", message: "5 failed logins for webadmin from 198.51.100.42",      endpoint: "blog.acme-corp.example", alertType: "wp_brute_force",       age: "2m ago" },
+  { severity: "critical", title: "Defender: Wacatac",                message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",    endpoint: "CH-04",                  alertType: "defender_signature",   age: "5m ago" },
+  { severity: "medium",   title: "Microseg block — outbound SMB",    message: "TCP/445 from NL-FS1 denied by rule pol_smb_lock",          endpoint: "NL-FS1",                 alertType: "microseg_block",       age: "9m ago" },
+  { severity: "medium",   title: "12 failed LDAP logons",            message: "Account svc-backup failed bind 12× in 4m",                 endpoint: "DC01",                   alertType: "ldap_failed_logon",    age: "14m ago" },
+  { severity: "low",      title: "M365 OAuth grant",                 message: "Tenant consent to ContactSync (Mail.ReadWrite)",           endpoint: "tenant_b",               alertType: "m365_oauth_grant",     age: "22m ago" },
 ];
 
 // ---------------------------------------------------------------------------
-// Cycle hook — drives the active stage index off a monotonic timer.
+// Cycle hook — drives stage progression. Also exposes per-stage progress so
+// the typewriter inside each stage can advance smoothly.
 // ---------------------------------------------------------------------------
 
-function useSocCycle() {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [finished, setFinished]   = useState(false);
+type CyclePhase = "running" | "finale" | "resetting";
+
+interface CycleState {
+  stageIdx: number;
+  phase: CyclePhase;
+  /** ms since stage entered "running" state — used for typewriter. */
+  tStage: number;
+}
+
+function useInvestigationCycle(): CycleState {
+  const [state, setState] = useState<CycleState>({ stageIdx: 0, phase: "running", tStage: 0 });
+  const startedAt = useRef(Date.now());
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       while (!cancelled) {
-        for (let i = 0; i < PIPELINE_STAGES.length; i++) {
-          setActiveIdx(i);
-          setFinished(false);
-          await delay(PIPELINE_STAGES[i].durationMs);
+        for (let i = 0; i < STAGES.length; i++) {
+          startedAt.current = Date.now();
+          setState({ stageIdx: i, phase: "running", tStage: 0 });
+          const total = STAGES[i].durationMs + STAGES[i].holdMs;
+          await delay(total);
           if (cancelled) return;
         }
-        setFinished(true);
-        await delay(3200);
+        setState((s) => ({ ...s, phase: "finale" }));
+        await delay(4200);
+        if (cancelled) return;
+        setState({ stageIdx: 0, phase: "resetting", tStage: 0 });
+        await delay(600);
       }
     };
     run();
     return () => { cancelled = true; };
   }, []);
 
-  return { activeIdx, finished };
+  // Per-stage time tick for typewriter — 60Hz-ish.
+  const [tStage, setT] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      setT(Date.now() - startedAt.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state.stageIdx, state.phase]);
+
+  return { ...state, tStage };
 }
 
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -84,31 +239,26 @@ const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 export function SocConsoleHero() {
-  const { activeIdx, finished } = useSocCycle();
+  const cycle = useInvestigationCycle();
 
   return (
     <div className="relative w-full max-w-6xl mx-auto">
-      {/* Outer browser chrome — marketing flourish so it reads as a screenshot */}
       <div className="relative rounded-2xl border bg-card text-card-foreground shadow-2xl shadow-primary/10 overflow-hidden">
         <BrowserChrome url="console.mithras.com.au/soc" />
-
-        {/* Inner content — laid out to match SocConsole.tsx */}
         <div className="p-4 sm:p-6 space-y-5">
           <SocHeader />
-          <KpiStrip activeIdx={activeIdx} finished={finished} />
+          <KpiStrip cycle={cycle} />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <div className="lg:col-span-8">
-              <ActiveInvestigationCard activeIdx={activeIdx} finished={finished} />
+              <InvestigationTheatre cycle={cycle} />
             </div>
             <div className="lg:col-span-4 space-y-4">
               <LiveAlertsCard />
-              <FleetMiniGrid finished={finished} />
+              <FleetMiniGrid finished={cycle.phase === "finale"} />
             </div>
           </div>
         </div>
       </div>
-
-      {/* Ambient glow under the console */}
       <div className="absolute -inset-x-6 -bottom-6 h-32 bg-gradient-to-t from-primary/10 to-transparent blur-2xl -z-10" />
     </div>
   );
@@ -138,7 +288,7 @@ function BrowserChrome({ url }: { url: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Header — matches SocConsole.tsx
+// SOC header — matches SocConsole.tsx
 // ---------------------------------------------------------------------------
 
 function SocHeader() {
@@ -166,14 +316,12 @@ function SocHeader() {
 }
 
 // ---------------------------------------------------------------------------
-// KPI strip — matches SocConsole.tsx
+// KPI strip — ticks up as the demo runs
 // ---------------------------------------------------------------------------
 
-function KpiStrip({ activeIdx, finished }: { activeIdx: number; finished: boolean }) {
-  // "Investigations today" + "AI triages today" tick up as the cycle progresses,
-  // so visitors see the numbers change as the agents work.
-  const triagesTick = 142 + activeIdx + (finished ? 1 : 0);
-  const investTick  = 47  + (activeIdx >= 3 ? 1 : 0) + (finished ? 1 : 0);
+function KpiStrip({ cycle }: { cycle: CycleState }) {
+  const triagesTick = 142 + cycle.stageIdx + (cycle.phase === "finale" ? 1 : 0);
+  const investTick  = 47  + (cycle.stageIdx >= 3 ? 1 : 0) + (cycle.phase === "finale" ? 1 : 0);
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <Kpi icon={<Bell      className="h-4 w-4" />} label="Open alerts"          value="23"  sub="2 critical"        accent="warning" />
@@ -198,54 +346,100 @@ function Kpi({
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
         <span className="text-muted-foreground">{icon}</span>
       </div>
-      <div className={`text-xl font-bold tabular-nums ${accentClass}`}>{value}</div>
+      <div className={`text-xl font-bold tabular-nums ${accentClass} transition-all`}>{value}</div>
       {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Active investigation — mirror of MultiAgentVerdictTrail.tsx with the cycle
-// driving "active" / "done" / "pending" state per agent.
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// INVESTIGATION THEATRE — the showpiece
+// ===========================================================================
 
-function ActiveInvestigationCard({ activeIdx, finished }: { activeIdx: number; finished: boolean }) {
+function InvestigationTheatre({ cycle }: { cycle: CycleState }) {
+  const finale = cycle.phase === "finale";
   return (
     <div className="rounded-lg border border-primary/30 bg-card text-card-foreground shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between gap-3 flex-wrap bg-gradient-to-br from-primary/5 to-transparent">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="h-4 w-4 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Multi-agent consensus</span>
-              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-primary/40 text-primary">
-                {finished ? "complete" : `phase ${activeIdx + 1}/${PIPELINE_STAGES.length}`}
-              </span>
-            </div>
-            <div className="text-sm font-semibold mt-0.5 truncate">
-              Alert <span className="font-mono text-primary">#a47c91</span> &middot; wp_brute_force on blog.acme-corp.example
-            </div>
-          </div>
-        </div>
-        <FinalVerdictPill finished={finished} />
+      {/* Alert header banner — pulses red, sets the stage */}
+      <AlertBanner finale={finale} />
+
+      {/* Agent ribbon — circles connected by a flow line, with a particle */}
+      <div className="p-4 sm:p-5 border-b border-border/40">
+        <AgentRibbon cycle={cycle} />
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* 5-agent grid — staged via the cycle */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-          {PIPELINE_STAGES.map((stage, i) => {
-            const state: AgentState =
-              finished           ? "done" :
-              i <  activeIdx     ? "done" :
-              i === activeIdx    ? "active" : "pending";
-            return <AgentTile key={stage.id} stage={stage} state={state} />;
-          })}
-        </div>
+      {/* Main panel — switches between live reasoning and the finale */}
+      <div className="p-4 sm:p-5 min-h-[280px]">
+        {finale ? <FinaleResolution /> : <LiveReasoning cycle={cycle} />}
+      </div>
+    </div>
+  );
+}
 
-        {/* Active reasoning panel — replaces with summary on each tick */}
-        <ActiveReasoning activeIdx={activeIdx} finished={finished} />
+function AlertBanner({ finale }: { finale: boolean }) {
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 border-b border-border/40 transition-colors ${
+      finale
+        ? "bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent"
+        : "bg-gradient-to-r from-red-500/10 via-red-500/5 to-transparent"
+    }`}>
+      <div className={`h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+        finale ? "bg-emerald-500/15" : "bg-red-500/15"
+      }`}>
+        {finale
+          ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+          : <AlertTriangle className="h-5 w-5 text-red-500 animate-pulse" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-wider">
+          <span className={finale ? "text-emerald-500 font-semibold" : "text-red-500 font-semibold"}>
+            {finale ? "Alert resolved" : "Alert captured"}
+          </span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground font-mono">#a47c91</span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground font-mono">wp_brute_force</span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground font-mono">03:14:02 UTC</span>
+        </div>
+        <div className="text-sm font-medium mt-0.5">
+          <span className="font-mono text-foreground/90">blog.acme-corp.example</span>
+          <span className="text-muted-foreground"> · 5 failed logins for </span>
+          <span className="font-mono text-foreground/90">webadmin</span>
+          <span className="text-muted-foreground"> from </span>
+          <span className="font-mono text-foreground/90">198.51.100.42</span>
+        </div>
+      </div>
+      <div className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded border font-mono font-medium flex-shrink-0 ${
+        finale
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+          : "border-amber-500/40 bg-amber-500/10 text-amber-500"
+      }`}>
+        {finale ? "RESOLVED · 24s" : "INVESTIGATING"}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Agent ribbon — 5 avatars on a flow line with a travelling particle
+// ---------------------------------------------------------------------------
+
+function AgentRibbon({ cycle }: { cycle: CycleState }) {
+  const isFinale = cycle.phase === "finale";
+  return (
+    <div className="relative">
+      {/* connecting line */}
+      <div className="absolute top-5 left-[10%] right-[10%] h-px bg-border/60" />
+      {/* travelling pulse */}
+      {!isFinale && <TravellingPulse stageIdx={cycle.stageIdx} />}
+
+      <div className="relative grid grid-cols-5 gap-2">
+        {STAGES.map((stage, i) => {
+          const state: AgentState =
+            isFinale ? "done" : i < cycle.stageIdx ? "done" : i === cycle.stageIdx ? "active" : "pending";
+          return <AgentAvatar key={stage.id} stage={stage} state={state} />;
+        })}
       </div>
     </div>
   );
@@ -253,145 +447,280 @@ function ActiveInvestigationCard({ activeIdx, finished }: { activeIdx: number; f
 
 type AgentState = "pending" | "active" | "done";
 
-function AgentTile({ stage, state }: { stage: typeof PIPELINE_STAGES[number]; state: AgentState }) {
+function AgentAvatar({ stage, state }: { stage: StageDef; state: AgentState }) {
   const Icon = stage.icon;
-  const baseCls =
-    state === "active" ? "border-primary/60 bg-primary/5 shadow-[0_0_24px_-8px] shadow-primary/40" :
-    state === "done"   ? "border-emerald-500/30 bg-emerald-500/5" :
-                         "border-dashed border-border/40 bg-muted/10";
+  const ringCls =
+    state === "active" ? "border-primary bg-primary/15 shadow-[0_0_40px_-8px] shadow-primary/60" :
+    state === "done"   ? "border-emerald-500/60 bg-emerald-500/10" :
+                         "border-border/40 bg-muted/20";
   const iconCls =
-    state === "active" ? "text-primary"        :
-    state === "done"   ? "text-emerald-500"    :
-                         "text-muted-foreground/60";
-
+    state === "active" ? "text-primary"     :
+    state === "done"   ? "text-emerald-500" :
+                         "text-muted-foreground/50";
   return (
-    <div className={`relative rounded-lg border ${baseCls} p-3 transition-all duration-500`}>
-      <div className="flex items-center gap-1.5 text-xs font-medium mb-1">
-        <Icon className={`h-3.5 w-3.5 ${iconCls}`} />
-        <span>{stage.label}</span>
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={`relative h-10 w-10 rounded-full border-2 ${ringCls} flex items-center justify-center transition-all duration-500`}>
+        <Icon className={`h-4 w-4 ${iconCls}`} />
         {state === "active" && (
-          <span className="ml-auto inline-flex gap-0.5">
-            <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-            <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:120ms]" />
-            <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:240ms]" />
-          </span>
+          <span className="absolute -inset-1 rounded-full border-2 border-primary/40 animate-ping" />
         )}
         {state === "done" && (
-          <CheckCircle2 className="h-3 w-3 text-emerald-500 ml-auto" />
+          <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-emerald-500 flex items-center justify-center">
+            <CheckCircle2 className="h-2.5 w-2.5 text-background" strokeWidth={3} />
+          </span>
         )}
       </div>
-      <div className="text-[11px] text-muted-foreground leading-tight mb-2">{stage.role}</div>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {state === "pending" ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground">— pending</span>
-        ) : (
-          <>
-            <VerdictPill verdict={stage.verdict} />
-            <span className="text-[10px] text-muted-foreground tabular-nums">{Math.round(stage.confidence * 100)}%</span>
-          </>
-        )}
+      <div className={`text-[10px] font-semibold leading-none text-center ${
+        state === "pending" ? "text-muted-foreground/60" : ""
+      }`}>
+        {stage.label}
       </div>
     </div>
   );
 }
 
-function ActiveReasoning({ activeIdx, finished }: { activeIdx: number; finished: boolean }) {
-  if (finished) {
-    return (
-      <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-4">
-        <div className="flex items-start gap-3">
-          <div className="h-8 w-8 rounded-md bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-            <Zap className="h-4 w-4 text-emerald-500" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-wider text-emerald-500 font-semibold mb-1">
-              Incident resolved · auto-response fired · incident INC-2418 opened
-            </div>
-            <div className="text-sm leading-relaxed">
-              Blocked <span className="font-mono text-emerald-600 dark:text-emerald-400">198.51.100.42</span> at the perimeter,
-              forced MFA reset on <span className="font-mono text-emerald-600 dark:text-emerald-400">webadmin</span>,
-              opened a ticket on ACME and notified the customer admin.
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
-              <Badge tone="ok">5 agents · 24s</Badge>
-              <Badge tone="ok">$0.027 total</Badge>
-              <Badge tone="ok">12 citations</Badge>
-              <Badge tone="ok">customer notified</Badge>
-              <Badge tone="ok">auto-rollback armed (4h)</Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+/**
+ * Light particle that travels from the previous agent avatar to the current
+ * one as the alert "hands off". Renders as an absolutely-positioned dot that
+ * uses a CSS `key` change to retrigger the animation on stage change.
+ */
+function TravellingPulse({ stageIdx }: { stageIdx: number }) {
+  if (stageIdx === 0) return null;
+  // Each avatar is centered at (i + 0.5) / 5 of the row width.
+  const fromPct = ((stageIdx - 1) + 0.5) * 20;
+  const toPct   = (stageIdx     + 0.5) * 20;
+  return (
+    <div
+      key={stageIdx}
+      className="absolute top-[18px] h-2 w-2 rounded-full bg-primary shadow-[0_0_12px] shadow-primary"
+      style={{
+        left: `${fromPct}%`,
+        animation: "soc-pulse-travel 700ms ease-out forwards",
+        ["--to" as string]: `${toPct - fromPct}%`,
+      }}
+    />
+  );
+}
 
-  const stage = PIPELINE_STAGES[activeIdx];
+// ---------------------------------------------------------------------------
+// Live reasoning — typewriter body + citations chips + verdict stamp
+// ---------------------------------------------------------------------------
+
+function LiveReasoning({ cycle }: { cycle: CycleState }) {
+  const stage = STAGES[cycle.stageIdx];
   const Icon = stage.icon;
+
+  // Typewriter — reveal `visibleChars` of stage.body.
+  const ratio = Math.min(1, cycle.tStage / stage.durationMs);
+  const visibleChars = Math.floor(ratio * stage.body.length);
+  const visibleBody  = stage.body.slice(0, visibleChars);
+  const typing = visibleChars < stage.body.length;
+
+  // Citations fade in once the body is ~30% through.
+  const citationStart = stage.durationMs * 0.3;
+  const citationsVisible = Math.max(0, Math.min(
+    stage.citations.length,
+    Math.floor((cycle.tStage - citationStart) / Math.max(1, (stage.durationMs - citationStart) / Math.max(1, stage.citations.length))),
+  ));
+
+  // Bullets reveal AFTER body is fully typed.
+  const bulletsStart = stage.durationMs;
+  const bulletsEnd   = stage.durationMs + stage.holdMs * 0.7;
+  const bullets = stage.bullets ?? [];
+  const bulletsVisible = bullets.length
+    ? Math.max(0, Math.min(
+        bullets.length,
+        Math.floor(((cycle.tStage - bulletsStart) / Math.max(1, (bulletsEnd - bulletsStart) / bullets.length))),
+      ))
+    : 0;
+
+  // Verdict stamp appears once everything else has rendered.
+  const verdictShown =
+    cycle.tStage > stage.durationMs + (bullets.length ? stage.holdMs * 0.4 : 0);
+
   return (
-    <div className="rounded-lg border border-border/40 bg-card p-3.5">
-      <div className="flex items-start gap-3">
-        <div className="h-8 w-8 rounded-md bg-primary/15 flex items-center justify-center flex-shrink-0">
+    <div className="space-y-3">
+      {/* Header: which agent + model */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 text-[12px]">
           <Icon className="h-4 w-4 text-primary" />
+          <span className="font-semibold">{stage.label} agent</span>
+          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground">{stage.role}</span>
+          {typing && (
+            <span className="inline-flex gap-0.5 ml-1">
+              <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+              <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:120ms]" />
+              <span className="h-1 w-1 rounded-full bg-primary animate-bounce [animation-delay:240ms]" />
+            </span>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="text-xs font-medium flex items-center gap-2">
-              <span>{stage.label}</span>
-              <span className="text-[10px] text-muted-foreground font-mono">running…</span>
-            </div>
-            <span className="text-[10px] text-muted-foreground font-mono">{stage.model}</span>
+        <span className="text-[10px] font-mono text-muted-foreground">{stage.model}</span>
+      </div>
+
+      {/* Typewriter body */}
+      <div className="rounded-lg border border-border/40 bg-muted/20 p-3.5">
+        <p className="text-[12px] leading-relaxed font-mono text-foreground/85 min-h-[3.5em] whitespace-pre-wrap">
+          {visibleBody}
+          {typing && <span className="inline-block w-1.5 h-3.5 bg-primary/80 align-text-bottom animate-pulse ml-0.5" />}
+        </p>
+
+        {/* Citations chips */}
+        {stage.citations.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {stage.citations.slice(0, citationsVisible).map((c, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-primary/10 text-primary text-[10px] font-mono animate-[soc-chip-in_300ms_ease-out]"
+              >
+                <Database className="h-2.5 w-2.5" />
+                {c}
+              </span>
+            ))}
           </div>
-          <p className="text-[12px] leading-relaxed text-foreground/85">{stage.summary}</p>
-          <div className="mt-2 flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Cpu className="h-2.5 w-2.5" />latency {stage.latency}</span>
-            <span>{stage.cost}</span>
-            <span className="inline-flex items-center gap-1"><ExternalLink className="h-2.5 w-2.5" />{4 + activeIdx} citations</span>
+        )}
+
+        {/* Bullets (refutations / findings / playbook) */}
+        {bullets.length > 0 && bulletsVisible > 0 && stage.bulletKind && (
+          <div className="mt-3 space-y-1">
+            {bullets.slice(0, bulletsVisible).map((b, i) => (
+              <BulletRow key={i} bullet={b} kind={stage.bulletKind!} />
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Footer — verdict stamp + cost/latency meta */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><Cpu className="h-2.5 w-2.5" />latency {stage.latency}</span>
+          <span>{stage.cost}</span>
+          <span className="inline-flex items-center gap-1">
+            <ExternalLink className="h-2.5 w-2.5" />{stage.citations.length} citations
+          </span>
         </div>
+        {verdictShown && (
+          <div className="inline-flex items-center gap-1.5 animate-[soc-stamp-in_400ms_cubic-bezier(0.34,1.56,0.64,1)]">
+            <VerdictPill verdict={stage.verdict} />
+            <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
+              {Math.round(stage.confidence * 100)}% conf
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function FinalVerdictPill({ finished }: { finished: boolean }) {
+function BulletRow({ bullet, kind }: { bullet: { label: string; meta?: string; ok?: boolean }; kind: "refute" | "find" | "playbook" }) {
+  const icon =
+    kind === "refute"   ? <Ban         className="h-3 w-3 text-red-500" /> :
+    kind === "find"     ? <Network     className="h-3 w-3 text-amber-500" /> :
+                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />;
   return (
-    <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded border font-medium ${
-      finished
-        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-        : "border-amber-500/40 bg-amber-500/10 text-amber-500"
-    }`}>
-      {finished ? "Resolved · 24s" : "Investigating…"}
-    </span>
+    <div className="flex items-center gap-2 text-[11px] font-mono py-1 px-2 rounded bg-background/50 animate-[soc-row-in_300ms_ease-out]">
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="flex-1 min-w-0 truncate text-foreground/90">{bullet.label}</span>
+      {bullet.meta && (
+        <span className={`text-[10px] ${
+          kind === "refute"  ? "text-red-500" :
+          kind === "find"    ? "text-amber-500" :
+                               "text-emerald-500"
+        }`}>
+          {bullet.meta}
+        </span>
+      )}
+    </div>
   );
 }
 
 function VerdictPill({ verdict }: { verdict: string }) {
   const cls =
-    verdict === "true_positive"  ? "border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/5" :
-    verdict === "false_positive" ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5" :
-    verdict === "needs_human"    ? "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/5" :
-    verdict === "not_refuted"    ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5" :
-    verdict === "campaign"       ? "border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/5" :
-    verdict === "auto-fired"     ? "border-primary/50 text-primary bg-primary/5" :
+    verdict === "true_positive"  ? "border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/10" :
+    verdict === "false_positive" ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" :
+    verdict === "needs_human"    ? "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10" :
+    verdict === "not_refuted"    ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" :
+    verdict === "agrees"         ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10" :
+    verdict === "campaign"       ? "border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/10" :
+    verdict === "auto-fired"     ? "border-primary/50 text-primary bg-primary/10" :
                                    "border-border";
   return (
-    <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border font-medium ${cls}`}>
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border font-bold ${cls}`}>
       {verdict.replace(/_/g, " ")}
     </span>
   );
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: "ok" }) {
-  const cls = tone === "ok" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/40" : "";
+// ---------------------------------------------------------------------------
+// Finale — big resolution stamp + playbook recap + cost line
+// ---------------------------------------------------------------------------
+
+function FinaleResolution() {
+  const playbook = STAGES[STAGES.length - 1].bullets ?? [];
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono ${cls}`}>
-      {children}
-    </span>
+    <div className="space-y-4 animate-[soc-fade-in_500ms_ease-out]">
+      <div className="rounded-lg border border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="h-10 w-10 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+            <Zap className="h-5 w-5 text-emerald-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-wider text-emerald-500 font-bold">
+              Incident contained · INC-2418 opened · ACME notified
+            </div>
+            <p className="text-sm leading-relaxed mt-0.5">
+              Blocked attacker IP at the perimeter, forced MFA reset on the affected
+              account, and notified the customer admin with the full evidence trail.
+              All 5 agents agreed; no human intervention required.
+            </p>
+          </div>
+        </div>
+
+        {/* Playbook checklist */}
+        <div className="rounded-md bg-background/50 border border-emerald-500/20 p-3 space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-emerald-500 font-semibold mb-1">
+            Playbook · 5 of 5 dispatched
+          </div>
+          {playbook.map((p, i) => (
+            <div key={i} className="flex items-center gap-2 text-[12px]">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+              <span className="flex-1 truncate">{p.label}</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{p.meta}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Final cost / time / coverage strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <FinalStat icon={<Sparkles className="h-3.5 w-3.5" />} label="Agents" value="5" />
+        <FinalStat icon={<Cpu      className="h-3.5 w-3.5" />} label="Time"   value="24s" />
+        <FinalStat icon={<Eye      className="h-3.5 w-3.5" />} label="Cited"  value="12 rows" />
+        <FinalStat icon={<MailCheck className="h-3.5 w-3.5" />} label="Cost"  value="$0.027" />
+      </div>
+
+      <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+        <RotateCcw className="h-3 w-3" />
+        Auto-rollback armed: undoes the perimeter block in 4h if the customer doesn&apos;t confirm.
+      </div>
+    </div>
+  );
+}
+
+function FinalStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2.5">
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-emerald-500 mb-0.5">
+        {icon}
+        {label}
+      </div>
+      <div className="text-base font-bold tabular-nums">{value}</div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Live alerts card — matches the real /soc Live alerts panel
+// Live alerts card — small product-styled list
 // ---------------------------------------------------------------------------
 
 function LiveAlertsCard() {
@@ -437,7 +766,7 @@ function LiveAlertsCard() {
 }
 
 // ---------------------------------------------------------------------------
-// Fleet mini-grid — small visualisation of the endpoint going red / isolated
+// Fleet mini-grid
 // ---------------------------------------------------------------------------
 
 const TOTAL_ENDPOINTS = 48;
@@ -468,16 +797,6 @@ function FleetMiniGrid({ finished }: { finished: boolean }) {
               : "bg-emerald-500/40";
             return <div key={i} className={`h-2.5 w-2.5 rounded-full ${cls} transition-all`} />;
           })}
-        </div>
-        <div className="mt-3 flex items-center gap-3 text-[10px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-emerald-500/60" />
-            healthy
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className={`h-2 w-2 rounded-full ${finished ? "bg-amber-500/70" : "bg-red-500/80"}`} />
-            {finished ? "isolated" : "active"}
-          </span>
         </div>
       </div>
     </div>

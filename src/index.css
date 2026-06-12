@@ -141,4 +141,39 @@
   .animate-scan {
     animation: scan-line 2s linear infinite;
   }
+
+  /* ---- Marketing SOC console animations (SocConsoleHero) ---- */
+
+  /* Light particle that travels between agent avatars on hand-off.
+     `--to` is set inline as a percent offset from the starting `left`. */
+  @keyframes soc-pulse-travel {
+    0%   { transform: translateX(0)        scale(1);   opacity: 0; }
+    20%  {                                  opacity: 1;             }
+    100% { transform: translateX(var(--to)) scale(0.6); opacity: 0; }
+  }
+
+  /* Citation chip materialise — scale + fade in */
+  @keyframes soc-chip-in {
+    0%   { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  /* Bullet row slide in from below + fade */
+  @keyframes soc-row-in {
+    0%   { transform: translateY(4px); opacity: 0; }
+    100% { transform: translateY(0);   opacity: 1; }
+  }
+
+  /* Verdict stamp slam — big-then-settle */
+  @keyframes soc-stamp-in {
+    0%   { transform: scale(1.6) rotate(-3deg); opacity: 0; }
+    60%  { transform: scale(0.95) rotate(0deg); opacity: 1; }
+    100% { transform: scale(1)    rotate(0deg); opacity: 1; }
+  }
+
+  /* Finale fade-in */
+  @keyframes soc-fade-in {
+    0%   { transform: translateY(6px); opacity: 0; }
+    100% { transform: translateY(0);   opacity: 1; }
+  }
 }
