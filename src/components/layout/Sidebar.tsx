@@ -140,6 +140,7 @@ const navSections: NavSection[] = [
       { name: "Users", href: "/users", icon: Users },
       { name: "Settings", href: "/settings", icon: Settings },
       { name: "Help", href: "/help", icon: BookOpen },
+      { name: "SOPs", href: "/help/sops", icon: BookOpen },
       { name: "Glossary", href: "/glossary", icon: BookOpen },
     ],
   },

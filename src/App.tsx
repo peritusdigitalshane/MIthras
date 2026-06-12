@@ -48,6 +48,7 @@ import EndpointDetail from "./pages/EndpointDetail";
 import Alerts from "./pages/Alerts";
 import Incidents from "./pages/Incidents";
 import IncidentDetail from "./pages/IncidentDetail";
+import HelpSops from "./pages/HelpSops";
 import CustomerReports from "./pages/CustomerReports";
 import MyCustomers from "./pages/MyCustomers";
 import Sites from "./pages/Sites";
@@ -576,6 +577,30 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <IncidentDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help/sops"
+                element={
+                  <ProtectedRoute>
+                    <HelpSops />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help/sops/:audience"
+                element={
+                  <ProtectedRoute>
+                    <HelpSops />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help/sops/:audience/:slug"
+                element={
+                  <ProtectedRoute>
+                    <HelpSops />
                   </ProtectedRoute>
                 }
               />
