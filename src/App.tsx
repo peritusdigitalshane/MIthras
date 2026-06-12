@@ -30,6 +30,7 @@ import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import AdminOverview from "./pages/AdminOverview";
 import SystemHealth from "./pages/SystemHealth";
+import AdminHealth from "./pages/AdminHealth";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Recommendations from "./pages/Recommendations";
@@ -253,6 +254,14 @@ const App = () => (
               />
               <Route
                 path="/admin/health"
+                element={
+                  <ProtectedRoute>
+                    <AdminHealth />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/health/status"
                 element={
                   <ProtectedRoute>
                     <SystemHealth />
