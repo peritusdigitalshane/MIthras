@@ -177,6 +177,7 @@ const partnerNavigation = [
   { name: "Billing", href: "/partner/billing", icon: Receipt },
   { name: "Invoices", href: "/partner/invoices", icon: FileText },
   { name: "Sales kit", href: "/partner/resources", icon: BookOpen },
+  { name: "SOPs", href: "/help/sops/partner", icon: BookOpen },
 ];
 
 const distributorNavigation = [
@@ -187,6 +188,7 @@ const distributorNavigation = [
   { name: "Billing", href: "/distributor/billing", icon: Receipt },
   { name: "Invoices", href: "/distributor/invoices", icon: FileText },
   { name: "Playbook & sales kit", href: "/distributor/resources", icon: BookOpen },
+  { name: "SOPs", href: "/help/sops/distributor", icon: BookOpen },
 ];
 
 const customerNavigation = [
@@ -196,6 +198,7 @@ const customerNavigation = [
   { name: "Install protection", href: "/deploy", icon: Download },
   { name: "Monthly reports", href: "/customer/reports", icon: FileText },
   { name: "Need help?", href: "/customer/contact", icon: BookOpen },
+  { name: "SOPs", href: "/help/sops/customer_admin", icon: BookOpen },
 ];
 
 function isItemVisible(item: NavItem, org: any) {
