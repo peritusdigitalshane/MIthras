@@ -33,16 +33,16 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 const PIPELINE_STAGES = [
-  { id: "triage",       label: "Triage",       icon: Brain,       role: "Initial classification",        verdict: "true_positive", confidence: 0.94, model: "gpt-5-mini", latency: "1.8s", cost: "$0.004", summary: "5 failed logins for mithras-test in 3m32s window. Source 198.51.100.42 not in allow-list. Verdict: true_positive.", durationMs: 1800 },
+  { id: "triage",       label: "Triage",       icon: Brain,       role: "Initial classification",        verdict: "true_positive", confidence: 0.94, model: "gpt-5-mini", latency: "1.8s", cost: "$0.004", summary: "5 failed logins for webadmin in 3m32s window. Source 198.51.100.42 not in allow-list. Verdict: true_positive.", durationMs: 1800 },
   { id: "verification", label: "Verification", icon: ShieldCheck, role: "Independent re-classification", verdict: "true_positive", confidence: 0.88, model: "claude-sonnet", latency: "1.1s", cost: "$0.002", summary: "Cross-checked against 7 site_event_logs. Pattern matches wp_brute_force playbook. Agrees with Triage.", durationMs: 1400 },
   { id: "adversarial",  label: "Adversarial",  icon: Sword,       role: "Refutation attempt",            verdict: "not_refuted",   confidence: 0.91, model: "gpt-5-mini", latency: "1.4s", cost: "$0.002", summary: "Tested 3 benign explanations (autofill, password manager, security audit). None survived endpoint context check.", durationMs: 1600 },
   { id: "investigate",  label: "Investigate",  icon: FileSearch,  role: "Cross-tenant forensics",        verdict: "campaign",      confidence: 0.92, model: "claude-sonnet", latency: "3.2s", cost: "$0.011", summary: "Same source IP 198.51.100.42 hit 4 other tenant sites in last 24h. Coordinated credential-stuffing campaign confirmed.", durationMs: 2400 },
-  { id: "commander",    label: "Commander",    icon: Sparkles,    role: "Playbook + response",           verdict: "auto-fired",    confidence: 0.95, model: "gpt-5-mini", latency: "2.7s", cost: "$0.008", summary: "Block 198.51.100.42 at perimeter, force MFA reset for mithras-test, watch dev6 for 24h, notify ACME admin.", durationMs: 2200 },
+  { id: "commander",    label: "Commander",    icon: Sparkles,    role: "Playbook + response",           verdict: "auto-fired",    confidence: 0.95, model: "gpt-5-mini", latency: "2.7s", cost: "$0.008", summary: "Block 198.51.100.42 at perimeter, force MFA reset for webadmin, watch the acme blog for 24h, notify ACME admin.", durationMs: 2200 },
 ] as const;
 
 const LIVE_ALERTS: Array<{ severity: "critical" | "high" | "medium" | "low"; title: string; message: string; endpoint: string; alertType: string; age: string }> = [
-  { severity: "high",     title: "WordPress brute force on dev6",   message: "5 failed logins for mithras-test from 198.51.100.42",         endpoint: "dev6.peritusdigital.com.au", alertType: "wp_brute_force",       age: "2m ago" },
-  { severity: "critical", title: "Defender: Wacatac",                message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",      endpoint: "WH-04",                      alertType: "defender_signature",   age: "5m ago" },
+  { severity: "high",     title: "WordPress brute force on acme blog",  message: "5 failed logins for webadmin from 198.51.100.42",      endpoint: "blog.acme-corp.example", alertType: "wp_brute_force",       age: "2m ago" },
+  { severity: "critical", title: "Defender: Wacatac",                message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",      endpoint: "CH-04",                      alertType: "defender_signature",   age: "5m ago" },
   { severity: "medium",   title: "Microseg block — outbound SMB",    message: "TCP/445 from NL-FS1 denied by rule pol_smb_lock",            endpoint: "NL-FS1",                     alertType: "microseg_block",       age: "9m ago" },
   { severity: "medium",   title: "12 failed LDAP logons",            message: "Account svc-backup failed bind 12× in 4m",                    endpoint: "DC01",                       alertType: "ldap_failed_logon",    age: "14m ago" },
   { severity: "low",      title: "M365 OAuth grant",                 message: "Tenant consent to ContactSync (Mail.ReadWrite)",              endpoint: "tenant_b",                   alertType: "m365_oauth_grant",     age: "22m ago" },
@@ -225,7 +225,7 @@ function ActiveInvestigationCard({ activeIdx, finished }: { activeIdx: number; f
               </span>
             </div>
             <div className="text-sm font-semibold mt-0.5 truncate">
-              Alert <span className="font-mono text-primary">#a47c91</span> &middot; wp_brute_force on dev6.peritusdigital.com.au
+              Alert <span className="font-mono text-primary">#a47c91</span> &middot; wp_brute_force on blog.acme-corp.example
             </div>
           </div>
         </div>
@@ -309,7 +309,7 @@ function ActiveReasoning({ activeIdx, finished }: { activeIdx: number; finished:
             </div>
             <div className="text-sm leading-relaxed">
               Blocked <span className="font-mono text-emerald-600 dark:text-emerald-400">198.51.100.42</span> at the perimeter,
-              forced MFA reset on <span className="font-mono text-emerald-600 dark:text-emerald-400">mithras-test</span>,
+              forced MFA reset on <span className="font-mono text-emerald-600 dark:text-emerald-400">webadmin</span>,
               opened a ticket on ACME and notified the customer admin.
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">

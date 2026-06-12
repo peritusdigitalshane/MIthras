@@ -29,16 +29,16 @@ const AI_ACTIVITY: Array<{
   summary: string;
   age: string;
 }> = [
-  { verdict: "true_positive",  status: "auto_closed", confidence: 0.94, alertTitle: "wp_brute_force on dev6.peritusdigital.com.au", summary: "5 failed logins for mithras-test, distinct IP 198.51.100.42. Verified TP — 5 agents agree. IP blocked at perimeter; MFA reset forced.", age: "2m ago" },
-  { verdict: "true_positive",  status: "open",        confidence: 0.88, alertTitle: "defender_signature: Trojan:Win32/Wacatac on WH-04", summary: "Real-time protection caught Wacatac variant; file quarantined. Adversarial agent confirmed no benign explanation.", age: "5m ago" },
+  { verdict: "true_positive",  status: "auto_closed", confidence: 0.94, alertTitle: "wp_brute_force on blog.acme-corp.example", summary: "5 failed logins for webadmin, distinct IP 198.51.100.42. Verified TP — 5 agents agree. IP blocked at perimeter; MFA reset forced.", age: "2m ago" },
+  { verdict: "true_positive",  status: "open",        confidence: 0.88, alertTitle: "defender_signature: Trojan:Win32/Wacatac on CH-04", summary: "Real-time protection caught Wacatac variant; file quarantined. Adversarial agent confirmed no benign explanation.", age: "5m ago" },
   { verdict: "false_positive", status: "auto_closed", confidence: 0.79, alertTitle: "microseg_block from NL-FS1:445", summary: "Outbound SMB to corporate file server — expected behaviour for the backup job that runs at 03:00.", age: "9m ago" },
   { verdict: "true_positive",  status: "open",        confidence: 0.82, alertTitle: "ldap_failed_logon × 12 on DC01", summary: "Failed binds from a single workstation. Investigation in progress — likely a stale service account; opened ticket on ACME-LAP-04.", age: "14m ago" },
   { verdict: "needs_human",    status: "open",        confidence: 0.61, alertTitle: "m365_oauth_grant on tenant_b", summary: "New tenant-wide consent to non-Microsoft app with Mail.ReadWrite scope. Risk profile borderline — flagged for analyst review.", age: "22m ago" },
 ];
 
 const LIVE_ALERTS: Array<{ severity: "critical" | "high" | "medium" | "low"; title: string; message: string; endpoint: string; alertType: string; age: string }> = [
-  { severity: "high",     title: "WordPress brute force on dev6",     message: "5 failed logins for mithras-test from 198.51.100.42",            endpoint: "dev6.peritusdigital.com.au", alertType: "wp_brute_force",       age: "2m ago" },
-  { severity: "critical", title: "Defender signature: Wacatac",       message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",         endpoint: "WH-04",                     alertType: "defender_signature",   age: "5m ago" },
+  { severity: "high",     title: "WordPress brute force on acme blog", message: "5 failed logins for webadmin from 198.51.100.42",          endpoint: "blog.acme-corp.example", alertType: "wp_brute_force",       age: "2m ago" },
+  { severity: "critical", title: "Defender signature: Wacatac",       message: "Real-time protection blocked Trojan:Win32/Wacatac.B!ml",         endpoint: "CH-04",                     alertType: "defender_signature",   age: "5m ago" },
   { severity: "medium",   title: "Microseg block — outbound SMB",     message: "TCP/445 from NL-FS1 to file-server denied by rule pol_smb_lock",  endpoint: "NL-FS1",                    alertType: "microseg_block",       age: "9m ago" },
   { severity: "medium",   title: "12 failed LDAP logons",             message: "Account ACME-LAP-04\\svc-backup failed bind 12× in 4m",          endpoint: "DC01",                      alertType: "ldap_failed_logon",    age: "14m ago" },
   { severity: "low",      title: "M365 OAuth grant — Mail.ReadWrite", message: "Tenant-wide consent granted to ContactSync (publisher unknown)",  endpoint: "tenant_b",                  alertType: "m365_oauth_grant",     age: "22m ago" },
@@ -47,8 +47,8 @@ const LIVE_ALERTS: Array<{ severity: "critical" | "high" | "medium" | "low"; tit
 
 const POSTURE = [
   { org: "ACME Corp",          endpoints: 142, openAlerts: 7,  critical: 1, threats: 1, ai: 41, last: "2m ago"  },
-  { org: "Westfield Health",   endpoints:  88, openAlerts: 12, critical: 0, threats: 3, ai: 28, last: "5m ago"  },
-  { org: "Sundance Studios",   endpoints:  41, openAlerts:  5, critical: 0, threats: 0, ai: 14, last: "11m ago" },
+  { org: "Contoso Healthcare",   endpoints:  88, openAlerts: 12, critical: 0, threats: 3, ai: 28, last: "5m ago"  },
+  { org: "Fabrikam Studios",   endpoints:  41, openAlerts:  5, critical: 0, threats: 0, ai: 14, last: "11m ago" },
   { org: "Lakeside Realty",    endpoints:  31, openAlerts:  3, critical: 0, threats: 0, ai:  9, last: "18m ago" },
   { org: "Bayside Bookkeeping",endpoints:  18, openAlerts:  0, critical: 0, threats: 0, ai:  2, last: "1h ago"  },
 ];

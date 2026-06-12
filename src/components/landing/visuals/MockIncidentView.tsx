@@ -23,8 +23,8 @@ const OPEN_ROWS: Array<{
   status: "Open" | "Triaging" | "In progress";
   assignee?: string;
 }> = [
-  { id: "INC-2418", title: "Trojan:Win32/Wacatac.B!ml on WH-04",         kind: "threat",         severity: "Severe",  endpoint: "WH-04",                   sla: { state: "due", text: "due in 41m" },   status: "In progress", assignee: "Emma C" },
-  { id: "INC-2417", title: "WordPress brute force on dev6 — 5 sites",     kind: "alert",          severity: "High",    endpoint: "dev6.peritusdigital.com.au", sla: { state: "due", text: "due in 2h 18m" }, status: "Triaging",    assignee: "AI Commander" },
+  { id: "INC-2418", title: "Trojan:Win32/Wacatac.B!ml on CH-04",         kind: "threat",         severity: "Severe",  endpoint: "CH-04",                   sla: { state: "due", text: "due in 41m" },   status: "In progress", assignee: "Emma C" },
+  { id: "INC-2417", title: "WordPress brute force on acme blog — 5 sites", kind: "alert",          severity: "High",    endpoint: "blog.acme-corp.example", sla: { state: "due", text: "due in 2h 18m" }, status: "Triaging",    assignee: "AI Commander" },
   { id: "INC-2416", title: "Critical CVE-2026-0142 — PHP 8.1 RCE",        kind: "vuln_critical",  severity: "Severe",  endpoint: "DEV-WEB-02",              sla: { state: "breached", text: "breached 12m ago" }, status: "Open" },
   { id: "INC-2415", title: "12 failed LDAP logons on DC01",               kind: "alert",          severity: "High",    endpoint: "DC01",                    sla: { state: "due", text: "due in 3h 51m" }, status: "Triaging" },
   { id: "INC-2414", title: "Posture drift — Defender RTP disabled",       kind: "posture_drift",  severity: "Moderate",endpoint: "ACME-LAP-04",             sla: { state: "due", text: "due in 18h" },   status: "Open" },

@@ -15,9 +15,9 @@ import {
 
 const TOP_CUSTOMERS = [
   { name: "ACME Corp",          endpoints: 142, plan: "Pro",      mrr: "$1,562" },
-  { name: "Westfield Health",   endpoints:  88, plan: "Pro",      mrr: "$968"   },
+  { name: "Contoso Healthcare",   endpoints:  88, plan: "Pro",      mrr: "$968"   },
   { name: "Northern Logistics", endpoints:  64, plan: "Standard", mrr: "$704"   },
-  { name: "Sundance Studios",   endpoints:  41, plan: "Pro",      mrr: "$451"   },
+  { name: "Fabrikam Studios",   endpoints:  41, plan: "Pro",      mrr: "$451"   },
   { name: "Lakeside Realty",    endpoints:  31, plan: "Standard", mrr: "$341"   },
   { name: "Coastal Chartered",  endpoints:  27, plan: "Standard", mrr: "$297"   },
   { name: "Bayside Bookkeeping",endpoints:  18, plan: "Standard", mrr: "$198"   },
@@ -36,7 +36,7 @@ export function MockMultiTenantConsole() {
               <ShieldCheck className="h-3.5 w-3.5" />
               Partner portal
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Coastal Tech &mdash; Reseller</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Sentinel IT Partners &mdash; Reseller</h1>
             <p className="text-sm text-muted-foreground max-w-2xl">
               Manage your customers, deploy the Mithras agent, and track wholesale billing in one place.
             </p>
