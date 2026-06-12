@@ -422,7 +422,7 @@ Deno.serve(async (req) => {
         schema: ADVERSARIAL_SCHEMA,
         schemaName: "alert_adversarial",
         model,
-        timeoutMs: 45_000,
+        timeoutMs: 90_000,
         feature: "adversarial",
         organizationId: triageRow.organization_id,
     });

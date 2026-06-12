@@ -458,7 +458,7 @@ Deno.serve(async (req) => {
         schema: VERIFY_SCHEMA,
         schemaName: "alert_verification",
         model,
-        timeoutMs: 45_000,
+        timeoutMs: 90_000,
         feature: "verification",
         organizationId: triageRow.organization_id,
     });

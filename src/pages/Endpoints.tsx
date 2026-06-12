@@ -5,6 +5,7 @@ import { Plus, Download, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEndpoints } from "@/hooks/useDashboardData";
 import { useToast } from "@/hooks/use-toast";
+import { BulkUpgradeButton } from "@/components/endpoints/BulkUpgradeButton";
 
 const Endpoints = () => {
   const { data: endpoints, refetch, isRefetching } = useEndpoints();
@@ -51,7 +52,8 @@ const Endpoints = () => {
               Manage and monitor all registered endpoints
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <BulkUpgradeButton />
             <Button variant="outline" size="sm" onClick={handleSync} disabled={isRefetching}>
               <RefreshCw className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
               Sync All

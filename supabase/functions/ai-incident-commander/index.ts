@@ -237,7 +237,7 @@ Produce the structured commander output.`;
         schemaName: "incident_commander_output",
         feature: "incident_commander",
         organizationId: alert.organization_id,
-        timeoutMs: 45_000,
+        timeoutMs: 90_000,
     });
 
     if (!llmResult.ok) {

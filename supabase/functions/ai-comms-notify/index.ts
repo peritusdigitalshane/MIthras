@@ -316,7 +316,7 @@ Deno.serve(async (req) => {
         schema:       EMAIL_SCHEMA,
         schemaName:   "incident_email_draft",
         model,
-        timeoutMs:    45_000,
+        timeoutMs:    90_000,
         feature:      "comms",
         organizationId: td.organization_id as string,
     });

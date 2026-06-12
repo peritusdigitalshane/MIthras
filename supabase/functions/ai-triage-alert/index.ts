@@ -514,7 +514,7 @@ Deno.serve(async (req) => {
         userPrompt,
         schema: TRIAGE_SCHEMA,
         schemaName: "alert_triage",
-        timeoutMs: 45_000,
+        timeoutMs: 90_000,
         feature: "triage",
         organizationId: ctx.alert.organization_id,
     });
