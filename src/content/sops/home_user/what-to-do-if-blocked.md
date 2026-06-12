@@ -6,6 +6,9 @@ order: 2
 estimated_minutes: 6
 updated_at: 2026-06-12
 tags: recovery, false-positive, defender, quarantine
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
 ## Purpose

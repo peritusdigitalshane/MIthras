@@ -27,21 +27,21 @@ The operator. Authorisation requires a record in `public.super_admins` or an `or
 
 1. Open `/soc`. The console lists every cross-tenant alert in the `AI agent activity` panel, ordered by `decided_at` descending.
 2. Filter the panel by `Final verdict = needs_human` and `Confidence < 0.85` to surface alerts that explicitly require operator judgement. Re-sort by `severity` if the queue depth exceeds twenty.
-3. Click the target decision row. The `AI decision drawer` opens on the right. The drawer is the only per-alert surface; there is no `/alerts/:id` route.
+3. Select the target decision row. The `AI decision drawer` opens on the right. The drawer is the only per-alert surface; there is no `/alerts/:id` route.
 4. Read the `Multi-agent verdict trail` card in sequence:
    - `Triage` verdict, classification, and confidence.
    - `Verification` agreement state and citation count.
    - `Adversarial` refutation state. A `refuted` chip means the adversarial agent identified a benign explanation that defeats the triage conclusion.
    - `Final verdict` chip, which represents the Commander's consensus.
-5. Inspect every citation chip on the Verification card. Click each chip; it must resolve to a real row in `endpoint_event_logs`, `endpoint_threats`, `firewall_audit_logs`, or `alerts`. A citation that fails to resolve is a hallucination signal and the verdict is not trusted.
+5. Inspect every citation chip on the Verification card. Select each chip; it must resolve to a real row in `endpoint_event_logs`, `endpoint_threats`, `firewall_audit_logs`, or `alerts`. A citation that fails to resolve is a hallucination signal and the verdict is not trusted.
 6. Map the triage classification to a MITRE ATT&CK technique using the technique IDs listed on the `Triage` card. If the technique chain is incoherent (for example `T1486` ransomware impact with no preceding `Execution` tactic citation), treat the verdict as suspect.
-7. If an incident has been opened, click `Open incident` in the drawer header to load `/incidents/:id`. Review the `AI Commander summary`, the `Playbook` card, and the `Autonomous response` card in that order.
+7. If an incident has been opened, select `Open incident` in the drawer header to load `/incidents/:id`. Review the `AI Commander summary`, the `Playbook` card, and the `Autonomous response` card in that order.
 8. On the `Autonomous response` card, check the action lifecycle in `ai_agent_actions`:
    - `status = executed` with `customer_confirmed_at` populated means the customer has accepted the action.
    - `status = executed` with `force_fired = true` means an operator overrode the consensus gate; treat as a four-eyes review item.
    - `status = pending` means the action is armed but the auto-rollback timer is still running.
 9. Disposition the alert from the drawer or from the Incident Detail page:
-   - **Confirm at consensus.** When two of three agents agree and the Adversarial agent did not refute, click `Confirm action` on the `Autonomous response` card, then click `Resolve` from `HeaderActions` on `/incidents/:id`.
+   - **Confirm at consensus.** When two of three agents agree and the Adversarial agent did not refute, select `Confirm action` on the `Autonomous response` card, then select `Resolve` from `HeaderActions` on `/incidents/:id`.
    - **Override.** When the citation trail is incoherent or the classification is wrong, use the verdict override controls in the drawer to record `Approve`, `Override`, or `Dismiss`, then write a refute note. The override writes to `ai_triage_decisions.review_action` and `ai_triage_decisions.review_reason`.
    - **Escalate.** When the indicator appears across multiple tenants or matches an active campaign, leave the incident open and follow the cross-tenant investigation procedure.
 

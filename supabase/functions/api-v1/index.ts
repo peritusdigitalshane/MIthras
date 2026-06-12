@@ -66,19 +66,20 @@ async function visibleOrgIds(auth: ApiAuthOk): Promise<string[] | null> {
             .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
         const ids = (kids ?? []).map((o) => o.id as string);
         // Include the reseller's own org so resources the reseller owns directly
-        // remain visible. The reseller's own non-customer rows are filtered by
-        // the resource type itself (e.g. they do not own incidents directly).
-        return ids.length ? ids : [NIL_UUID];
+        // (endpoints in the reseller's office, internal incidents, enrolment
+        // tokens for the reseller's own devices) remain visible.
+        return [auth.organizationId, ...ids];
     }
     if (auth.organizationType === "distributor") {
         const { data: resellers } = await supabase
             .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
         const resellerIds = (resellers ?? []).map((r) => r.id as string);
-        if (resellerIds.length === 0) return [NIL_UUID];
+        if (resellerIds.length === 0) return [auth.organizationId];
         const { data: customers } = await supabase
             .from("organizations").select("id").in("parent_partner_id", resellerIds);
-        const ids = (customers ?? []).map((c) => c.id as string);
-        return ids.length ? ids : [NIL_UUID];
+        const customerIds = (customers ?? []).map((c) => c.id as string);
+        // Distributor sees: self, its resellers, and the customers under those resellers.
+        return [auth.organizationId, ...resellerIds, ...customerIds];
     }
     return null;
 }
@@ -356,17 +357,25 @@ async function handleEnrollmentToken(auth: ApiAuthOk, req: Request): Promise<Res
     const ttlMinutes = clampInt(String(body.ttl_minutes ?? "60"), 60, 60 * 24 * 7);
     const platform = String(body.platform ?? "windows").toLowerCase();
     if (!["windows", "linux"].includes(platform)) return json({ error: "invalid_platform" }, 400);
+    const runtimeHint = platform === "windows" ? "powershell" : "linux";
+
+    // enrollment_tokens.created_by is NOT NULL with an FK to auth.users — use
+    // the api_keys.created_by as the synthetic creator so the row is
+    // attributable to the operator who issued the API key.
+    const { data: keyRow } = await supabase
+        .from("api_keys").select("created_by").eq("id", auth.apiKeyId).maybeSingle();
+    if (!keyRow?.created_by) return json({ error: "api_key_owner_missing" }, 500);
 
     const token = "ent_" + crypto.randomUUID().replace(/-/g, "");
-    const tokenHash = await sha256Hex(token);
     const expires = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
 
     const { error } = await supabase.from("enrollment_tokens").insert({
-        token_hash:       tokenHash,
-        organization_id:  targetOrgId,
-        created_by:       null,
-        platform,
-        expires_at:       expires,
+        token,
+        organization_id: targetOrgId,
+        created_by:      keyRow.created_by,
+        runtime_hint:    runtimeHint,
+        channel:         "stable",
+        expires_at:      expires,
     });
     if (error) return json({ error: "issue_failed", message: error.message }, 500);
 
@@ -381,11 +390,6 @@ async function handleEnrollmentToken(auth: ApiAuthOk, req: Request): Promise<Res
                 : `# Linux installer not yet available`,
         },
     }, 201);
-}
-
-async function sha256Hex(s: string): Promise<string> {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 // =============================================================================
