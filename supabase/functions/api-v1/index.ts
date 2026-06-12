@@ -51,6 +51,42 @@ function isUuid(s: string): boolean {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+// Resolve the full set of organisation IDs the caller is permitted to see.
+// Single source of truth for tenant scoping across every list and detail
+// handler. Returns null when the org type is unrecognised — callers must
+// fail closed in that case.
+async function visibleOrgIds(auth: ApiAuthOk): Promise<string[] | null> {
+    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
+        return [auth.organizationId];
+    }
+    if (auth.organizationType === "reseller" || auth.organizationType === "partner") {
+        const { data: kids } = await supabase
+            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
+        const ids = (kids ?? []).map((o) => o.id as string);
+        // Include the reseller's own org so resources the reseller owns directly
+        // remain visible. The reseller's own non-customer rows are filtered by
+        // the resource type itself (e.g. they do not own incidents directly).
+        return ids.length ? ids : [NIL_UUID];
+    }
+    if (auth.organizationType === "distributor") {
+        const { data: resellers } = await supabase
+            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
+        const resellerIds = (resellers ?? []).map((r) => r.id as string);
+        if (resellerIds.length === 0) return [NIL_UUID];
+        const { data: customers } = await supabase
+            .from("organizations").select("id").in("parent_partner_id", resellerIds);
+        const ids = (customers ?? []).map((c) => c.id as string);
+        return ids.length ? ids : [NIL_UUID];
+    }
+    return null;
+}
+
+function forbidden(): Response {
+    return json({ error: "forbidden", message: "Organisation type is not permitted to call this endpoint." }, 403);
+}
+
 // =============================================================================
 // Route handlers
 // =============================================================================
@@ -148,24 +184,21 @@ async function handleListEndpoints(auth: ApiAuthOk, url: URL): Promise<Response>
     const offset = clampInt(url.searchParams.get("offset"), 0, 100_000);
     const orgFilter = url.searchParams.get("organization_id");
 
-    let q = supabase
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+
+    let scope = visible;
+    if (orgFilter && isUuid(orgFilter)) {
+        if (!visible.includes(orgFilter)) return json({ data: [], total: 0, limit, offset, next_offset: null });
+        scope = [orgFilter];
+    }
+
+    const q = supabase
         .from("endpoints")
         .select("id, hostname, runtime, agent_version, is_active, enrolled_at, organization_id, last_seen_at", { count: "exact" })
+        .in("organization_id", scope)
         .range(offset, offset + limit - 1)
         .order("enrolled_at", { ascending: false });
-
-    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
-        q = q.eq("organization_id", auth.organizationId);
-    } else {
-        // reseller / distributor: limit to customers they own, optionally filtered
-        const { data: childOrgs } = await supabase
-            .from("organizations")
-            .select("id")
-            .or(`parent_partner_id.eq.${auth.organizationId},id.eq.${auth.organizationId}`);
-        const ids = (childOrgs ?? []).map((o) => o.id);
-        q = q.in("organization_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-        if (orgFilter && isUuid(orgFilter)) q = q.eq("organization_id", orgFilter);
-    }
 
     const { data, error, count } = await q;
     if (error) return json({ error: "query_failed", message: error.message }, 500);
@@ -190,17 +223,9 @@ async function handleGetEndpoint(auth: ApiAuthOk, id: string): Promise<Response>
     if (error) return json({ error: "query_failed", message: error.message }, 500);
     if (!data) return json({ error: "not_found" }, 404);
 
-    // Tenant gate
-    if (
-        auth.organizationType !== "distributor"
-        && data.organization_id !== auth.organizationId
-    ) {
-        const { data: parent } = await supabase
-            .from("organizations").select("parent_partner_id").eq("id", data.organization_id).maybeSingle();
-        if (!parent || parent.parent_partner_id !== auth.organizationId) {
-            return json({ error: "not_found" }, 404);  // do not leak existence
-        }
-    }
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+    if (!visible.includes(data.organization_id)) return json({ error: "not_found" }, 404);
     return json({ data });
 }
 
@@ -211,20 +236,15 @@ async function handleListIncidents(auth: ApiAuthOk, url: URL): Promise<Response>
     const offset = clampInt(url.searchParams.get("offset"), 0, 100_000);
     const status = url.searchParams.get("status");
 
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+
     let q = supabase
         .from("incidents")
         .select("id, organization_id, title, severity, status, opened_at, sla_due_at, resolved_at, resolution_notes", { count: "exact" })
+        .in("organization_id", visible)
         .range(offset, offset + limit - 1)
         .order("opened_at", { ascending: false });
-
-    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
-        q = q.eq("organization_id", auth.organizationId);
-    } else if (auth.organizationType === "reseller" || auth.organizationType === "partner") {
-        const { data: kids } = await supabase
-            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
-        const ids = (kids ?? []).map((o) => o.id);
-        q = q.in("organization_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-    }
     if (status) q = q.eq("status", status);
 
     const { data, error, count } = await q;
@@ -254,13 +274,9 @@ async function handleGetIncident(auth: ApiAuthOk, id: string): Promise<Response>
     if (error) return json({ error: "query_failed", message: error.message }, 500);
     if (!data) return json({ error: "not_found" }, 404);
 
-    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
-        if (data.organization_id !== auth.organizationId) return json({ error: "not_found" }, 404);
-    } else if (auth.organizationType === "reseller" || auth.organizationType === "partner") {
-        const { data: parent } = await supabase
-            .from("organizations").select("parent_partner_id").eq("id", data.organization_id).maybeSingle();
-        if (!parent || parent.parent_partner_id !== auth.organizationId) return json({ error: "not_found" }, 404);
-    }
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+    if (!visible.includes(data.organization_id)) return json({ error: "not_found" }, 404);
     return json({ data });
 }
 
@@ -270,27 +286,14 @@ async function handleListThreats(auth: ApiAuthOk, url: URL): Promise<Response> {
     const limit  = clampInt(url.searchParams.get("limit"),  50, 200);
     const offset = clampInt(url.searchParams.get("offset"), 0, 100_000);
 
-    // endpoint_threats has no organization_id column. Scope through endpoints first.
-    let orgIds: string[] = [];
-    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
-        orgIds = [auth.organizationId];
-    } else if (auth.organizationType === "reseller" || auth.organizationType === "partner") {
-        const { data: kids } = await supabase
-            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
-        orgIds = (kids ?? []).map((o) => o.id);
-        if (orgIds.length === 0) orgIds = ["00000000-0000-0000-0000-000000000000"];
-    } else if (auth.organizationType === "distributor") {
-        const { data: resellers } = await supabase
-            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
-        const resellerIds = (resellers ?? []).map((r) => r.id);
-        const { data: customers } = await supabase
-            .from("organizations").select("id").in("parent_partner_id", resellerIds.length ? resellerIds : ["00000000-0000-0000-0000-000000000000"]);
-        orgIds = (customers ?? []).map((c) => c.id);
-        if (orgIds.length === 0) orgIds = ["00000000-0000-0000-0000-000000000000"];
-    }
+    // endpoint_threats has no organization_id column. Scope through endpoints
+    // first using the shared visibility helper, then filter threats by the
+    // resulting endpoint ids.
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
     const { data: endpointRows } = await supabase
-        .from("endpoints").select("id").in("organization_id", orgIds);
-    const endpointIds = (endpointRows ?? []).map((e) => e.id);
+        .from("endpoints").select("id").in("organization_id", visible);
+    const endpointIds = (endpointRows ?? []).map((e) => e.id as string);
 
     const q = supabase
         .from("endpoint_threats")
@@ -314,20 +317,16 @@ async function handleListReports(auth: ApiAuthOk, url: URL): Promise<Response> {
     const limit  = clampInt(url.searchParams.get("limit"),  12, 60);
     const offset = clampInt(url.searchParams.get("offset"), 0, 1000);
 
-    let q = supabase
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+
+    const q = supabase
         .from("customer_reports")
         .select("id, organization_id, period_start, period_end, status, sent_at, summary", { count: "exact" })
+        .in("organization_id", visible)
         .range(offset, offset + limit - 1)
         .order("period_start", { ascending: false });
 
-    if (auth.organizationType === "customer" || auth.organizationType === "home_user") {
-        q = q.eq("organization_id", auth.organizationId);
-    } else if (auth.organizationType === "reseller" || auth.organizationType === "partner") {
-        const { data: kids } = await supabase
-            .from("organizations").select("id").eq("parent_partner_id", auth.organizationId);
-        const ids = (kids ?? []).map((o) => o.id);
-        q = q.in("organization_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-    }
     const { data, error, count } = await q;
     if (error) return json({ error: "query_failed", message: error.message }, 500);
     return json({
@@ -347,17 +346,12 @@ async function handleEnrollmentToken(auth: ApiAuthOk, req: Request): Promise<Res
     const targetOrgId = String(body.organization_id ?? auth.organizationId);
     if (!isUuid(targetOrgId)) return json({ error: "invalid_organization_id" }, 400);
 
-    // Resellers / distributors may issue tokens against customers they own.
-    if (targetOrgId !== auth.organizationId) {
-        if (!(auth.organizationType === "reseller" || auth.organizationType === "partner" || auth.organizationType === "distributor")) {
-            return json({ error: "forbidden" }, 403);
-        }
-        const { data: target } = await supabase
-            .from("organizations").select("parent_partner_id").eq("id", targetOrgId).maybeSingle();
-        if (!target || target.parent_partner_id !== auth.organizationId) {
-            return json({ error: "forbidden" }, 403);
-        }
-    }
+    // The caller may issue tokens against any organisation it owns through the
+    // tenancy hierarchy. visibleOrgIds() resolves the full owned set including
+    // the distributor → reseller → customer two-hop.
+    const visible = await visibleOrgIds(auth);
+    if (visible === null) return forbidden();
+    if (!visible.includes(targetOrgId)) return json({ error: "forbidden" }, 403);
 
     const ttlMinutes = clampInt(String(body.ttl_minutes ?? "60"), 60, 60 * 24 * 7);
     const platform = String(body.platform ?? "windows").toLowerCase();
