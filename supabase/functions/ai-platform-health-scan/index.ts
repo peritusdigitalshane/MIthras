@@ -170,6 +170,68 @@ async function detectStalePulses(): Promise<RawFinding[]> {
         });
     }
 
+    // 2c. Auto-failed transition for stuck orchestrations >10 min old.
+    //     Orchestrator dies mid-flight; the triage row stays in 'triaged' or
+    //     'verified' forever; the worker only re-queues 'pending' rows so it
+    //     never gets picked up. Flip such rows to 'failed' so they no longer
+    //     count as in-flight and an operator-visible status reflects reality
+    //     (review finding H#5).
+    const { data: stuckMid, error: stuckErr } = await supabase
+        .from("ai_triage_decisions")
+        .update({ orchestration_state: "failed" })
+        .in("orchestration_state", ["triaged", "verified"])
+        .lt("created_at", tenMinAgo)
+        .select("id");
+    if (!stuckErr && stuckMid && stuckMid.length > 0) {
+        out.push({
+            finding_key: "auto_failed:stuck_orchestrations",
+            category: "ai_pipeline",
+            title: `${stuckMid.length} stuck orchestration(s) auto-failed`,
+            description: `Triage decisions stuck in triaged/verified state for >10 min flipped to 'failed' so the worker no longer counts them as in-flight. Investigate the orchestrator crash that left them stranded.`,
+            evidence: { count: stuckMid.length, sample_ids: stuckMid.slice(0, 5).map((r) => r.id) },
+        });
+    }
+
+    // 2d. Surface silent agent failures the orchestrator wrote to
+    //     ai_triage_decisions. These were "downgraded silently" before the
+    //     critical-review fix added the failure flags.
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60_000).toISOString();
+    const { data: silentFails } = await supabase
+        .from("ai_triage_decisions")
+        .select("id, alert_id, verification_failed, adversarial_failed, investigation_failed, commander_failed")
+        .gte("created_at", sixHoursAgo)
+        .or("verification_failed.eq.true,adversarial_failed.eq.true,investigation_failed.eq.true,commander_failed.eq.true")
+        .limit(20);
+    if (silentFails && silentFails.length > 0) {
+        out.push({
+            finding_key: "ai_agent_failures",
+            category: "ai_pipeline",
+            title: `${silentFails.length} AI agent failure(s) in last 6h`,
+            description: "One or more agents in the orchestrator chain returned non-OK and the verdict was downgraded as a fail-safe. Review the affected triage decisions and check ai_llm_calls for the underlying LLM provider errors.",
+            evidence: { count: silentFails.length, sample_ids: silentFails.slice(0, 5).map((r) => r.id) },
+        });
+    }
+
+    // 2e. Comms failure (SMTP disabled or send threw) with an action that has
+    //     auto-rollback disarmed. These are alerts where a customer never got
+    //     the confirm/deny link and an analyst MUST review (review finding #4).
+    const { data: stalledComms } = await supabase
+        .from("ai_agent_actions")
+        .select("id, alert_id, comms_failure_at, comms_failure_reason")
+        .eq("comms_failed", true)
+        .neq("status", "rolled_back")
+        .gte("comms_failure_at", sixHoursAgo)
+        .limit(20);
+    if (stalledComms && stalledComms.length > 0) {
+        out.push({
+            finding_key: "comms_failed_actions_pending_review",
+            category: "ai_pipeline",
+            title: `${stalledComms.length} response(s) waiting for human comms review`,
+            description: "The autonomous response fired but the customer notification couldn't be sent (SMTP disabled or unreachable). Auto-rollback timer has been disarmed; an operator must contact the customer manually and either confirm or roll back from the dashboard.",
+            evidence: { count: stalledComms.length, sample_ids: stalledComms.slice(0, 5).map((r) => r.id) },
+        });
+    }
+
     return out;
 }
 

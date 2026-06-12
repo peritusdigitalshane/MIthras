@@ -432,6 +432,20 @@ Mithras Threat Defence · <a href="${SITE_URL}" style="color:#64748b">${SITE_URL
                 .update({ status: "failed", error_message: smtp.error })
                 .eq("id", commsRow.id);
         }
+        // Critical safety: the action that triggered this comms attempt has a
+        // 4h auto-rollback timer armed expecting customer confirmation. Since
+        // the customer can't BE notified, the rollback would fire silently —
+        // either un-isolating a real threat or doing nothing the analyst
+        // expected. Pause the timer + flag the action so the dashboard +
+        // platform-health-scan can surface it. See review finding #4.
+        if (actionId) {
+            await supabase.from("ai_agent_actions").update({
+                comms_failed:         true,
+                comms_failure_at:     new Date().toISOString(),
+                comms_failure_reason: smtp.error,
+                rollback_at:          null,    // disarm auto-rollback cron
+            }).eq("id", actionId);
+        }
         return jsonResponse({ error: smtp.error }, 400, origin);
     }
 
@@ -481,6 +495,18 @@ Mithras Threat Defence · <a href="${SITE_URL}" style="color:#64748b">${SITE_URL
             await supabase.from("ai_agent_comms")
                 .update({ status: "failed", error_message: msg.slice(0, 800) })
                 .eq("id", commsRow.id);
+        }
+        // Same safety as smtp_disabled — pause the auto-rollback timer +
+        // flag the action so operators see it. The customer was supposed to
+        // receive a confirm/deny link; without it, we can't safely let the
+        // 4h countdown decide.
+        if (actionId) {
+            await supabase.from("ai_agent_actions").update({
+                comms_failed:         true,
+                comms_failure_at:     new Date().toISOString(),
+                comms_failure_reason: msg.slice(0, 200),
+                rollback_at:          null,
+            }).eq("id", actionId);
         }
         return jsonResponse({ error: "smtp_send_failed", details: msg }, 502, origin);
     }

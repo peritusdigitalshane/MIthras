@@ -338,13 +338,55 @@ function buildUserPrompt(
     return out.join("\n");
 }
 
-function isAuthorised(req: Request): boolean {
+interface AuthzResult {
+    ok: boolean;
+    service?: boolean;
+    userId?: string;
+}
+
+async function isAuthorised(req: Request): Promise<AuthzResult> {
     const socSecret = req.headers.get("x-mithras-soc-secret") ?? "";
-    if (SOC_SECRET && socSecret === SOC_SECRET) return true;
+    if (SOC_SECRET && socSecret === SOC_SECRET) return { ok: true, service: true };
     const auth = req.headers.get("Authorization") ?? "";
     const jwt = auth.replace(/^Bearer\s+/i, "").trim();
-    if (jwt === SUPABASE_SERVICE_KEY) return true;
-    return false;
+    if (!jwt) return { ok: false };
+    if (jwt === SUPABASE_SERVICE_KEY) return { ok: true, service: true };
+    const { data: { user } } = await supabase.auth.getUser(jwt);
+    if (!user) return { ok: false };
+    return { ok: true, userId: user.id };
+}
+
+/**
+ * Tenancy gate scoped to the triage decision being verified. Service callers
+ * pass through; user callers must be super-admin or a member of the alert's
+ * organization. MUST run BEFORE any read of the triage row or before kicking
+ * off LLM work, otherwise a signed-in user from org A can pull org B's
+ * verification verdicts + cited evidence by guessing a triage_decision_id
+ * (cross-tenant IDOR — review finding #1).
+ */
+async function authoriseForTriage(
+    authz: AuthzResult,
+    triageDecisionId: string,
+): Promise<{ ok: true; organizationId: string; triageRow: { organization_id: string; verdict: string | null; confidence: number | null; summary: string | null } } | { ok: false; status: number; body: Record<string, unknown> }> {
+    const { data: triageRow } = await supabase
+        .from("ai_triage_decisions")
+        .select("organization_id, verdict, confidence, summary")
+        .eq("id", triageDecisionId).maybeSingle();
+    if (!triageRow) return { ok: false, status: 404, body: { error: "triage_decision_not_found" } };
+    const organizationId = String(triageRow.organization_id);
+    if (authz.service) return { ok: true, organizationId, triageRow: triageRow as never };
+    if (!authz.userId) return { ok: false, status: 401, body: { error: "missing_user" } };
+    const { data: superAdmin } = await supabase
+        .from("super_admins").select("user_id").eq("user_id", authz.userId).maybeSingle();
+    if (superAdmin) return { ok: true, organizationId, triageRow: triageRow as never };
+    const { data: membership } = await supabase
+        .from("organization_memberships")
+        .select("role")
+        .eq("user_id", authz.userId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+    if (!membership) return { ok: false, status: 403, body: { error: "forbidden" } };
+    return { ok: true, organizationId, triageRow: triageRow as never };
 }
 
 async function getVerificationModel(): Promise<string> {
@@ -363,7 +405,9 @@ Deno.serve(async (req) => {
     const preflight = handlePreflight(req); if (preflight) return preflight;
     const origin = req.headers.get("origin");
     if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405, origin);
-    if (!isAuthorised(req)) return jsonResponse({ error: "forbidden" }, 403, origin);
+
+    const authz = await isAuthorised(req);
+    if (!authz.ok) return jsonResponse({ error: "forbidden" }, 403, origin);
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch {}
@@ -373,12 +417,12 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "alert_id_and_triage_decision_id_required" }, 400, origin);
     }
 
-    // Pull the triage verdict to feed the comparison.
-    const { data: triageRow } = await supabase
-        .from("ai_triage_decisions")
-        .select("organization_id, verdict, confidence, summary")
-        .eq("id", triageDecisionId).maybeSingle();
-    if (!triageRow) return jsonResponse({ error: "triage_decision_not_found" }, 404, origin);
+    // Tenancy gate — must run BEFORE any read of the verification verdict,
+    // BEFORE any LLM work, BEFORE returning anything that contains evidence
+    // from this org. Cross-tenant IDOR review finding.
+    const triageAuthz = await authoriseForTriage(authz, triageDecisionId);
+    if (!triageAuthz.ok) return jsonResponse(triageAuthz.body, triageAuthz.status, origin);
+    const triageRow = triageAuthz.triageRow;
     if (!triageRow.verdict) return jsonResponse({ error: "triage_has_no_verdict_yet" }, 400, origin);
 
     // Budget check — verification is an additional LLM call, so respect the cap.

@@ -269,6 +269,11 @@ const CITATION_ALLOWLIST = new Set([
     "m365_mailbox_rules",
     "m365_oauth_grants",
     "incidents",
+    // WordPress evidence — without these, every wp_brute_force /
+    // wp_credential_stuffing / wp_critical_finding alert lands with zero
+    // valid citations and the quality gate downgrades it to needs_human.
+    "site_event_logs",
+    "site_audit_findings",
 ]);
 
 // LLMs frequently submit close-but-not-exact table names ("alert" for

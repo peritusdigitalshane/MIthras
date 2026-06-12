@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     // Load the action with tenancy check for operator callers.
     const { data: action } = await supabase
         .from("ai_agent_actions")
-        .select("id, organization_id, endpoint_id, action_kind, status, customer_overrode_at, rolled_back_at, linked_command_id")
+        .select("id, organization_id, endpoint_id, action_kind, status, customer_overrode_at, rolled_back_at, linked_command_id, snapshot_data")
         .eq("id", actionId).maybeSingle();
     if (!action) return jsonResponse({ error: "action_not_found" }, 404, origin);
 
@@ -129,8 +129,21 @@ Deno.serve(async (req) => {
 
     const reversalKind = REVERSAL_KIND[action.action_kind as string];
     let rollbackCommandId: string | null = null;
+    let skippedReason: string | null = null;
 
-    if (reversalKind && action.endpoint_id) {
+    // Snapshot-aware rollback: for isolate_network, if the endpoint was
+    // already in enforce mode pre-action then issuing release_isolation now
+    // would un-isolate a host that was supposed to stay isolated. Skip the
+    // reversal command and just close the audit. Same idea would apply to
+    // any future reversible action whose snapshot records a pre-state.
+    const snapshot = (action.snapshot_data as Record<string, unknown> | null) ?? {};
+    const wasAlreadyIsolated = snapshot.was_already_isolated === true
+        || snapshot.was_isolation_mode === "enforce";
+    if (action.action_kind === "isolate_network" && wasAlreadyIsolated) {
+        skippedReason = "snapshot_says_was_already_enforce";
+    }
+
+    if (reversalKind && action.endpoint_id && !skippedReason) {
         // Try to cancel any not-yet-dispatched forward command first so we don't
         // race with the agent.
         if (action.linked_command_id) {
@@ -186,5 +199,6 @@ Deno.serve(async (req) => {
         rolled_back: true,
         reversal_command_id: rollbackCommandId,
         customer_override: isCustomerOverride,
+        skipped_reason: skippedReason,
     }, 200, origin);
 });

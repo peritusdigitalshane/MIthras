@@ -178,6 +178,53 @@ async function callChatLlm(messages: any[], orgId: string | null): Promise<{ ok:
     }
 }
 
+// Validate each extracted citation: the row must exist AND the caller must
+// be a member of (or super-admin over) that row's organization. Hallucinated
+// IDs the LLM made up get dropped silently so the chat surface never claims
+// "alerts.id=xyz says…" for a row that never existed or that lives in some
+// other tenant.
+const CITATION_KIND_TO_TABLE: Record<CitationChip["kind"], string> = {
+    alert:         "alerts",
+    endpoint:      "endpoints",
+    incident:      "incidents",
+    investigation: "ai_investigations",
+    verdict:       "ai_triage_decisions",
+};
+
+async function validateCitations(
+    chips: CitationChip[],
+    authed: { userId: string; orgIds: string[]; isSuper: boolean },
+): Promise<CitationChip[]> {
+    if (chips.length === 0) return chips;
+    // Bucket by table so we batch one lookup per kind.
+    const buckets: Record<string, CitationChip[]> = {};
+    for (const c of chips) {
+        const table = CITATION_KIND_TO_TABLE[c.kind];
+        if (!table) continue;
+        (buckets[table] ??= []).push(c);
+    }
+    const allowed: CitationChip[] = [];
+    for (const [table, bucket] of Object.entries(buckets)) {
+        const ids = bucket.map((b) => b.id);
+        const { data: rows } = await supabase
+            .from(table)
+            .select("id, organization_id")
+            .in("id", ids);
+        const orgById = new Map<string, string>();
+        for (const r of (rows ?? [])) {
+            orgById.set(String((r as { id: string }).id), String((r as { organization_id: string }).organization_id));
+        }
+        for (const chip of bucket) {
+            const orgId = orgById.get(chip.id);
+            if (!orgId) continue;                       // hallucinated / deleted
+            if (authed.isSuper)                  { allowed.push(chip); continue; }
+            if (authed.orgIds.includes(orgId))   { allowed.push(chip); continue; }
+            // Caller can't see this row — silently drop the chip.
+        }
+    }
+    return allowed;
+}
+
 // Parse simple "table.id=<uuid>" patterns from the response so we can render
 // citation chips. The model is instructed in the system prompt to embed
 // citations this way.
@@ -228,6 +275,26 @@ Deno.serve(async (req) => {
     // alerts/incidents/endpoints via the chat context.
     if (scopedOrgId && !authed.isSuper && !authed.orgIds.includes(scopedOrgId)) {
         return jsonResponse({ error: "forbidden" }, 403, origin);
+    }
+
+    // === 0b. Pre-flight LLM budget gate ===
+    // Without this, a single user can drive arbitrary OpenAI spend on the
+    // chat endpoint — no per-call check, no per-user quota, no circuit
+    // breaker. Refuse new calls once the org is over its monthly ceiling
+    // (review finding H#8). Use the scoped org if provided, otherwise the
+    // user's first org.
+    const budgetOrgId = scopedOrgId ?? authed.orgIds[0] ?? null;
+    if (budgetOrgId) {
+        const { data: remainingCents } = await supabase.rpc(
+            "ai_soc_budget_remaining_cents", { p_org_id: budgetOrgId },
+        );
+        if ((remainingCents ?? 0) <= 0) {
+            return jsonResponse({
+                error: "ai_budget_exhausted",
+                organization_id: budgetOrgId,
+                message: "Your organisation has hit its monthly AI budget. Raise the cap from /admin/ai-costs or wait for the next cycle.",
+            }, 429, origin);
+        }
     }
 
     // === 1. Resolve or create the chat session ===
@@ -313,7 +380,12 @@ ${contextBlock}`;
         return jsonResponse({ error: llmResult.error, session_id: sessionId }, 502, origin);
     }
 
-    const citations = extractCitations(llmResult.content);
+    const rawCitations = extractCitations(llmResult.content);
+    // Server-side citation validation. The LLM extracted these IDs from the
+    // context block — but it can also fabricate "table.id=<uuid>" patterns
+    // that look real and don't exist. Drop any chip whose row the caller
+    // can't actually see (review finding H#10).
+    const citations = await validateCitations(rawCitations, authed);
 
     // Estimate cost — use the same fallback rates as _shared/ai-llm.ts.
     // Quick inline calc to keep this function self-contained.

@@ -45,13 +45,50 @@ function jsonResponse(body: unknown, status: number, origin: string | null): Res
     });
 }
 
-function isAuthorised(req: Request): boolean {
+interface AuthzResult {
+    ok: boolean;
+    service?: boolean;
+    userId?: string;
+}
+
+async function isAuthorised(req: Request): Promise<AuthzResult> {
     const socSecret = req.headers.get("x-mithras-soc-secret") ?? "";
-    if (SOC_SECRET && socSecret === SOC_SECRET) return true;
+    if (SOC_SECRET && socSecret === SOC_SECRET) return { ok: true, service: true };
     const auth = req.headers.get("Authorization") ?? "";
     const jwt = auth.replace(/^Bearer\s+/i, "").trim();
-    if (jwt === SUPABASE_SERVICE_KEY) return true;
-    return false;
+    if (!jwt) return { ok: false };
+    if (jwt === SUPABASE_SERVICE_KEY) return { ok: true, service: true };
+    const { data: { user } } = await supabase.auth.getUser(jwt);
+    if (!user) return { ok: false };
+    return { ok: true, userId: user.id };
+}
+
+/**
+ * Tenancy gate on the triage_decision being actioned. Service callers pass;
+ * user callers must be super-admin or admin of the triage_decision's org.
+ * Without this, a service-key holder (or anyone with one of the cross-tenant
+ * service paths) could dispatch isolate_network / kill_process /
+ * quarantine_file at any tenant's endpoint by guessing UUIDs.
+ */
+async function authoriseForTriage(
+    authz: AuthzResult,
+    triageRow: { organization_id: string },
+): Promise<{ ok: true } | { ok: false; status: number; body: Record<string, unknown> }> {
+    if (authz.service) return { ok: true };
+    if (!authz.userId) return { ok: false, status: 401, body: { error: "missing_user" } };
+    const { data: superAdmin } = await supabase
+        .from("super_admins").select("user_id").eq("user_id", authz.userId).maybeSingle();
+    if (superAdmin) return { ok: true };
+    const { data: membership } = await supabase
+        .from("organization_memberships")
+        .select("role")
+        .eq("user_id", authz.userId)
+        .eq("organization_id", triageRow.organization_id)
+        .maybeSingle();
+    if (!membership || !["owner","admin"].includes(membership.role as string)) {
+        return { ok: false, status: 403, body: { error: "forbidden" } };
+    }
+    return { ok: true };
 }
 
 interface OrgSettings {
@@ -95,22 +132,30 @@ async function generateConfirmationToken(): Promise<{ raw: string; hash: string 
 
 // Take a pre-action snapshot of the state we'll need to restore on rollback.
 // Returns the snapshot JSON to embed in ai_agent_actions.snapshot_data.
+//
+// The endpoints schema has isolation_mode ({notify_only, enforce}) but no
+// is_isolated column — so the snapshot uses isolation_mode as the source of
+// truth. The rollback path consults `was_isolation_mode` and skips the
+// reversal if the endpoint was already in enforce mode pre-action (no
+// un-isolating a host that should stay isolated).
 async function takeSnapshot(actionKind: string, endpointId: string | null): Promise<Record<string, unknown>> {
     if (!endpointId) return {};
     switch (actionKind) {
         case "isolate_network": {
             const { data } = await supabase
-                .from("endpoints").select("id, isolation_mode, is_isolated")
+                .from("endpoints").select("id, isolation_mode")
                 .eq("id", endpointId).maybeSingle();
+            const mode = (data as { isolation_mode?: string } | null)?.isolation_mode ?? null;
             return {
-                was_isolated:   (data as any)?.is_isolated === true,
-                isolation_mode: (data as any)?.isolation_mode ?? null,
+                was_isolation_mode: mode,
+                was_already_isolated: mode === "enforce",
+                snapshot_at: new Date().toISOString(),
             };
         }
         // Other action kinds are either irreversible (kill_process), informational
         // (scans/collect), or set their own reversal context in agent_commands.
         default:
-            return {};
+            return { snapshot_at: new Date().toISOString() };
     }
 }
 
@@ -118,7 +163,9 @@ Deno.serve(async (req) => {
     const preflight = handlePreflight(req); if (preflight) return preflight;
     const origin = req.headers.get("origin");
     if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405, origin);
-    if (!isAuthorised(req)) return jsonResponse({ error: "forbidden" }, 403, origin);
+
+    const authz = await isAuthorised(req);
+    if (!authz.ok) return jsonResponse({ error: "forbidden" }, 403, origin);
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch {}
@@ -127,6 +174,20 @@ Deno.serve(async (req) => {
 
     const forceOverride: string | null = typeof body.action_kind === "string" ? body.action_kind as string : null;
     const forceFire = body.force === true;
+    const forceReason = typeof body.force_reason === "string" ? (body.force_reason as string).trim() : "";
+
+    // forceFire bypasses every consensus gate AND every per-org policy; that
+    // makes its audit trail load-bearing. Refuse the override unless the
+    // caller is a user (we need a user_id) AND supplied a non-empty reason.
+    // Service callers cannot forceFire — they have no caller identity.
+    if (forceFire) {
+        if (authz.service) {
+            return jsonResponse({ error: "force_fire_requires_user_caller" }, 403, origin);
+        }
+        if (!forceReason || forceReason.length < 8) {
+            return jsonResponse({ error: "force_fire_requires_reason", min_length: 8 }, 400, origin);
+        }
+    }
 
     // Load the orchestrated triage decision + the originating alert.
     const { data: td } = await supabase
@@ -134,6 +195,13 @@ Deno.serve(async (req) => {
         .select("id, alert_id, organization_id, verdict, confidence, recommended_command, final_verdict, final_confidence, orchestration_state, disagreement_detected, adversarial_refuted")
         .eq("id", triageDecisionId).maybeSingle();
     if (!td) return jsonResponse({ error: "triage_decision_not_found" }, 404, origin);
+
+    // Tenancy gate — MUST run before dispatching anything. A service-key
+    // holder otherwise dispatches isolate / kill / quarantine on ANY tenant's
+    // endpoint by guessing the triage_decision UUID. Cross-tenant IDOR
+    // review finding #2.
+    const orgAuthz = await authoriseForTriage(authz, { organization_id: td.organization_id as string });
+    if (!orgAuthz.ok) return jsonResponse(orgAuthz.body, orgAuthz.status, origin);
 
     // Gate 1 — consensus must be complete and TP.
     if (!forceFire) {
@@ -225,6 +293,10 @@ Deno.serve(async (req) => {
     // delivery layer is responsible for embedding it in the one-click link).
     const tokenPair = await generateConfirmationToken();
 
+    const reasoning = forceFire
+        ? `forceFire override by user ${authz.userId}: ${forceReason}. Action ${actionKind} dispatched with ${rollbackMinutes}-minute rollback window. CONSENSUS GATES BYPASSED.`
+        : `Autonomous response: consensus ${td.final_verdict} at ${finalConf} confidence (threshold ${minConf}). Action ${actionKind} dispatched with ${rollbackMinutes}-minute rollback window.`;
+
     const { data: action, error: actionErr } = await supabase
         .from("ai_agent_actions")
         .insert({
@@ -236,11 +308,17 @@ Deno.serve(async (req) => {
             status:             "executing",
             auto_rollback_minutes: rollbackMinutes,
             snapshot_data:      snapshot,
-            reasoning:          `Autonomous response: consensus ${td.final_verdict} at ${finalConf} confidence (threshold ${minConf}). Action ${actionKind} dispatched with ${rollbackMinutes}-minute rollback window.`,
+            reasoning,
             rollback_at:        rollbackAt,
             executed_at:        new Date().toISOString(),
             linked_command_id:  commandId,
             confirmation_token_hash: tokenPair.hash,
+            // forceFire audit trail — non-null on every override so the
+            // dashboard, the SOC review, and any forensics on a bad isolate
+            // can answer "who fired this manually?".
+            force_fired:        forceFire,
+            override_caller_id: forceFire ? authz.userId ?? null : null,
+            override_reason:    forceFire ? forceReason : null,
         })
         .select("id")
         .single();

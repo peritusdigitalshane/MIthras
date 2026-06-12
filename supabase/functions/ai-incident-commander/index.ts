@@ -150,16 +150,28 @@ async function runCommander(input: {
 
     const { data: triage } = await supabase
         .from("ai_triage_decisions")
-        .select("id, summary, verdict, final_verdict, final_confidence, disagreement_detected, key_indicators, reasoning_steps")
+        .select("id, organization_id, summary, verdict, final_verdict, final_confidence, disagreement_detected, key_indicators, reasoning_steps")
         .eq("id", input.triageDecisionId)
         .maybeSingle();
 
     const { data: investigation } = await supabase
         .from("ai_investigations")
-        .select("id, incident_summary, attack_chain_analysis, mitre_tags, affected_assets, suggested_containment, suggested_eradication, customer_report_markdown")
+        .select("id, organization_id, incident_summary, attack_chain_analysis, mitre_tags, affected_assets, suggested_containment, suggested_eradication, customer_report_markdown")
         .eq("id", input.investigationId)
         .maybeSingle();
     if (!investigation) return { ok: false, error: "investigation_not_found" };
+
+    // Cross-org FK pollution guard. The caller posts alert_id +
+    // triage_decision_id + investigation_id as three independent fields;
+    // without this check, a service-key holder could mix IDs across tenants
+    // and pollute incidents records (review finding H#9). All three rows
+    // MUST belong to the same organization.
+    if (
+        (triage && String(triage.organization_id) !== String(alert.organization_id)) ||
+        String(investigation.organization_id) !== String(alert.organization_id)
+    ) {
+        return { ok: false, error: "cross_org_id_mismatch" };
+    }
 
     const { data: endpoint } = alert.endpoint_id
         ? await supabase.from("endpoints").select("hostname, os_version, organization_id").eq("id", alert.endpoint_id).maybeSingle()
@@ -279,7 +291,7 @@ Produce the structured commander output.`;
             commander_summary: out.commander_summary,
             commander_last_action_at: nowIso,
             commander_model:   llmResult.model,
-            commander_cost_microcents: (existing as any).commander_cost_microcents ?? 0 + commanderCostMicrocents,
+            commander_cost_microcents: ((existing as any).commander_cost_microcents ?? 0) + commanderCostMicrocents,
             sla_due_at:        existing.sla_due_at ?? slaDueAt,
         };
         // Bump status forward if appropriate but never backwards.

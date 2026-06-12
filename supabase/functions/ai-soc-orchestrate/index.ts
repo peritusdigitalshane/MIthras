@@ -251,6 +251,10 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
         alert_id: alertId,
         triage_decision_id: triageDecision.id,
     });
+    // Surface verification failures explicitly. Without this, a timeout or
+    // 429 from the LLM provider silently downgrades the verdict to
+    // needs_human with no operator-visible signal — review finding H#3.
+    const verificationFailed = !verifyResp.ok;
 
     // Load the verification verdict.
     const { data: verifyRow } = await supabase
@@ -272,9 +276,10 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
     const agentsDisagree = !!verifyVerdict && verifyVerdict !== triageDecision.verdict;
     let advRefuted: boolean | null = null;
     let advCounterVerdict: string | null = null;
+    let adversarialFailed = false;
 
     if (triageSaidTP || agentsDisagree) {
-        await callAgent("ai-adversarial-check", {
+        const advResp = await callAgent("ai-adversarial-check", {
             alert_id: alertId,
             triage_decision_id: triageDecision.id,
         });
@@ -286,6 +291,15 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
             .maybeSingle();
         if (advRow?.verdict === "refuted")     advRefuted = true;
         if (advRow?.verdict === "not_refuted") advRefuted = false;
+
+        // If the adversarial call failed AND there's no verdict row, the
+        // safe interpretation is "refuted" — not "didn't run". The whole
+        // point of adversarial review is to block autonomous response on
+        // hallucinations; failing open defeats it (review finding H#2).
+        if (!advResp.ok && advRefuted === null) {
+            adversarialFailed = true;
+            advRefuted = true;
+        }
     }
 
     // === STEP 4: CONSENSUS ===
@@ -316,6 +330,11 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
         consensus_reasoning:  consensus.reasoning,
         orchestration_state:  "completed",
         auto_closed:          shouldAutoClose,
+        // Failure flags so the dashboard + health scan can surface silent
+        // downgrades. NULL is reserved for "didn't run for legitimate
+        // reasons" — these are always TRUE/FALSE.
+        verification_failed:  verificationFailed,
+        adversarial_failed:   adversarialFailed,
     }).eq("id", triageDecision.id);
 
     // === STEP 4b: FORENSIC INVESTIGATION ===
@@ -334,6 +353,7 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
     // and the customer email. We never block response on investigation
     // succeeding — if it errors out we log and continue.
     let investigationId: string | null = null;
+    let investigationFailed = false;
     const worthInvestigating =
         consensus.finalVerdict === "true_positive" ||
         (consensus.finalVerdict === "needs_human" && consensus.disagreement);
@@ -345,9 +365,17 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
             });
             if (invResp.ok && invResp.data?.investigation?.id) {
                 investigationId = invResp.data.investigation.id;
+            } else {
+                investigationFailed = true;
             }
         } catch (e) {
+            investigationFailed = true;
             console.error("forensic investigation failed (non-fatal):", e instanceof Error ? e.message : String(e));
+        }
+        if (investigationFailed) {
+            await supabase.from("ai_triage_decisions")
+                .update({ investigation_failed: true })
+                .eq("id", triageDecision.id);
         }
     }
 
@@ -377,6 +405,7 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
     // handled by the response + comms pipeline directly without spinning up
     // an incident object.
     let incidentId: string | null = null;
+    let commanderFailed = false;
     const shouldOpenIncident =
         consensus.finalVerdict === "true_positive" &&
         !consensus.disagreement &&
@@ -392,9 +421,37 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
             });
             if (icResp.ok && icResp.data?.incident_id) {
                 incidentId = icResp.data.incident_id;
+            } else {
+                commanderFailed = true;
             }
         } catch (e) {
+            commanderFailed = true;
             console.error("incident commander failed (non-fatal):", e instanceof Error ? e.message : String(e));
+        }
+        if (commanderFailed) {
+            // Minimal-fallback incident — without this, an autonomous response
+            // fires + a customer email may go out, but no incidents row exists
+            // for the analyst to find. Review finding H#4.
+            const { data: fallback } = await supabase.from("incidents")
+                .insert({
+                    organization_id:   triageDecision.organization_id,
+                    alert_id:          alertId,
+                    kind:              "alert",
+                    severity:          "High",
+                    status:            responseAction ? "contained" : "open",
+                    title:             "AI Commander failed — manual review required",
+                    description:       "ai-incident-commander did not complete. Triage/Verify/Adversarial all agreed this was a true positive; investigation completed. Operator must review and confirm response.",
+                    triage_decision_id: triageDecision.id,
+                    investigation_id:  investigationId,
+                    commander_summary: "(commander agent failed — see ai_triage_decisions.commander_failed)",
+                    opened_at:         new Date().toISOString(),
+                    triaged_at:        new Date().toISOString(),
+                })
+                .select("id").maybeSingle();
+            if (fallback) incidentId = fallback.id as string;
+            await supabase.from("ai_triage_decisions")
+                .update({ commander_failed: true })
+                .eq("id", triageDecision.id);
         }
     }
 
