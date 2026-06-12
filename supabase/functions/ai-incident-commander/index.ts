@@ -86,6 +86,43 @@ const COMMANDER_SCHEMA = {
     additionalProperties: false,
 } as const;
 
+// LLM uses a richer taxonomy (malware, ransomware, credential_compromise…)
+// but the incidents.kind CHECK constraint only allows 6 parent categories.
+// Map richer -> allowed without losing the LLM classification (which is
+// stored separately in commander_kind).
+function mapLlmKindToSchema(llm: string): string {
+    switch (llm) {
+        case "malware":
+        case "ransomware":
+            return "threat";
+        case "credential_compromise":
+        case "data_exfiltration":
+        case "lateral_movement":
+        case "unauthorized_access":
+        case "insider_threat":
+        case "phishing":
+            return "alert";
+        case "misconfiguration":
+        case "policy_violation":
+            return "posture_drift";
+        default:
+            return "custom";
+    }
+}
+
+// LLM emits lowercase (info / low / medium / high / critical), schema enforces
+// Title-case (Severe / High / Moderate / Low). Map for the constraint.
+function mapLlmSeverityToSchema(llm: string): string {
+    switch (llm) {
+        case "critical": return "Severe";
+        case "high":     return "High";
+        case "medium":   return "Moderate";
+        case "low":      return "Low";
+        case "info":     return "Low";
+        default:         return "Moderate";
+    }
+}
+
 interface CommanderOutput {
     kind: string;
     severity: string;
@@ -219,12 +256,20 @@ Produce the structured commander output.`;
         last_decision_at: nowIso,
     };
 
+    // The LLM uses a richer taxonomy than incidents.kind_check allows. Map
+    // its kind to one of the 6 schema-allowed values, preserving the original
+    // in commander_kind so the analyst trail keeps the finer classification.
+    // Same shape for severity — LLM emits lowercase, schema is Title-case.
+    const dbKind     = mapLlmKindToSchema(out.kind);
+    const dbSeverity = mapLlmSeverityToSchema(out.severity);
+
     let incidentId: string;
     if (existing) {
         // Update — preserve opened_at + status if it's already past 'open'.
         const updateFields: Record<string, unknown> = {
-            kind:              out.kind,
-            severity:          out.severity,
+            kind:              dbKind,
+            commander_kind:    out.kind,
+            severity:          dbSeverity,
             title:             out.title,
             description:       out.customer_summary,
             triage_decision_id: input.triageDecisionId,
@@ -258,8 +303,9 @@ Produce the structured commander output.`;
                 organization_id:   alert.organization_id,
                 endpoint_id:       alert.endpoint_id,
                 alert_id:          input.alertId,
-                kind:              out.kind,
-                severity:          out.severity,
+                kind:              dbKind,
+                commander_kind:    out.kind,
+                severity:          dbSeverity,
                 status:            initialStatus,
                 title:             out.title,
                 description:       out.customer_summary,
