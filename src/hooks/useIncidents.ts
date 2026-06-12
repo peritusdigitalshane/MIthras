@@ -9,6 +9,7 @@ export interface Incident {
   id: string;
   organization_id: string;
   endpoint_id: string | null;
+  alert_id: string | null;
   threat_id: string | null;
   kind: string;
   severity: IncidentSeverity;
@@ -25,7 +26,39 @@ export interface Incident {
   resolution_notes: string | null;
   created_at: string;
   updated_at: string;
+  // AI Commander surface (populated by ai-incident-commander)
+  commander_summary: string | null;
+  commander_kind: string | null;
+  commander_model: string | null;
+  commander_cost_microcents: number | null;
+  commander_last_action_at: string | null;
+  playbook_step: string | null;
+  playbook_state: Record<string, unknown> | null;
+  triage_decision_id: string | null;
+  investigation_id: string | null;
   endpoint?: { id: string; hostname: string } | null;
+}
+
+/**
+ * Single-incident loader used by /incidents/:id. Fetches the row with
+ * endpoint join; the page composes the rest (triage / investigation /
+ * response / comms) from their own hooks keyed on alert_id.
+ */
+export function useIncident(incidentId: string | undefined) {
+  return useQuery({
+    queryKey: ["incident", incidentId],
+    enabled: !!incidentId,
+    queryFn: async (): Promise<Incident | null> => {
+      const { data, error } = await supabase
+        .from("incidents")
+        .select("*, endpoint:endpoints!incidents_endpoint_id_fkey(id, hostname)")
+        .eq("id", incidentId!)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return (data ?? null) as unknown as Incident | null;
+    },
+    refetchInterval: 30_000,
+  });
 }
 
 const OPEN_STATUSES: IncidentStatus[] = ["open", "triaging", "in_progress"];

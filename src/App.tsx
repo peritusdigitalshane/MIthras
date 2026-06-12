@@ -47,6 +47,7 @@ import GroupPolicy from "./pages/GroupPolicy";
 import EndpointDetail from "./pages/EndpointDetail";
 import Alerts from "./pages/Alerts";
 import Incidents from "./pages/Incidents";
+import IncidentDetail from "./pages/IncidentDetail";
 import CustomerReports from "./pages/CustomerReports";
 import MyCustomers from "./pages/MyCustomers";
 import Sites from "./pages/Sites";
@@ -567,6 +568,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Incidents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/incidents/:id"
+                element={
+                  <ProtectedRoute>
+                    <IncidentDetail />
                   </ProtectedRoute>
                 }
               />

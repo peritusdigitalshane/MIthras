@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import {
   useIncidents, useResolveIncident, useUpdateIncidentStatus, useAssignIncident,
@@ -219,6 +220,7 @@ function IncidentTable({ rows, onResolve, closed }: { rows: Incident[]; onResolv
   const updateStatus = useUpdateIncidentStatus();
   const assign = useAssignIncident();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   if (rows.length === 0) {
     return (
@@ -279,7 +281,12 @@ function IncidentTable({ rows, onResolve, closed }: { rows: Incident[]; onResolv
       </TableHeader>
       <TableBody>
         {rows.map((i) => (
-          <TableRow key={i.id}>
+          <TableRow key={i.id} className="cursor-pointer hover:bg-muted/40" onClick={(ev) => {
+            // Don't navigate when the click started on an interactive control
+            // (Select, Button, etc.) inside the row.
+            if ((ev.target as HTMLElement).closest("button, select, [role='combobox']")) return;
+            navigate(`/incidents/${i.id}`);
+          }}>
             <TableCell><Badge variant="outline" className={severityClasses(i.severity)}>{i.severity}</Badge></TableCell>
             <TableCell className="max-w-md"><div className="truncate font-medium">{i.title}</div><div className="text-xs text-muted-foreground truncate">{i.description}</div></TableCell>
             <TableCell className="text-sm">{i.endpoint?.hostname ?? <span className="text-muted-foreground">—</span>}</TableCell>
