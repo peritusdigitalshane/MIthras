@@ -79,8 +79,12 @@ function Get-InstalledAppsForDiscovery {
             Get-ItemProperty -Path $hive -ErrorAction SilentlyContinue | ForEach-Object {
                 $name = $_.DisplayName
                 if (-not $name) { return }
-                if ($_.SystemComponent -eq 1) { return }
-                if ($_.ParentKeyName)         { return }
+                # PSObject.Properties.Match guards against keys missing the
+                # SystemComponent / ParentKeyName values entirely — most do
+                # not, and an unguarded property access raised a warning per
+                # hive scan on every collection cycle.
+                if ($_.PSObject.Properties.Match('SystemComponent').Count -gt 0 -and $_.SystemComponent -eq 1) { return }
+                if ($_.PSObject.Properties.Match('ParentKeyName').Count   -gt 0 -and $_.ParentKeyName)         { return }
                 if ($name -match '^(KB\d+|Update for |Security Update for |Hotfix )') { return }
 
                 $loc = $_.InstallLocation

@@ -356,11 +356,11 @@ while ($true) {
             } catch { Write-AgentLog -Level Warn "software_inventory collect failed: $_" }
         }
 
-        # v0.4.5: Process creation events (Security/4688) -- every heartbeat.
-        try {
-            $pe = Get-ProcessCreationEventsPayload -StatePath $script:ProcessEventStateFile
-            if ($pe -and $pe.Count -gt 0) { $payload['process_events'] = $pe }
-        } catch { Write-AgentLog -Level Warn "process_events collect failed: $_" }
+        # v0.7.19: ProcessEventCollector retired. No server-side destination
+        # exists for process_events — Sysmon EID 1 in `sysmon_events` covers
+        # the same signal and is actively consumed by the AI hunt pipeline.
+        # Module remains in the bundle for backwards compatibility with the
+        # next install but is no longer invoked from the main loop.
 
         # v0.4.5: Persistence snapshot -- diff-only, every $PersistencePushEvery.
         if ((Get-Date) - $script:LastPersistencePushAt -ge $script:PersistencePushEvery) {
