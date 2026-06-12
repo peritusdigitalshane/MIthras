@@ -366,16 +366,20 @@ async function handleEnrollmentToken(auth: ApiAuthOk, req: Request): Promise<Res
         .from("api_keys").select("created_by").eq("id", auth.apiKeyId).maybeSingle();
     if (!keyRow?.created_by) return json({ error: "api_key_owner_missing" }, 500);
 
+    // The raw token is returned to the caller exactly once. The server
+    // persists only its SHA-256 hash; a database snapshot leak cannot be
+    // used to enrol a rogue endpoint with an outstanding token.
     const token = "ent_" + crypto.randomUUID().replace(/-/g, "");
+    const tokenHash = await sha256Hex(token);
     const expires = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
 
-    const { error } = await supabase.from("enrollment_tokens").insert({
-        token,
-        organization_id: targetOrgId,
-        created_by:      keyRow.created_by,
-        runtime_hint:    runtimeHint,
-        channel:         "stable",
-        expires_at:      expires,
+    const { error } = await supabase.rpc("api_issue_enrollment_token", {
+        p_organization_id: targetOrgId,
+        p_created_by:      keyRow.created_by,
+        p_token_hash:      tokenHash,
+        p_runtime_hint:    runtimeHint,
+        p_channel:         "stable",
+        p_expires_at:      expires,
     });
     if (error) return json({ error: "issue_failed", message: error.message }, 500);
 
@@ -390,6 +394,11 @@ async function handleEnrollmentToken(auth: ApiAuthOk, req: Request): Promise<Res
                 : `# Linux installer not yet available`,
         },
     }, 201);
+}
+
+async function sha256Hex(s: string): Promise<string> {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 // =============================================================================
