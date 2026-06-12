@@ -1,77 +1,65 @@
 ---
-title: Audit channel margins
+title: Audit channel margins across the reseller hierarchy
 audience: peritus_super_admin
-description: Reconcile distributor pricing vs. reseller pricing vs. customer MRR across the whole channel, monthly.
+description: Reconcile reseller wholesale pricing, customer monthly recurring revenue, and Peritus floor pricing across the full channel for a billing period.
 order: 2
 estimated_minutes: 25
 updated_at: 2026-06-12
 tags: finance, channel, audit
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-- Monthly close — the **5th business day** of the new month, after distributor invoices have been marked sent.
-- After a pricing change at any layer (default tier prices, per-org overrides, deal margin locks).
-- When a distributor reports their numbers don't match what we billed them.
+## Purpose
+This procedure reconciles the three-layer pricing stack — customer monthly recurring revenue (MRR), reseller wholesale cost, and Peritus floor — for every active customer in the channel. It identifies pricing drift caused by per-organisation overrides, deal-margin locks, and mid-period rate changes, and confirms that aggregate channel revenue ties to Stripe revenue for the period. Margin discrepancies that surface here are corrected before distributor invoices are dispatched.
 
-## What "margin" means here
-For every active customer there's a three-layer pricing stack:
+## Audience and authority
+The operator executing this procedure is a Peritus platform operator whose `user_id` is present in `public.super_admins`. Read access to `/admin/channel`, `/admin/pricing`, and `/admin/invoices` is gated by `is_super_admin(auth.uid())`. Recalculation operations write to the invoice ledger and are recorded against the operator's identity.
 
-| Layer | Price source | Whose revenue |
-|---|---|---|
-| **Customer MRR** | `platform_pricing.default_<tier>_price` or `organizations.price_override_cents` | Reseller's revenue |
-| **Reseller cost** | `platform_pricing.default_<tier>_wholesale` or `distributor_pricing_override` per disty | Distributor's revenue |
-| **Distributor cost** | `platform_pricing.default_<tier>_floor` | Peritus revenue |
+## Prerequisites
+- The billing period is closed. The procedure is scheduled for the fifth business day of the new month, after reseller invoices have been marked `sent` in `/admin/invoices`.
+- The most recent rate change in `public.platform_pricing` is at least 24 hours old, allowing nightly rollups to settle.
+- The operator has confirmed that the Stripe period close has run and that Stripe revenue totals are available for cross-reference.
+- The operator has reviewed the deal-margin-lock register on `/admin/deals` for any locks registered during the period.
 
-For each customer: **Customer MRR – Reseller cost = Reseller margin.** **Reseller cost – Distributor cost = Distributor margin.**
+## Procedure
 
-## Where to look
-**`/admin/pricing`** is the rate authority. **`/admin/channel`** rolls up actual revenue vs. expected.
+1. Navigate to `/admin/channel`. The channel rollup view renders.
+2. Filter the period selector to the closing month. Three rollup tiles render:
+   - `Customer MRR (charged)` — the aggregate revenue resellers will bill to their customers.
+   - `Reseller wholesale (charged)` — the aggregate revenue Peritus will bill to resellers.
+   - `Peritus floor (recognised)` — the revenue Peritus recognises from the channel.
+3. Inspect the `Margin variance` column in the customer roll-up table. Variance is computed as the delta between the expected price derived from `public.platform_pricing` and the actual charged price after any `price_override_cents` on `public.organizations` or active deal-margin lock.
+4. For every flagged row, select the customer to expand the override chain. The chain enumerates each rule applied, in priority order, with the row identifier and the effective timestamp.
+5. Navigate to `/admin/resellers`. For each reseller, perform the per-reseller reconciliation in steps 6 through 8.
+6. Open the reseller detail page. Compare the reseller's invoiced total for the period against the value billed to the reseller on `/admin/invoices`. The two values must match within one Australian dollar; sub-dollar drift is acceptable rounding from per-customer pro-rating.
+7. For any reseller with variance greater than five Australian dollars, open the invoice line items panel and identify the customer rows that do not tie. The most common root cause is a deal-margin lock registered mid-period where one side of the invoice ledger has not refreshed; select `Recalculate invoice` to force a rebuild from `public.platform_pricing` and the override chain.
+8. The second most common root cause is a customer decommissioned mid-period where the reseller's accounting system uses calendar days while the Mithras ledger uses a 30-day month. Document the drift in the reconciliation note; no platform action is required.
+9. If a rate change was applied to `public.platform_pricing` during the period, navigate to `/admin/pricing` and open `Change history`. Note the effective timestamp of the change.
+10. Return to `/admin/channel`, filter to the affected tier, and compare aggregates before and after the effective timestamp. Confirm that new subscriptions with `subscription_started_at >= effective_date` are billed at the new rate and that pre-existing subscriptions retain the prior rate until renewal.
+11. Cross-reference the `Peritus floor (recognised)` total against Stripe revenue for the period. The two values must agree within two percent.
 
-## Steps
+## Verification
+- The sum of `Customer MRR (charged)`, the reseller-margin column, and the Peritus-floor column reconciles end-to-end across `/admin/channel`.
+- No customer row reports zero MRR while remaining in `Active` state on `/admin/resellers`. Zero-MRR active rows indicate a decommission that did not close the subscription correctly.
+- The Stripe revenue total for the period agrees with `Peritus floor (recognised)` within two percent.
+- Every reseller invoice on `/admin/invoices` is marked `sent` and ties to its corresponding entry on the reseller's `/distributor/invoices` view within rounding.
+- An entry is present in `/activity` for each `invoice_recalculated` action executed during the audit.
 
-1. Open **`/admin/channel`**.
-2. Filter to **current month**.
-3. Check the three rollup tiles:
-   - **Customer MRR (charged)** — what resellers will bill customers.
-   - **Reseller wholesale (charged)** — what distys will bill resellers.
-   - **Distributor floor (charged to Peritus)** — our revenue.
-4. The **Margin variance** column highlights any customer whose actual MRR doesn't match expected (deal-margin-lock applied, or per-org override).
-5. Click through any flagged row to see the override chain.
+## Troubleshooting
+- **Aggregate channel revenue diverges from Stripe revenue by more than two percent.** Do not attempt in-product correction. Open a finance escalation with the Peritus accounts team and pause distributor-invoice dispatch for the affected period.
+- **A reseller reports a discrepancy that cannot be reconciled within fifteen minutes of investigation.** Capture the reseller identifier, the disputed customer rows, and the override chain output, then open a high-severity finding on `/admin/health` with the tag `channel_pricing_dispute`.
+- **A deal-margin lock has an `applied_at` timestamp later than the corresponding deal `closed_at`.** This indicates potential margin-protection abuse. Flag the deal on `/admin/deals` for review and do not invoice the affected customer rows until the lock is validated.
+- **The `Recalculate invoice` control returns `recalculation_locked`.** A prior recalculation is still in flight. Wait sixty seconds and retry. Persistent locking indicates a stuck background job and warrants a finding on `/admin/health`.
 
-## Per-distributor reconciliation
+## Audit and compliance
+- Each invoice recalculation writes a row to `public.activity_logs` with `action_type = 'invoice_recalculated'`, the invoice identifier, and the operator's `user_id`.
+- Deal-margin-lock validations write a row to `public.activity_logs` with `action_type = 'deal_lock_reviewed'`.
+- The channel reconciliation report is retained in `/admin/channel` snapshots for seven years in accordance with the Peritus financial records retention policy and supports Australian Taxation Office and external audit review.
+- Discrepancies escalated to finance are tracked outside this system; the in-product audit trail records only the platform actions taken by the operator.
 
-For each distributor:
-
-1. Open `/admin/resellers`, pick the disty.
-2. Compare their `/distributor/invoices` total this month vs. our `/admin/invoices` total billed to them.
-3. The two should match within rounding (sub-$1 difference is OK; rounding inside per-customer pro-rating).
-
-If they differ by **more than $5**:
-- Open the invoice line items panel. Find the customer rows that don't match.
-- Most common cause: a deal-margin-lock was applied mid-period and one side of the system didn't refresh. Force-recalculate via the **Recalculate invoice** button (super-admin only).
-- Second most common: a customer was decommissioned mid-month and pro-rating differs. The system uses 30-day months; if your disty uses calendar days, expect small drift.
-
-## Steps for a pricing change retro
-
-If you changed default tier prices mid-month:
-
-1. Open `/admin/pricing` → **Change history**.
-2. Find the row for the change. Note the effective date.
-3. On `/admin/channel`, filter to the affected tier and **before/after** the effective date.
-4. Verify the new price propagated to all new customer subscriptions after that date (`subscription_started_at >= effective_date`).
-5. Customers on contracts before the date keep the old price until renewal.
-
-## Verify
-- Customer MRR + Reseller wholesale + Distributor floor sums match on `/admin/channel`.
-- No unexpected zero-MRR rows (decommissioned but not closed customers).
-- Total revenue line matches Stripe revenue for the period.
-
-## When to escalate
-- **Total channel revenue is more than 2% off Stripe revenue.** Don't fix in-app — get accounts involved.
-- A distributor reports a discrepancy you can't explain in 15 minutes.
-- A deal-margin lock looks like it was registered after the deal closed (potential margin-protection abuse).
-
-## Related
-- [Onboard distributor](/help/sops/peritus_super_admin/onboard-distributor)
-- [Distributor: monthly invoicing](/help/sops/distributor/monthly-invoicing)
-- [Respond to AI budget alert](/help/sops/peritus_super_admin/respond-to-ai-budget-alert)
+## Related procedures
+- [Onboard a new reseller organisation](/help/sops/peritus_super_admin/onboard-distributor)
+- [Respond to an AI cost-budget alert](/help/sops/peritus_super_admin/respond-to-ai-budget-alert)
+- [Force-rollback an AI Triage Agent response](/help/sops/peritus_super_admin/force-rollback-ai-response)

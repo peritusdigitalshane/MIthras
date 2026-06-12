@@ -1,64 +1,73 @@
 ---
-title: Understand an incident detail page
+title: Read and act on an incident detail page
 audience: customer_admin
-description: How to read /incidents/:id — the AI Commander's summary, the multi-agent verdict, and what the playbook has done.
+description: Interpret every card on /incidents/:id, confirm or reverse the autonomous response, and know when the Peritus 24/7 SOC will act for you.
 order: 4
 estimated_minutes: 10
 updated_at: 2026-06-12
-tags: incidents, ai-soc, security
+tags: incidents, ai-soc, response
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-You got a "Critical incident opened" email, or you saw an active incident on the dashboard. You want to understand what happened without needing a security degree.
+## Purpose
+This procedure explains how to read the incident detail page at `/incidents/:id`, how to interpret each card on it, and how to act on the autonomous response Mithras has already taken. Customer administrators are expected to confirm or reverse autonomous actions within the rollback window; this document defines exactly how.
 
-## The cards on the page (in order)
+## Audience and authority
+Customer administrators whose `organization_memberships.role` is `admin` or `owner`. Confirming an action or marking it a false positive invokes the `confirm_ai_action` Remote Procedure Call (RPC) and writes to `public.ai_agent_actions`; both privileges are gated on the `admin` or `owner` role. Customer members can read the page but cannot act on it.
 
-### Header
-- **Severity** — the AI Commander's classification. Severe and High auto-open incidents; Moderate and Low are surfaced in `/threats` only.
-- **Status** — Open → Triaging → In progress → Resolved / False positive.
-- **SLA** — when the SOC team commits to closing the case. Severe/Critical = 1h, High = 4h, Moderate = 1 day, Low = 7 days.
-- **Commander kind** — the LLM's specific classification (e.g. `malware`, `credential_compromise`). Friendlier than the legacy 6-value parent.
+## Prerequisites
+- An incident has been created for your organisation. Severe and High threats automatically create an incident; Moderate and Low threats are visible on `/threats` only.
+- You are signed in to the Mithras console at `https://www.mithras.com.au/login`.
+- You can identify which endpoint and which user are associated with the incident.
 
-### AI Commander summary
-One-line analyst summary written by the **Incident Commander Agent**. This is what the 24/7 SOC sees at-a-glance. The collapsible **Customer-facing summary** is the friendlier version used in monthly reports.
+## Procedure
 
-### Playbook
-Step-by-step progress through the response workflow:
-1. **forensics_complete** — investigation done, attack chain mapped.
-2. **contained** — automated action ran (isolate / kill / quarantine).
-3. **customer_notified** — comms agent sent the email to your notification recipients.
-4. **review_scheduled** — operator scheduled a post-incident review.
-5. **resolved** — threat eradicated, case closed.
+1. Open the incident from the email notification or by navigating to `/incidents` and selecting the row. The page loads at `/incidents/:id`.
+2. Read the **Header** card. It states:
+   - **Severity** — the classification assigned by the AI Commander. Values are `Severe`, `High`, `Moderate`, `Low`.
+   - **Status** — one of `Open`, `Triaging`, `In progress`, `Resolved`, `False positive`.
+   - **Service Level Agreement (SLA)** — the time within which the Peritus 24/7 SOC commits to resolution: one hour for `Severe`, four hours for `High`, one business day for `Moderate`, seven days for `Low`.
+   - **Commander kind** — the precise incident class (for example `malware`, `credential_compromise`, `ransomware_precursor`).
+3. Read the **AI Commander summary** card. The single-line operator summary is written by the Incident Commander Agent. The collapsible **Customer-facing summary** is the version reproduced in your monthly customer report.
+4. Read the **Playbook** card. It lists the ordered response stages: `forensics_complete`, `contained`, `customer_notified`, `review_scheduled`, `resolved`. The active stage is marked **In progress**; completed stages display the timestamp of completion.
+5. Read the **Agent consensus** card. The card displays three verdicts:
+   - **Triage** — the first-line classification by the AI Triage Agent.
+   - **Verification** — an independent re-classification by a second model.
+   - **Adversarial** — a counter-argument that attempts to refute the verdict. A value of `not_refuted` indicates the verdict survived adversarial review.
+   When all three verdicts agree and the adversarial result is `not_refuted`, the consensus is trusted and the playbook advances autonomously. Disagreement routes the incident to the Peritus 24/7 SOC for human review.
+6. Read the **Autonomous response** card. The card states:
+   - **Action kind** — for example `isolate_network`, `kill_process`, `quarantine_file`.
+   - **Status** — `executing`, `executed`, `customer_confirmed`, or `rolled_back`.
+   - **Auto-rollback armed** banner — the action will be automatically reversed at the displayed expiry timestamp unless confirmed first. The default window is four hours.
+   - **`forceFire` override** badge — a SOC operator manually bypassed the consensus gates. Treat this as an explicit signal to read the case in detail.
+7. Decide on action:
+   - To make the containment permanent, select **Confirm action**. The button calls the `confirm_ai_action` RPC and sets the status to `customer_confirmed`. The auto-rollback is cancelled.
+   - To reverse the containment, select **Rollback now**. The agent receives the reversal command at the next heartbeat. Provide a written reason of at least twenty characters; the reason is retained in the audit trail.
+   - To take no decision, allow the auto-rollback timer to expire. The action is reversed automatically at the timestamp shown on the banner.
+8. Read the **Customer notifications** card. Each email dispatched by the AI Comms Agent is listed with its delivery status. A `failed` row indicates a delivery error; the platform automatically disarms the auto-rollback when no notification reached you, and the Peritus 24/7 SOC is alerted.
+9. After closure, read the **Resolution notes** card. The notes are written by the operator who closed the case and are reproduced in your monthly customer report.
 
-If a step shows the current chip, the SOC is actively working it.
+## Verification
+- The **Status** chip in the header reflects the action you took. `customer_confirmed` confirms a permanent action; `rolled_back` confirms a reversal.
+- The **Auto-rollback armed** banner is absent once an action has been confirmed or rolled back.
+- The endpoint at `/endpoints/:id` reflects the post-action state. For an `isolate_network` action that was confirmed, the endpoint shows **Network isolated**; for a rolled-back action, the endpoint returns to **Online**.
+- The audit log at `/activity` contains a matching `ai_action_confirmed` or `ai_action_rolled_back` row with your user identifier.
 
-### Agent consensus
-The **multi-agent verdict trail** card. Three AI agents:
-- **Triage** — first-line classifier.
-- **Verification** — re-runs with a different model.
-- **Adversarial** — tries to *refute* the verdict.
+## Troubleshooting
+- **The Confirm action and Rollback now buttons are disabled.** Your `organization_memberships.role` is `member`. Ask an administrator or owner in your organisation to act, or escalate to your reseller for a role change.
+- **The Auto-rollback armed banner shows an expiry in the past.** The rollback has already executed. Refresh the page; the **Status** chip will display `rolled_back`. Re-issuing the original action requires a fresh incident or a manual request to the Peritus 24/7 SOC.
+- **The Agent consensus card shows disagreement and the playbook has not advanced.** The incident is queued for the Peritus 24/7 SOC. Expected handling time is the SLA shown in the header. No customer action is required until the SOC contacts you.
+- **A customer notification row is `failed`.** The associated auto-rollback has been disarmed. The Peritus 24/7 SOC has been alerted and will contact you through a fallback channel. Confirm the **Notification recipients** configuration at `/settings` to prevent recurrence.
 
-If the three agents agree (verdict + the adversarial says **not_refuted**), the verdict is trustworthy. If they disagree, it gets flagged for human review.
+## Audit and compliance
+- The action record is retained in `public.ai_agent_actions` for 24 months in accordance with the customer's data retention configuration.
+- Customer decisions (confirm, rollback, mark false positive) are written to `public.activity_logs` with `action_type` of `ai_action_confirmed`, `ai_action_rolled_back`, or `ai_action_false_positive`, and `actor_id = auth.uid()`.
+- Outbound notifications and their delivery status are recorded in `public.ai_agent_comms`.
+- Incident metadata, the consensus trail, and resolution notes are summarised in the monthly customer report distributed via `public.customer_reports`.
 
-### Autonomous response
-What action ran (if anything):
-- **action_kind** — `isolate_network`, `kill_process`, `quarantine_file`, etc.
-- **status** — `executing`, `executed`, `customer_confirmed`, `rolled_back`.
-- **Auto-rollback armed** banner — within 4 hours, the action will be undone automatically unless someone confirms it (you or the SOC).
-- **forceFire override** badge — a SOC operator manually skipped the consensus gates. Take that as a high-attention signal.
-
-### Customer notifications
-Emails the comms agent sent. If a row is `failed` you'll see the SMTP error. The platform automatically disarms the auto-rollback when this happens, but it's a flag for the SOC to contact you directly.
-
-### Resolution notes (once closed)
-The operator's reasoning. These also land in your next monthly customer report.
-
-## When to act
-- If the **Auto-rollback armed** banner is showing and you want to **keep** the containment action permanent, click **Confirm action** in the email you received. That cancels the auto-rollback.
-- If you believe the response was wrong (legitimate activity was blocked), click the **False positive** link in the email or contact your reseller. The action will be reversed within minutes.
-- Otherwise: just wait for the SOC to close it. You'll get a closure email with the resolution notes.
-
-## Related
-- [Review threats](/help/sops/customer_admin/review-threats)
-- [Set up notification recipients](/help/sops/customer_admin/set-up-notification-recipients)
-- [Request emergency unlock](/help/sops/customer_admin/request-emergency-unlock)
+## Related procedures
+- [Review threats detected on your endpoints](/help/sops/customer_admin/review-threats)
+- [Configure notification recipients](/help/sops/customer_admin/set-up-notification-recipients)
+- [Request an emergency unlock for an endpoint](/help/sops/customer_admin/request-emergency-unlock)

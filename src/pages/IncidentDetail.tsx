@@ -21,7 +21,8 @@ import { useAiTriageDecision } from "@/hooks/useAISoc";
 import { MultiAgentVerdictTrail } from "@/components/ai/MultiAgentVerdictTrail";
 import { AiDecisionDrawer } from "@/components/ai/AiDecisionDrawer";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTenant } from "@/contexts/TenantContext";
 
 /**
  * Incident detail page (/incidents/:id).
@@ -455,6 +456,12 @@ interface ResponseActionRow {
 }
 
 function ResponseActionCard({ triageDecisionId }: { triageDecisionId: string }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const { isSuperAdmin } = useTenant();
+  const [rollbackOpen, setRollbackOpen] = useState(false);
+  const [rollbackReason, setRollbackReason] = useState("");
+
   const { data: action } = useQuery({
     queryKey: ["incident-response-action", triageDecisionId],
     queryFn: async (): Promise<ResponseActionRow | null> => {
@@ -470,9 +477,41 @@ function ResponseActionCard({ triageDecisionId }: { triageDecisionId: string }) 
     refetchInterval: 30_000,
   });
 
+  const confirmMut = useMutation({
+    mutationFn: async (actionId: string) => {
+      const { error } = await supabase.rpc("confirm_ai_action" as any, { p_action_id: actionId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Action confirmed", description: "Auto-rollback cancelled." });
+      qc.invalidateQueries({ queryKey: ["incident-response-action", triageDecisionId] });
+    },
+    onError: (e: any) => toast({ title: "Confirm failed", description: e?.message ?? "Unknown", variant: "destructive" }),
+  });
+
+  const rollbackMut = useMutation({
+    mutationFn: async (input: { actionId: string; reason: string }) => {
+      const { data, error } = await supabase.functions.invoke("ai-response-rollback", {
+        body: { action_id: input.actionId, operator_reason: input.reason },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Rollback dispatched" });
+      setRollbackOpen(false);
+      setRollbackReason("");
+      qc.invalidateQueries({ queryKey: ["incident-response-action", triageDecisionId] });
+    },
+    onError: (e: any) => toast({ title: "Rollback failed", description: e?.message ?? "Unknown", variant: "destructive" }),
+  });
+
   if (!action) return null;
   const isRolledBack = !!action.rolled_back_at;
-  const isPendingRollback = !isRolledBack && action.rollback_at && new Date(action.rollback_at).getTime() > Date.now();
+  const isConfirmed = action.status === "customer_confirmed";
+  const isPendingRollback = !isRolledBack && !isConfirmed && action.rollback_at && new Date(action.rollback_at).getTime() > Date.now();
+  const canConfirm = action.status === "executed" && !isRolledBack && !isConfirmed && !action.customer_overrode_at;
+  const canRollback = (action.status === "executed" || action.status === "customer_confirmed") && !isRolledBack && !action.customer_overrode_at;
 
   return (
     <Card className={action.comms_failed ? "border-amber-500/40 bg-amber-500/5" : undefined}>
@@ -515,6 +554,12 @@ function ResponseActionCard({ triageDecisionId }: { triageDecisionId: string }) 
             </div>
           </div>
         )}
+        {isConfirmed && (
+          <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-500">
+            <CheckCircle2 className="h-4 w-4" />
+            Action confirmed — auto-rollback cancelled.
+          </div>
+        )}
         {isRolledBack && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <RotateCcw className="h-4 w-4" />
@@ -538,7 +583,73 @@ function ResponseActionCard({ triageDecisionId }: { triageDecisionId: string }) 
             </div>
           </div>
         )}
+
+        {/* Action buttons */}
+        {(canConfirm || canRollback) && (
+          <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+            {canConfirm && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => confirmMut.mutate(action.id)}
+                disabled={confirmMut.isPending}
+              >
+                {confirmMut.isPending && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+                Confirm action
+              </Button>
+            )}
+            {canRollback && (
+              <Button
+                size="sm"
+                variant={isSuperAdmin ? "destructive" : "outline"}
+                onClick={() => setRollbackOpen(true)}
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                {isSuperAdmin ? "Force rollback" : "Rollback now"}
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
+
+      <Dialog open={rollbackOpen} onOpenChange={setRollbackOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5 text-amber-500" />
+              {isSuperAdmin ? "Force rollback this action" : "Rollback this action"}
+            </DialogTitle>
+            <DialogDescription>
+              Reverses <span className="font-mono">{action.action_kind}</span>. The endpoint will return to its prior state within a heartbeat.
+              {isSuperAdmin && " As a super-admin, this counts as a force rollback and is recorded in the audit trail."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Reason (required, ≥ 20 chars)
+            </div>
+            <Textarea
+              value={rollbackReason}
+              onChange={(e) => setRollbackReason(e.target.value)}
+              placeholder="What makes this action wrong? Lands in the audit log + monthly customer report."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRollbackOpen(false)} disabled={rollbackMut.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={rollbackMut.isPending || rollbackReason.trim().length < 20}
+              onClick={() => rollbackMut.mutate({ actionId: action.id, reason: rollbackReason.trim() })}
+            >
+              {rollbackMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Rollback now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

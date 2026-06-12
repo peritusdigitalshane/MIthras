@@ -1,76 +1,74 @@
 ---
-title: Approve an autonomous response — or override it
+title: Approve or override an autonomous response
 audience: soc_operator
-description: When the AI SOC has armed (or run) an autonomous action, how to confirm it, when to roll back, and when to force-fire one yourself.
+description: Confirm, roll back, or force-fire an autonomous action on the Incident Detail page, with full audit trail and four-eyes discipline.
 order: 3
 estimated_minutes: 8
 updated_at: 2026-06-12
-tags: ai-soc, response, override
+tags: ai-soc, response, override, force-fire, rollback
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-You're working from `/soc` (the cross-tenant console) and an alert needs an operator decision — either to confirm an autonomous action that ran, or to authorise one the AI declined to take.
+## Purpose
+This procedure governs every operator interaction with the autonomous response engine: confirming an action that fired at consensus, rolling back an action that should not have fired, and force-firing an action that the AI Triage chain declined to take. Every path mutates `public.ai_agent_actions` and is surfaced to the customer and the channel partner. The operator is the accountable signer for any deviation from consensus.
 
-## The default flow (no operator action needed)
-For most alerts:
-1. Triage agent classifies → Verification agrees → Adversarial doesn't refute.
-2. Commander opens incident + queues the action (e.g., `isolate_network`).
-3. Comms agent notifies the customer's recipients.
-4. Action auto-fires.
-5. Auto-rollback is armed for **4 hours** unless the customer confirms.
+## Audience and authority
+The operator. Confirm and roll back are available to any user whose `organization_memberships.role` is `admin` or `owner` for the customer organisation, or who is recorded in `public.super_admins`. Force-fire is restricted to `super_admins` and requires authentication of the caller by the `ai-response-execute` edge function with a `force_reason` of at least eight characters.
 
-You only step in when something is off-pattern.
+## Prerequisites
+- The operator is signed in to the SOC console and has navigated to the relevant `/incidents/:id` page.
+- The `Autonomous response` card is visible and shows a valid `ai_agent_actions` row.
+- The operator has verified the multi-agent verdict trail in the source `AI decision drawer` from `/soc` or `/alerts`.
+- For any deviation from consensus (rollback, force-fire, or override of a refuted verdict), a second analyst is available for peer review under the four-eyes rule.
 
-## When to **confirm** an action that ran
+## Procedure
 
-Open the incident from `/incidents` (or directly from `/soc`).
+### Confirm an action that fired at consensus
 
-Confirm when:
-- All three agents agree.
-- The action proportionate to the classification.
-- The endpoint isn't tier-0 (no domain controller, no critical line-of-business server).
+1. Open `/incidents/:id`. Read the `AI Commander summary`, then the `Playbook` card. Every step that the playbook declares should be complete must show a green check.
+2. On the `Autonomous response` card, verify that `ai_agent_actions.status = executed`, that the action kind is proportionate to the classification, and that the affected endpoint is not a tier-0 asset (domain controller, line-of-business database server, or hypervisor host).
+3. Confirm that `ai_agent_comms.status = sent` for at least one customer recipient. A `failed` value indicates the customer did not receive notification and the auto-rollback timer was disarmed by the orchestrator.
+4. Click `Confirm action` on the `Autonomous response` card. The auto-rollback timer is cancelled and `ai_agent_actions.customer_confirmed_at` is set to `now()`.
+5. Click `Resolve` from `HeaderActions` and follow the resolve-incident procedure to close the case.
 
-→ Click **Confirm action** in the Autonomous response card. The auto-rollback is cancelled. You'll typically resolve the incident in the same flow — click **Resolve** with notes.
+### Roll back an action
 
-## When to **roll back** an action
+1. On `/incidents/:id`, identify the trigger for rollback. Legitimate triggers include a `refuted` chip on the Adversarial agent card, a customer report that the action broke production, a known false-positive pattern on an `eol_protected` tier customer, or evidence that the action ran against the wrong endpoint due to hostname collision.
+2. Click `Rollback now` on the `Autonomous response` card. The `ai-response-rollback` edge function reverses the action and updates `ai_agent_actions.rolled_back_at` and `ai_agent_actions.customer_overrode_id` (when triggered on behalf of a customer override).
+3. From `HeaderActions`, click `Mark false positive`. The triage verdict is updated to `benign` on `ai_triage_decisions`, and the future triage context includes the operator's refute note.
+4. Write a refute note in the dialog that names the benign explanation, the evidence that supports it, and any follow-up the customer requires. The note is recorded against `incidents.resolution_notes`.
 
-Roll back when:
-- The Adversarial agent chip says `refuted` (red).
-- The customer reached out saying the endpoint going off the LAN broke production.
-- The classification looks like a known false-positive pattern (e.g., a vendor LOB app on `eol_protected` tier customers).
-- The action ran on the wrong endpoint (rare but possible if hostname collided).
+### Force-fire an action the consensus declined
 
-→ Click **Rollback now**. The action reverses within minutes. Then:
-1. Re-classify the incident as **False positive** (sets `triage_decision.verdict = 'benign'`).
-2. Add detailed reasoning notes. Future triage uses your notes as context.
-3. Open a follow-up if the customer needs more help.
+1. Confirm that the operator-driven judgement is supportable. Acceptable grounds are cross-tenant intelligence that the AI did not have, a credential-stuffing pattern composed of low-signal events that individually fell below threshold, or an active campaign briefed by Peritus threat intelligence.
+2. From the `AI decision drawer` on `/soc` or `/alerts`, click `Force-fire response`. The drawer presents a confirmation form.
+3. Select the action kind explicitly. The AI did not pick one, and the kind drives both the executor path and the customer-visible label. Use `isolate_network` rather than `kill_process` whenever a system process on a tier-0 host is in scope.
+4. Enter a `force_reason` of at least eight characters that names the intelligence source, the cross-tenant pattern, or the operational rationale. The text is persisted to `ai_agent_actions.override_reason`.
+5. Click `Fire`. The `ai-response-execute` edge function validates that the caller is a user (not a service account), that the `force_reason` length is sufficient, and that the caller appears in `public.super_admins`. On success, `ai_agent_actions.force_fired` is set to `true` and `ai_agent_actions.override_caller_id` is set to `auth.uid()`.
+6. Notify the customer and the channel partner through the Comms agent or, if speed is critical, through the operator's direct contact channel. The `forceFire override` badge will appear on every customer-facing surface for this incident.
 
-## When to **force-fire** an action the AI declined
+## Verification
+- After `Confirm action`: the `Autonomous response` card shows `Customer confirmed` with the confirming user identifier; the auto-rollback chip is absent.
+- After `Rollback now`: `ai_agent_actions.rolled_back_at` is populated, the action chip reads `Rolled back`, and the endpoint state on `/endpoints/:id` reflects the reversed action (network reconnected, process restored, or quarantine released).
+- After `Force-fire`: `ai_agent_actions.force_fired = true`, `ai_agent_actions.override_reason` contains the operator's text, and the `forceFire override` badge is visible on `/incidents/:id`, the customer view, and the channel partner view.
+- The `activity_logs` table contains a corresponding row with `action_type` set to `response_confirmed`, `response_rolled_back`, or `response_force_fired`.
 
-Sometimes the consensus didn't reach the threshold (Verification disagreed, or Adversarial refuted), but you know from operator experience this is real. Examples: a pattern of low-signal events that together form a credential-stuffing campaign; intel from another customer in the same vertical you've been watching.
+## Troubleshooting
+- **`Force-fire response` returns `force_reason_too_short`.** The `ai-response-execute` edge function rejects any reason shorter than eight characters. Re-enter a reason that names the intelligence source and the technique under suspicion.
+- **`Force-fire response` returns `caller_not_user`.** A service-role token is being presented. Sign in to the console with a real operator account; force-fire is never permitted from automation.
+- **`Rollback now` reports `action_already_terminal`.** The action has already completed and cannot be reversed by the standard rollback path. Use the super-admin `Force rollback` variant on `/incidents/:id` and follow the force-rollback procedure.
+- **The customer reports the rollback did not restore connectivity.** Open `/endpoints/:id`, inspect the `Defender posture` card and the `Network isolation` chip. If isolation is still active, run `Force rollback` and escalate to the Peritus on-call.
+- **The `forceFire override` badge does not appear after a force-fire.** The action was executed but the badge component reads `ai_agent_actions.force_fired`. Refresh `/incidents/:id`; if the badge is still absent after thirty seconds, the column did not update and the operator must open an internal ticket against the response engine.
 
-To override:
-1. Open the alert from `/soc/alerts` (or `/alerts`).
-2. Click **Force-fire response** in the AI verdict card.
-3. The platform requires:
-   - You must be a **super-admin** (or have the `soc_operator` role).
-   - **Force reason** (≥ 8 chars). This text lands in `ai_agent_actions.override_reason` and the audit log.
-4. Pick the action kind explicitly (the AI didn't pick one for you, so you must).
-5. Click **Fire**.
+## Audit and compliance
+- Every confirm, rollback, and force-fire writes a row to `public.activity_logs` with `action_type` set to `response_confirmed`, `response_rolled_back`, or `response_force_fired`, with `actor_id = auth.uid()` and the `incident_id` linked.
+- The `ai_agent_actions` row carries the full lifecycle: `status`, `customer_confirmed_at`, `rolled_back_at`, `customer_overrode_at`, `force_fired`, `override_caller_id`, and `override_reason`. The row is retained for 24 months.
+- Force-fire actions are flagged in the customer's monthly report and surfaced to the channel partner. The `forceFire override` badge is rendered on every reporting surface.
+- Recurring force-fire patterns against the same classification are tracked by the Peritus SOC quality programme and feed the prompt-tuning backlog.
 
-The action runs immediately and the incident is stamped with a **forceFire override** badge — visible to the customer, the reseller, and on every reporting surface.
-
-## Verify
-- After **Confirm**: the action shows `customer_confirmed` on the endpoint detail page; auto-rollback chip is gone.
-- After **Rollback**: the action shows `rolled_back` with your user id; the endpoint is back online (or process restarted, depending on action kind).
-- After **Force-fire**: the action shows the **forceFire** badge with your override reason in tooltip; `ai_agent_actions.force_fired = true` in the row.
-
-## Hardening notes
-- **Never force-fire `kill_process` against a tier-0 system process.** Use `isolate_network` instead.
-- **Always include a customer-visible reason** when force-firing. The customer will see the incident page and the trust hit is bigger than the threat in many cases.
-- **If you find yourself force-firing the same pattern repeatedly**, that's a signal to tune the triage prompt or add a new playbook. Open a backlog item.
-
-## Related
-- [Triage a new alert](/help/sops/soc_operator/triage-new-alert)
+## Related procedures
+- [Triage a new alert in the SOC console](/help/sops/soc_operator/triage-new-alert)
 - [Resolve an incident](/help/sops/soc_operator/resolve-incident)
-- [Peritus: force rollback AI response](/help/sops/peritus_super_admin/force-rollback-ai-response)
+- [Force-rollback an AI response](/help/sops/peritus_super_admin/force-rollback-ai-response)

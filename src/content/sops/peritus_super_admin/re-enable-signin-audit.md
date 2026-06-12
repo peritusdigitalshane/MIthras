@@ -1,60 +1,57 @@
 ---
-title: Re-enable signin / audit M365 polling after a Premium upgrade
+title: Re-enable Microsoft 365 sign-in and directory audit polling
 audience: peritus_super_admin
-description: When a customer upgrades to Entra ID Premium and gains access to signin and audit logs, flip the supported flags so the ITDR poller picks them up.
+description: After a customer activates Entra ID Premium, guide them through the standard reconnect flow so the ITDR poller resumes sign-in and directory audit ingestion.
 order: 5
 estimated_minutes: 10
 updated_at: 2026-06-12
 tags: m365, itdr, entra
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-A customer just upgraded their Microsoft 365 tenant from Business Basic / Standard to a SKU that includes **Entra ID Premium P1** or **P2** (typically Business Premium, Enterprise Mobility + Security, or M365 E3/E5). Premium unlocks two Graph endpoints we previously couldn't read:
+## Purpose
+This procedure restores Microsoft 365 sign-in and directory audit ingestion for a customer tenant after the customer has activated an Entra ID Premium P1 or P2 entitlement on their Microsoft 365 tenant. Without Premium, the Identity Threat Detection and Response (ITDR) poller records `no_premium` against the `auditLogs/signIns` and `auditLogs/directoryAudits` Microsoft Graph endpoints and skips ingestion. The procedure ensures the customer reconnects through the standard tenant authorisation flow so the poller picks up the elevated scopes on the next cycle.
 
-- `auditLogs/signIns` — sign-in events with geo, risk, and conditional-access context.
-- `auditLogs/directoryAudits` — directory change events.
-
-Without Premium, the M365 ITDR poller logs these as `no_premium` and skips them. After upgrade, we need to flip the flags so the poller starts ingesting.
+## Audience and authority
+The operator executing this procedure is a Peritus platform operator whose `user_id` is present in `public.super_admins`. The route `/m365` is gated by `is_super_admin(auth.uid())` for cross-tenant visibility. The reconnect flow itself is executed by the customer's Microsoft 365 administrator, not by the operator; Peritus operators do not perform admin consent on a customer tenant.
 
 ## Prerequisites
-- The customer has confirmed (in writing) the SKU upgrade is complete.
-- You have super-admin scope and access to `/m365`.
+- The customer's Microsoft 365 administrator has confirmed in writing that the tenant has been upgraded to a SKU that includes Entra ID Premium P1 or P2, such as Microsoft 365 Business Premium, Enterprise Mobility and Security E3, or Microsoft 365 E3 or E5.
+- The tenant exists in `public.m365_tenants` with a populated `tenant_id` and a prior successful connection state.
+- The customer's primary administrator can sign in to the Mithras console and reach `/m365` with `customer_admin` scope.
+- The operator has confirmed there are no open findings on `/admin/health` related to the customer's existing OAuth credential.
 
-## Steps
+## Procedure
 
-1. Open **`/m365`** and find the customer's tenant row.
-2. Click the tenant. You'll see the **Capability flags** card with the current state of:
-   - `signin_audit_supported` (typically `false`)
-   - `directory_audit_supported` (typically `false`)
-3. Click **Probe capabilities**. The platform makes a test call against each endpoint with the tenant's stored OAuth token. Possible outcomes:
-   - **200 OK** → endpoint is accessible; flag will be flipped to `true` and persisted.
-   - **403** → the tenant does NOT have Premium yet (or the app doesn't have the right Graph permission scopes). Don't flip the flag manually.
-   - **401** → OAuth token is expired or the app registration is missing. Re-run the customer's OAuth flow first.
-4. After a successful probe, the row shows ✅ for the relevant flag.
-5. Wait for the next ITDR poll cycle (every 5 min). Verify in `/m365` that `signins_polled` is no longer `no_premium` — it should now show the actual count of sign-ins ingested.
+1. Navigate to `/m365` and locate the customer's tenant row. The row displays the current values of `signin_audit_supported` and `directory_audit_supported` derived from `public.m365_tenants`.
+2. Select the tenant. The Tenant Detail view renders the connection state, the most recent poll timestamp, and the capability flag history.
+3. Confirm that `signin_audit_supported` and `directory_audit_supported` are `false`. If either flag is already `true`, the tenant is already configured for Premium ingestion and no action is required.
+4. Instruct the customer's primary administrator to sign in to the Mithras console and navigate to `/m365`.
+5. Direct the customer to select `Reconnect tenant`. The control initiates the standard Microsoft 365 authorisation flow, where the customer's Entra ID administrator grants admin consent for the elevated Graph scopes `AuditLog.Read.All` and `Directory.Read.All`.
+6. The reconnect flow updates the row in `public.m365_tenants` with the refreshed OAuth credential, the consented scope list, and a new `last_authorised_at` timestamp. The ITDR poller's capability probe runs on the next polling cycle — every five minutes — and persists the resulting capability flags.
+7. Confirm with the customer that the reconnect flow completed without an authorisation error. Common error returns include `AADSTS65001` for incomplete admin consent and `AADSTS50020` for cross-tenant guest sign-in.
 
-## Manual flag flip (rare)
-
-If the probe consistently fails with a transient error but you have confirmation Premium is active, you can manually flip the flag:
-
-1. From the same tenant detail, click **Edit capability flags**.
-2. Tick `signin_audit_supported` and/or `directory_audit_supported`.
-3. Add a reason note. This lands in `activity_logs` with your user id.
-4. Click **Save**.
-
-The next poll will attempt to fetch. If it 403s, the flag auto-flips back to `false` and you'll see an entry in `platform_health_findings` as an open finding.
-
-## Verify
-- Tenant detail shows both flags green.
-- `/m365` shows `signins_polled > 0` within 5 min.
-- The customer's `/m365/posture` page now shows the "Recent sign-ins" card with data.
-- The audit-log entry for the flag flip is in `activity_logs`.
+## Verification
+- The Tenant Detail view on `/m365` reports `signin_audit_supported = true` and `directory_audit_supported = true` within five minutes of the customer's reconnect.
+- The poll history shows the most recent `signins_polled` and `directory_audits_polled` counts as positive integers; the prior `no_premium` skip state no longer appears.
+- The customer's `/m365/posture` view renders the `Recent sign-ins` and `Directory changes` cards with current data.
+- `/activity` records a row with `action_type = 'm365_tenant_reconnected'` attributed to the customer's primary administrator, and a follow-on row with `action_type = 'm365_capability_flag_changed'` attributed to the ITDR poller service identity.
 
 ## Troubleshooting
-- **Probe returned 200 but next poll still says `no_premium`.** Stale cache. Restart the `peritus-edge-functions` container — it caches tenant config for 5 min.
-- **Flag flipped to `true` automatically but signins still empty.** Premium is on but the app registration is missing `AuditLog.Read.All` permission. Go to the customer's Azure portal → app registration → add the permission → admin consent.
-- **Flag keeps flipping back to `false`.** Auto-rollback is firing because polls are 403ing. Either Premium isn't actually active or the app permission is missing.
+- **The reconnect flow returns `AADSTS65001` to the customer.** Admin consent was not granted. The customer's Entra ID administrator must complete admin consent on the application registration for the consented scopes to take effect. Re-initiating the reconnect after admin consent is granted resolves the failure.
+- **The capability flags remain `false` after a successful reconnect.** The capability probe fetches against `auditLogs/signIns` and observed a `403`. This indicates the application registration is missing the `AuditLog.Read.All` Graph permission with admin consent. The customer's Microsoft 365 administrator must add the permission and grant admin consent before the next probe cycle.
+- **The capability flags flip to `true` but `signins_polled` remains zero across multiple cycles.** The OAuth token is valid but the elevated scopes were not included in the token. Direct the customer to re-run the reconnect flow; mid-session consent does not retroactively elevate an existing token.
+- **The Tenant Detail view does not refresh after the customer reconnects.** The edge function caches tenant configuration for five minutes. Wait for the cache window to elapse or restart the `peritus-edge-functions` container for an immediate refresh.
 
-## Related
-- [Onboard distributor](/help/sops/peritus_super_admin/onboard-distributor)
-- [Customer admin: review threats](/help/sops/customer_admin/review-threats)
+## Audit and compliance
+- The customer reconnect writes a row to `public.activity_logs` with `action_type = 'm365_tenant_reconnected'` attributed to the customer's administrator.
+- Each capability flag transition writes a row to `public.activity_logs` with `action_type = 'm365_capability_flag_changed'`, the prior and new flag values, and the service identity that performed the transition.
+- Persistent capability-probe failures write findings to `public.platform_health_findings` with category `m365_capability` for retention of 12 months and surface on `/admin/health`.
+- Sign-in and directory audit data ingested through these capabilities is retained in accordance with the customer's data retention configuration and supports incident response under the customer's regulatory framework, including the Essential Eight Maturity Level requirements for monitoring of privileged access.
+
+## Related procedures
+- [Onboard a new reseller organisation](/help/sops/peritus_super_admin/onboard-distributor)
+- [Force-rollback an AI Triage Agent response](/help/sops/peritus_super_admin/force-rollback-ai-response)
+- [Respond to an AI cost-budget alert](/help/sops/peritus_super_admin/respond-to-ai-budget-alert)

@@ -1,72 +1,81 @@
 ---
-title: Investigate a cross-tenant pattern
+title: Investigate a cross-tenant campaign
 audience: soc_operator
-description: When you spot the same indicator across multiple customer organisations, how to confirm the pattern, document it, and trigger a coordinated response from the SOC console + threat-hunting surface.
+description: Confirm a cross-tenant indicator pattern, pivot through the SOC console and threat-hunting surface, and coordinate a multi-org response.
 order: 4
 estimated_minutes: 15
 updated_at: 2026-06-12
-tags: ai-soc, hunting, threat-intel
+tags: ai-soc, threat-hunting, campaign, cross-tenant, mitre-attack
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-You notice the same indicator across multiple customers in a short window — same malicious URL, same hash, same C2 IP, same attacker handle in event logs. This is a **pattern that may span tenants**, not an isolated alert, and the response is different.
+## Purpose
+This procedure governs the investigation of an indicator that appears across more than one customer organisation in a short window. A cross-tenant pattern is treated as a campaign and is investigated, documented, and coordinated differently from a single-tenant alert. The operator's task is to confirm that the pattern is real and not commodity noise, scope the affected fleet through threat-hunting queries, attach the investigation to a tracking incident, and drive a coordinated per-organisation response.
 
-## Where to work
-Two surfaces, side by side:
+## Audience and authority
+The operator. Cross-tenant queries require a record in `public.super_admins`, which grants the cross-organisation read scope used by the SOC console and the threat-hunting query engine. Per-organisation response actions follow the same authorisation rules as the single-tenant procedures.
 
-- **`/soc`** — the cross-tenant SOC console. Aggregates alerts, triage verdicts, and incidents across every customer organisation you have super-admin scope to. Filterable by org, severity, IOC.
-- **`/threat-hunting`** — the manual investigation surface. Lets you run cross-tenant KQL-style queries against `endpoint_event_logs`, `firewall_audit_logs`, and `endpoint_threats`.
+## Prerequisites
+- The operator has identified a candidate indicator (file hash, command-and-control IP, malicious URL, mailbox sender, or attacker handle) from a triage decision, customer report, or external threat-intelligence feed.
+- The operator can sign in to the SOC console and reach `/soc` and `/threat-hunting`.
+- The operator has read-access to `endpoint_event_logs`, `firewall_audit_logs`, `endpoint_threats`, `alerts`, and `incidents` across all organisations in scope.
+- A second analyst is available for peer review of any cross-tenant comms or any force-fire executed during the investigation.
 
-The SOC chat panel inside `/soc` is your fastest way to ask cross-tenant questions in natural language ("How many endpoints across all orgs hit this hash in the last 7 days?"). It enforces a citation allowlist — you can trust the chip-referenced rows.
+## Procedure
 
-## Steps
+### 1. Confirm the pattern
 
-### 1. Confirm the pattern is real
+1. Open `/soc`. Enter the candidate indicator in the cross-tenant search box. The console returns matching rows from `alerts`, `ai_triage_decisions`, `endpoint_threats`, and `endpoint_event_logs`.
+2. Count the distinct `organization_id` values returned. The threshold for campaign treatment is three or more organisations within a forty-eight-hour window and the indicator is not on the commodity allow-list (generic scanner user agents, Microsoft update telemetry, or public-internet baseline noise).
+3. Use the embedded SOC chat panel inside `/soc` to summarise the pattern. The chat panel enforces a citation allowlist; only the cited rows are trustworthy. A typical query is `Across all organisations, summarise activity related to <indicator> in the last seven days. Include endpoint counts, MITRE ATT&CK techniques observed, and the top affected organisations.`
+4. Map the indicator and observed behaviour to MITRE ATT&CK techniques. A coherent technique chain (for example `T1566.001` Spearphishing Attachment to `T1059.001` PowerShell to `T1071.001` Web C2) is a strong signal of a real campaign.
 
-Open **`/soc`**. Filter by the suspect indicator (search box). Count distinct organisations.
+### 2. Scope the affected fleet
 
-A pattern is significant when:
-- The indicator hits **3+ organisations** within a **48h** window, AND
-- The indicator isn't a known commodity (e.g., generic curl UA from a benign scan, public-internet baseline noise).
+1. Open `/threat-hunting`. Construct a query that scopes the indicator across the tables that carry the relevant telemetry:
+   - For file hashes, query `endpoint_threats` filtered on `indicator_hash` and grouped by `organization_id`.
+   - For network indicators, query `firewall_audit_logs` filtered on `remote_address` or `remote_host`.
+   - For execution artefacts, query `endpoint_event_logs` filtered on `event_id` and the relevant `process_name` or `command_line` fragment.
+2. Cross-reference timestamps. Concentration in a narrow window (under six hours across multiple organisations) is consistent with a coordinated campaign; even distribution over days is more consistent with commodity malware.
+3. Save the query. The saved query is retained against the operator's profile and is available from the `Recent` panel for re-use by other analysts on shift.
 
-If unsure, use the SOC chat panel: *"Across all orgs, summarise activity related to `<indicator>` in the last 7 days. Include endpoint counts and the top techniques observed."* Cited rows in the response are linkable to source.
+### 3. Document the investigation
 
-### 2. Pivot in /threat-hunting
+1. The platform does not maintain a dedicated campaign object. The investigation is tracked as an incident with attached notes. Select the highest-severity incident already opened against the indicator, or open a tracking incident manually from `/incidents`.
+2. Set the incident title to `campaign-<indicator-short>-<YYYY-MM-DD>` so the tracking incident is discoverable. Example: `campaign-sha256-d41d8c-2026-06-12`.
+3. In the incident notes, record the affected `organization_id` values and endpoint counts, the MITRE ATT&CK techniques observed, the link to the saved threat-hunting query, and the source of the original detection.
+4. If the campaign matches a publicly disclosed operation, record the threat-actor name and the public reference in the notes. Do not include unverified attribution.
 
-For deeper detail, switch to `/threat-hunting`:
-- Run a query like `endpoint_threats | where indicator_hash == '<hash>' | summarize count() by organization_id`
-- Cross-reference timestamps to spot whether the activity is concentrated in a window or spread.
-- Save the query — it shows up in your saved-queries panel for re-use.
+### 4. Coordinate the per-organisation response
 
-### 3. Document the pattern
+1. For every affected organisation, locate the open incident on its `/incidents` page. If the AI Triage chain has not already opened an incident, open one manually and run `Force-fire response` with an explicit `force_reason` that names the campaign tracking incident.
+2. For organisations whose risk profile or business hours require operator-confirmed action, confirm the autonomous response from `/incidents/:id` and follow the approve-auto-response procedure.
+3. For organisations where the action ran but the customer reports operational impact, follow the rollback path in the approve-auto-response procedure and record the rollback rationale in the tracking incident notes.
+4. Notify each affected channel partner directly. The platform does not auto-distribute campaign briefings; the operator is responsible for partner comms during an active investigation.
+5. If the triage prompt missed the pattern, raise a backlog item against the Peritus SOC prompt-tuning programme with the indicator, the technique chain, and a representative citation set.
 
-There's no dedicated campaign object yet — track the investigation as a note attached to an incident. Pick the highest-severity incident already opened against this indicator (or open a manual one via the AdminHealth flow for a meta-tracker), and:
+## Verification
+- Every affected organisation has an open incident on its `/incidents` page linked to the indicator.
+- The tracking incident on the highest-severity organisation contains the saved threat-hunting query link, the affected organisation list, and the MITRE ATT&CK technique chain.
+- The saved threat-hunting query appears in the operator's `Recent` panel on `/threat-hunting`.
+- The `activity_logs` table contains rows with `action_type = 'campaign_investigation_started'` and one row per affected organisation as the operator dispositions each incident.
 
-- Title the incident clearly (`'pattern-<indicator>-<date>'`).
-- In the resolution notes, list the affected org IDs + endpoint counts.
-- Link back to the saved threat-hunting query.
+## Troubleshooting
+- **The cross-tenant search returns zero rows for a known indicator.** The indicator format is non-canonical (for example, uppercased hash or a URL with a trailing slash). Re-enter the indicator in the canonical form recorded in `endpoint_threats.indicator_hash` (lowercase hex) or `firewall_audit_logs.remote_host` (lowercase, no scheme).
+- **The SOC chat panel returns a summary with no citation chips.** The model produced an ungrounded answer and the orchestrator suppressed delivery. Re-issue the query with explicit scope (`in the last 24 hours`, `for organisations with active EOL hardening`). Ungrounded answers are never trusted.
+- **A threat-hunting query times out.** The query touches `firewall_audit_logs`, which is large and partitioned by day. Restrict the time range to a forty-eight-hour window and re-run. If the timeout persists, narrow the query to a single organisation and union the results.
+- **An affected organisation has no open incident.** The AI Triage chain produced a `benign` verdict on the original alert. Open an incident manually from `/incidents`, attach the indicator and the tracking incident reference, and force-fire the appropriate response under the four-eyes rule.
+- **Escalation is required.** The pattern affects ten or more customer organisations, the indicators match a publicly disclosed nation-state operation, or the indicator is associated with an unpatched vulnerability. Notify the Peritus on-call duty officer and the leadership channel before any cross-customer comms. Do not publish the briefing externally until leadership has authorised partner distribution.
 
-### 4. Push the response
+## Audit and compliance
+- The tracking incident is retained in `public.incidents` for the lifetime of the customer organisation that owns it. Notes, attached query links, and resolution text are retained for seven years in accordance with the Peritus SOC evidentiary standard.
+- Every per-organisation disposition writes a row to `public.activity_logs` with the relevant `action_type` and `actor_id = auth.uid()`.
+- Force-fire actions executed during a campaign investigation are flagged in each affected customer's monthly report and surfaced to the channel partner.
+- The saved threat-hunting query is retained against the operator's profile for thirty days; promotion to a permanent hunting pack requires a peer review and a separate procedure.
 
-You have three levers:
-
-- **Per-org incidents** — for every affected org, the AI SOC already opened an incident (or you can manually create one via `/incidents`). Each customer's reseller will see it.
-- **Update triage prompts** — if this is a pattern the AI missed, add example evidence to the triage prompt history so future alerts are caught early. Open a backlog item.
-- **Notify affected resellers** — manually email the channel partner for each affected org with a brief. The platform doesn't auto-fan-out campaign briefings yet.
-
-## Verify
-- Affected orgs each have an open incident in their `/incidents` page tied to the indicator.
-- Your saved threat-hunting query is in the **Recent** panel.
-- The audit log at `/activity` shows your investigation steps.
-
-## When to escalate to Peritus leadership
-- The pattern affects **10+ customer orgs**, or
-- The indicators match a publicly-disclosed nation-state operation, or
-- You've found a **0-day exploitation pattern** (the IOC is associated with a vulnerability with no patch).
-
-→ Direct message the on-call CISO contact and CC the leadership channel. Don't publish to customers until leadership has briefed channel partners.
-
-## Related
-- [Triage a new alert](/help/sops/soc_operator/triage-new-alert)
-- [Approve auto-response](/help/sops/soc_operator/approve-auto-response)
-- [Resolve incident](/help/sops/soc_operator/resolve-incident)
+## Related procedures
+- [Triage a new alert in the SOC console](/help/sops/soc_operator/triage-new-alert)
+- [Approve or override an autonomous response](/help/sops/soc_operator/approve-auto-response)
+- [Resolve an incident](/help/sops/soc_operator/resolve-incident)

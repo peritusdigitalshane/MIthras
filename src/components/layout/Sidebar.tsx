@@ -158,6 +158,7 @@ const adminNavigation = [
   { name: "AI costs", href: "/admin/ai-costs", icon: Sparkles },
   { name: "Distributor portal", href: "/distributor", icon: Warehouse },
   { name: "System Health", href: "/admin/health", icon: Activity },
+  { name: "Audit logs", href: "/admin/audit-logs", icon: FileText },
 ];
 
 const socNavigation = [

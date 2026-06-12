@@ -59,7 +59,16 @@ function slugAndAudienceFromPath(path: string): { audience: SopAudience; slug: s
   return { audience, slug };
 }
 
+const VALID_AUDIENCES = new Set<SopAudience>([
+  "peritus_super_admin", "soc_operator", "distributor", "partner",
+  "customer_admin", "customer_member", "home_user",
+]);
+
 const SOPS: Sop[] = Object.entries(rawModules)
+  .filter(([path]) => {
+    const fileName = path.split("/").pop() ?? "";
+    return !fileName.startsWith("_");
+  })
   .map(([path, raw]) => {
     const { data, content } = parseFrontmatter(raw);
     const { audience, slug } = slugAndAudienceFromPath(path);
@@ -75,6 +84,7 @@ const SOPS: Sop[] = Object.entries(rawModules)
       content: content.trim(),
     };
   })
+  .filter((s) => VALID_AUDIENCES.has(s.audience))
   .sort((a, b) => {
     if (a.audience !== b.audience) return a.audience.localeCompare(b.audience);
     if (a.order !== b.order) return a.order - b.order;

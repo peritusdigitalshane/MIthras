@@ -1,56 +1,58 @@
 ---
 title: Read your monthly Mithras report
 audience: customer_member
-description: Where to find your monthly report, how to interpret what it tells you, and what's worth flagging to your IT lead.
+description: Locate, interpret, and act on the monthly Mithras security report delivered to your organisation.
 order: 1
 estimated_minutes: 6
 updated_at: 2026-06-12
-tags: reports, security-hygiene
+tags: reports, security-hygiene, customer-member
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-On the **first week of each month** when you get the "Your Mithras report is ready" email — or any time you want a snapshot of how your organisation is going.
+## Purpose
+This procedure explains how to locate the monthly Mithras Threat Defence report for your organisation, how to read each section in the order it appears, and which observations warrant escalation to your customer administrator. The monthly report is the primary instrument by which non-administrative staff verify that the platform is performing the work it was engaged to perform.
 
-## Where to find it
-- **Email** — the PDF is attached to the monthly email from your reseller.
-- **Web** — go to `/customer/reports`. You can read the latest report rendered in the browser and download any prior month.
+## Audience and authority
+Members of a customer organisation whose `organization_memberships.role` is `member`. The procedure is read-only. It does not require the `admin` or `owner` role, and it does not invoke any mutating Remote Procedure Call (RPC) or edge function.
 
-You don't need admin access; any member of the organisation can read the report.
+## Prerequisites
+- You hold an active membership in the customer organisation, confirmed by a row in `public.organization_memberships` with your `user_id`.
+- You are signed in to the Mithras console at `https://www.mithras.com.au/login`.
+- Your organisation has been live on the platform for at least one full calendar month, so that a published report exists.
+- Your email address is configured on `public.org_report_recipients` for category `monthly_report`, or you have access to a colleague's copy.
 
-## What you'll see (in order)
+## Procedure
 
-### Executive summary
-One or two paragraphs your reseller wrote about your specific situation. Read this first — if anything sounds urgent or unusual, message your IT lead.
+1. Open the Mithras console and navigate to `/customer/reports`.
+2. The page lists the published reports in reverse chronological order. The most recent entry is labelled with the prior calendar month under the `Reporting period` column. Select the topmost row.
+3. The report renders in the browser. Confirm the heading matches the period stated in the email subject `Your Mithras report is ready`.
+4. Read the `Executive summary` section. It contains the narrative your reseller has written for the reporting period. Note any sentence flagged with the word `Critical` or `Action required`.
+5. Read the `Endpoint coverage` panel. The `Total endpoints` figure is the count of rows in `public.endpoints` with `is_active = true` for the period. The `Uptime` percentage is derived from `public.endpoint_status` heartbeats. A figure below `95%` indicates a device was offline for material time.
+6. Read the `Threats handled` panel. Counts are grouped by `endpoint_threats.severity` into `Severe`, `High`, `Moderate`, and `Low`. Named incidents under `Notable events` link to the corresponding entry in `public.incidents`.
+7. Read the `Defender posture` panel. Each control (`Real-time protection`, `Antivirus engine`, `Behaviour monitoring`, `Tamper protection`) carries a green, amber, or red indicator. Amber or red means the control was disabled or unhealthy for part of the period.
+8. Read the `Vulnerability findings` panel. The figure is the count of open Common Vulnerabilities and Exposures (CVE) records attributed to your endpoints. The trend arrow compares against the prior period.
+9. Read the `Recommendations for next month` panel. Each item is an action proposed by your reseller. Items marked `Requires customer approval` need a decision from your administrator.
+10. Close the report. To download a Portable Document Format (PDF) copy for records, use the `Download PDF` control in the top right of the report header.
 
-### Endpoint coverage
-- **Total endpoints** — laptops + desktops + servers being monitored.
-- **Uptime %** — the agent should be running ~all the time. Anything below 95% is worth a question.
-- **New endpoints this month** — confirm they're real machines, not someone setting up a personal device.
+## Verification
+- The figures on the rendered `/customer/reports` page match the PDF attached to the monthly email.
+- The `Reporting period` field references the prior calendar month, not the current month.
+- The `Total endpoints` figure on the report agrees with the count visible at `/customer/endpoints`.
+- The `Open vulnerabilities` figure on the report agrees with the open count on the endpoint detail pages at `/customer/endpoints`.
 
-### Threats handled
-- **Severe / High** — things Mithras stopped that *could* have caused real harm.
-- **Moderate / Low** — common stuff. The number going up isn't always bad; sometimes it means the agent is just doing its job.
-- If you see a **named incident** with a description, that's worth knowing the story behind. Ask your IT lead.
+## Troubleshooting
+- **No report appears for the most recent month.** Reports are published within the first seven calendar days of the following month. If day eight has passed and no entry exists, ask your customer administrator to confirm delivery with the reseller.
+- **The figures in the browser differ from the figures in the PDF.** The PDF is generated at the moment of publication and is immutable. The browser view reflects the same snapshot. A genuine mismatch indicates a delivery error; ask your customer administrator to escalate using `/customer/contact`.
+- **The `Recommendations for next month` panel is empty.** This is a valid state when the reseller has no proposed changes. It is not an error.
+- **You cannot reach `/customer/reports`.** Confirm with your customer administrator that your membership is active. Membership revocation removes access to the entire `/customer` area without further notice.
 
-### Defender posture
-A health chip for each major Defender control. **All-green is normal**. Any amber/red chip means a control was off for part of the month.
+## Audit and compliance
+- Each report view is recorded to `public.activity_logs` with `action_type = 'customer_report_viewed'` and `actor_id = auth.uid()`.
+- Each PDF download is recorded to `public.activity_logs` with `action_type = 'customer_report_downloaded'`.
+- Report artefacts are retained in `public.customer_reports` for the duration of your contract and a further 24 months thereafter, in line with the customer's data retention configuration.
+- The email distribution list is sourced exclusively from `public.org_report_recipients` for category `monthly_report`. Recipients are not retained elsewhere.
 
-### Vulnerability findings
-Open CVEs (Common Vulnerabilities and Exposures) on your endpoints' software. A reducing count over months is good.
-
-### What we recommend next month
-This is your reseller's "ask" — usually approval to roll a Defender policy change, upgrade an EOL Windows machine, or close out a vulnerability.
-
-## When to flag something to your IT lead
-- The executive summary mentions a **critical** incident.
-- The number of severe threats stopped is suddenly much higher (or much lower) than prior months.
-- A Defender posture chip is red.
-- Vulnerability count is climbing.
-- The "we recommend" section mentions anything that needs **your** action.
-
-## Verify
-- The report on `/customer/reports` matches the PDF in your email — same numbers, same date stamp.
-- The report covers the **prior** month (May report is published in June).
-
-## Related
-- [Escalate a concern](/help/sops/customer_member/escalate-a-concern)
+## Related procedures
+- [Escalate a security concern](/help/sops/customer_member/escalate-a-concern)

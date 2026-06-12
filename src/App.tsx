@@ -31,6 +31,7 @@ import Admin from "./pages/Admin";
 import AdminOverview from "./pages/AdminOverview";
 import SystemHealth from "./pages/SystemHealth";
 import AdminHealth from "./pages/AdminHealth";
+import AdminAuditLogs from "./pages/AdminAuditLogs";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Recommendations from "./pages/Recommendations";
@@ -265,6 +266,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <SystemHealth />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/audit-logs"
+                element={
+                  <ProtectedRoute>
+                    <AdminAuditLogs />
                   </ProtectedRoute>
                 }
               />

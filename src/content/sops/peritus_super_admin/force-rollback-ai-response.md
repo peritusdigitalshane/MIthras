@@ -1,58 +1,60 @@
 ---
-title: Force-rollback a misfired AI response
+title: Force-rollback an AI Triage Agent response
 audience: peritus_super_admin
-description: Operator override when the AI SOC ran an autonomous action that shouldn't have. Reverses the action, logs an audit row, and feeds the triage prompt for next time.
+description: Reverse an autonomous AI Triage Agent action from the Incident Detail page, attribute the override, and capture context for prompt review.
 order: 4
 estimated_minutes: 8
 updated_at: 2026-06-12
 tags: ai-soc, override, incident-response
+owner: Mithras Customer Operations
+classification: Operational procedure
+review_cadence: Quarterly
 ---
 
-## When to use this
-The AI SOC ran an autonomous action — typically `isolate_network`, `kill_process`, or `quarantine_file` — and it's now clear it shouldn't have. Common triggers:
+## Purpose
+This procedure executes an operator override of an autonomous action taken by the AI Triage Agent when the customer-driven confirmation flow is insufficient — typically because the action has caused, or is causing, customer impact. The procedure reverses the action by invoking the `ai-response-rollback` edge function from the Incident Detail page, writes the override to the audit log, and optionally reclassifies the underlying triage decision so the verdict no longer contributes positive history to future triage.
 
-- The customer / reseller called: "Why is my server off the network?"
-- A SOC operator reviewed the verdict trail and flagged `refuted` on the adversarial agent — but the system fired anyway (look for `force_fired = true`).
-- A correlated batch of false-positive alerts hit multiple customers at once.
+## Audience and authority
+The operator executing this procedure is a Peritus platform operator whose `user_id` is present in `public.super_admins`. The `Force rollback` control on the Incident Detail page is rendered only when `is_super_admin(auth.uid())` returns true and the action is in a reversible state. Invocation of `ai-response-rollback` writes to `public.ai_agent_actions` and `public.activity_logs` under the operator's identity.
 
-The customer-self-service "Confirm action" flow is the soft path. **Force-rollback** is the operator override for when waiting isn't safe.
+## Prerequisites
+- An autonomous action — `isolate_network`, `kill_process`, or `quarantine_file` — has been recorded in `public.ai_agent_actions` for the incident in question.
+- The action is not in `customer_confirmed` state. Customer-confirmed actions require customer-initiated rollback through the standard confirmation flow.
+- The operator has identified the root cause of the misfire to a sufficient standard to record a written justification of at least twenty characters.
+- The operator has confirmed the affected endpoint is reachable, or has accepted that the inverse command will be queued for the next agent heartbeat.
 
-## Steps
+## Procedure
 
-1. Open the incident from `/incidents` or directly via the alert detail.
-2. In the **Autonomous response** card, click **Force rollback** (super-admin button, distinct from the customer's "Rollback now").
-3. The dialog requires:
-   - **Reason** (≥ 20 chars) — what makes the action wrong. *"False-positive on Contoso Healthcare's NAV ERP installer; same signature flagged on 3 other tier customers in last 60min"*. Lands in `ai_agent_actions.rollback_reason` and the audit log.
-   - **Adjust verdict?** — checkbox. If ticked, also reclassifies the triage decision from the original verdict (e.g., `malicious`) to `benign`. Pick this if the underlying decision is wrong, not just the action.
-   - **Notify customer?** — checkbox. Defaults on. Sends the customer-facing "We've reversed action X" email immediately, ahead of the next monthly report.
-4. Click **Rollback now**.
+1. Open the Incident Detail page from `/soc` or directly via the incident link in the operator's alert email.
+2. Locate the `Autonomous response` card. The card lists the action taken, the verdict attributed by the AI Triage Agent, the adversarial agent's adjudication, and the action state.
+3. Select `Force rollback`. The control is distinct from the customer-facing `Rollback now` control and is visible only to super-admin operators.
+4. Populate the override dialog:
+   - `Reason` — a written justification of at least twenty characters. The value is persisted to `public.ai_agent_actions.rollback_reason` and to `public.activity_logs`. State the observed false-positive signal, the customer impact, and any correlated incidents.
+   - `Adjust verdict?` — when selected, reclassifies the triage decision from its original verdict to `benign`. Select this option when the underlying decision is incorrect; do not select it when the verdict was correct but the action choice was disproportionate.
+   - `Notify customer?` — defaults to selected. When selected, dispatches the customer-facing rollback notification email immediately rather than deferring to the next scheduled report.
+5. Select `Rollback now`. The platform invokes the `ai-response-rollback` edge function with the action identifier and the operator's bearer token.
+6. The edge function writes the reversal command to the affected endpoint's command queue and updates `public.ai_agent_actions.state` to `force_rolled_back`. The inverse command — `unisolate_network`, `restart_process`, or `restore_file` — is delivered on the next agent heartbeat, typically within thirty seconds.
 
-The platform issues the inverse command (`unisolate_network`, `restart_process`, `restore_file`) on the next agent heartbeat (typically under 30 seconds).
-
-## When also to reclassify
-
-Always reclassify when the underlying verdict was wrong, not just the action choice. A correct `malicious` verdict + wrong action choice → roll back without reclassify (the verdict is still useful for context). A wrong `malicious` verdict → roll back **and** reclassify (so future triage doesn't use it as positive history).
-
-## When to escalate the rollback
-
-If a force-rollback affects **3+ customers in 60 minutes** with the same root cause, that's a model-quality or prompt regression. Open a high-priority incident on `/admin/health` (manual create) with severity `high` and tag with `ai_soc_regression`. The team needs to inspect:
-
-- Recent prompt changes (`git log _shared/prompts/`)
-- Recent model swaps (`ai_model_rates` history)
-- Specific customers in scope (is one customer's data poisoning others' triage?)
-
-## Verify
-- The action chip on the incident shows `force_rolled_back` with your user id + reason.
-- The endpoint detail page shows the inverse command queued and executed.
-- The customer received the rollback email (check audit log).
-- The triage decision's `operator_verdict` column is set if you reclassified.
-- The audit log at `/activity` shows `force_rollback` with full context.
+## Verification
+- The `Autonomous response` card displays the action state as `force_rolled_back`, attributed to the operator's `user_id`, with the recorded `rollback_reason`.
+- The Endpoint Detail page for the affected endpoint shows the inverse command in the command-execution log with a populated `executed_at` timestamp.
+- The triage decision in `public.ai_triage_decisions` carries a populated `operator_verdict` column when the verdict was reclassified.
+- `/activity` records a row with `action_type = 'ai_response_rolled_back'`, the action identifier, the reason, and the operator's `user_id`.
+- The customer-facing rollback notification appears in the customer's email outbox audit when `Notify customer?` was selected.
 
 ## Troubleshooting
-- **Force-rollback dialog is greyed out.** Action is already in `customer_confirmed` state — the customer accepted it. Talk to them first.
-- **Inverse command didn't execute.** The endpoint may be offline. Look at `endpoints.last_seen`. If offline, the rollback is queued — it'll fire on next heartbeat. Don't double-issue.
-- **Customer received the email but says the endpoint is still isolated.** Check `endpoint_status.is_isolated`. The agent may have raced — try `restart_agent_service` from the endpoint detail.
+- **The `Force rollback` control is disabled.** The action is already in `customer_confirmed` state. Customer confirmation supersedes operator override; contact the customer's primary administrator before any further reversal.
+- **The inverse command has not executed within five minutes.** The endpoint is offline. Inspect `endpoints.last_seen` to confirm. The inverse command remains queued and will execute on the next heartbeat. Do not re-issue the rollback; duplicate inverse commands produce ambiguous endpoint state.
+- **The customer reports the endpoint remains isolated after the inverse command executed.** Inspect `endpoint_status.is_isolated` for the latest snapshot. A persistent `true` value indicates an agent state mismatch; execute `restart_agent_service` from the Endpoint Detail page to force agent reinitialisation.
+- **Three or more force rollbacks have been executed across distinct customers within sixty minutes with a shared root cause.** This indicates a model-quality or prompt regression. Open a high-severity finding on `/admin/health` with the tag `ai_soc_regression`, link the affected incidents, and notify engineering for prompt and model rate review.
 
-## Related
-- [Approve auto-response](/help/sops/soc_operator/approve-auto-response)
-- [Respond to AI budget alert](/help/sops/peritus_super_admin/respond-to-ai-budget-alert)
+## Audit and compliance
+- The reversal writes a row to `public.activity_logs` with `action_type = 'ai_response_rolled_back'`, the affected `action_id`, the operator's `user_id`, and the full `rollback_reason` text.
+- The action row in `public.ai_agent_actions` is updated with `state = 'force_rolled_back'`, `rolled_back_by = auth.uid()`, and `rolled_back_at = now()`.
+- A reclassification updates `public.ai_triage_decisions.operator_verdict` and `operator_verdict_set_by`. The original verdict is retained for model-quality analysis.
+- AI agent actions are retained in `public.ai_agent_actions` for 24 months in accordance with the customer's data retention configuration and support post-incident review, regulator notification, and prompt regression analysis.
+
+## Related procedures
+- [Respond to an AI cost-budget alert](/help/sops/peritus_super_admin/respond-to-ai-budget-alert)
+- [Audit channel margins across the reseller hierarchy](/help/sops/peritus_super_admin/audit-channel-margins)
+- [Re-enable Microsoft 365 sign-in and directory audit polling](/help/sops/peritus_super_admin/re-enable-signin-audit)
