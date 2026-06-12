@@ -32,6 +32,8 @@ import AdminOverview from "./pages/AdminOverview";
 import SystemHealth from "./pages/SystemHealth";
 import AdminHealth from "./pages/AdminHealth";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
+import ApiKeys from "./pages/ApiKeys";
+import ApiDocs from "./pages/ApiDocs";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Recommendations from "./pages/Recommendations";
@@ -274,6 +276,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <AdminAuditLogs />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings/api-keys"
+                element={
+                  <ProtectedRoute>
+                    <ApiKeys />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/api-docs"
+                element={
+                  <ProtectedRoute>
+                    <ApiDocs />
                   </ProtectedRoute>
                 }
               />

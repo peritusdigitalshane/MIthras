@@ -37,6 +37,7 @@ import {
   Home,
   Coins,
   Target,
+  KeyRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -159,6 +160,8 @@ const adminNavigation = [
   { name: "Distributor portal", href: "/distributor", icon: Warehouse },
   { name: "System Health", href: "/admin/health", icon: Activity },
   { name: "Audit logs", href: "/admin/audit-logs", icon: FileText },
+  { name: "API keys", href: "/settings/api-keys", icon: KeyRound },
+  { name: "API docs", href: "/api-docs", icon: BookOpen },
 ];
 
 const socNavigation = [
