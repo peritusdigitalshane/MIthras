@@ -8,6 +8,7 @@ import { EndpointResponseActions } from "@/components/endpoints/EndpointResponse
 import { DefenderStateCard } from "@/components/endpoints/DefenderStateCard";
 import { UpgradeAgentButton } from "@/components/endpoints/UpgradeAgentButton";
 import { RemoteDesktopButton } from "@/components/endpoints/RemoteDesktopButton";
+import { DecommissionButton } from "@/components/endpoints/DecommissionButton";
 import { RemoteAccessCard } from "@/components/endpoints/RemoteAccessCard";
 import { IsolationModeToggle } from "@/components/endpoints/IsolationModeToggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -332,7 +333,8 @@ const EndpointDetail = () => {
         </div>
 
         {/* Remote Desktop quick-launch — only enabled once Remote Access is installed */}
-        <div className="flex justify-end">
+        <div className="flex justify-end items-center gap-2 flex-wrap">
+          <DecommissionButton endpointId={endpoint.id} hostname={endpoint.hostname} />
           <RemoteDesktopButton endpointId={endpoint.id} hostname={endpoint.hostname} meshAgentState={endpoint.mesh_agent_state ?? "not_installed"} />
         </div>
 

@@ -63,14 +63,17 @@ try {
         else { Write-Warning "[build-bundle] missing $f in source" }
     }
 
-    # lib/ and vendor/ wholesale
+    # lib/, vendor/, install/ wholesale. install/ ships Force-Remove.ps1
+    # so the agent's uninstall_self command can find a break-glass cleanup
+    # script at C:\ProgramData\Mithras\install\Force-Remove.ps1.
     Copy-Item -Path (Join-Path $AgentSrc 'lib')     -Destination $Stage -Recurse -Force
     Copy-Item -Path (Join-Path $AgentSrc 'vendor')  -Destination $Stage -Recurse -Force
+    Copy-Item -Path (Join-Path $AgentSrc 'install') -Destination $Stage -Recurse -Force
 
     # Skip tests/, _legacy-extracted/, testdata/, backups/ -- they're not for production.
 
     # Verify the bundle is complete enough that install-agent.ps1 will succeed.
-    foreach ($must in 'install-agent.ps1','mithras-agent.ps1','agent.version','mithras.ico','mithras-tray.ps1','vendor\nssm.exe','lib\HmacAuth.psm1','lib\FirewallAuditCollector.psm1') {
+    foreach ($must in 'install-agent.ps1','mithras-agent.ps1','agent.version','mithras.ico','mithras-tray.ps1','vendor\nssm.exe','lib\HmacAuth.psm1','lib\FirewallAuditCollector.psm1','install\Force-Remove.ps1') {
         $check = Join-Path $Stage $must
         if (-not (Test-Path $check)) { throw "[build-bundle] required file missing from bundle: $must" }
     }
