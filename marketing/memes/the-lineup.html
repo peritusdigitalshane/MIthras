@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The Lineup — Where your cybersecurity is based</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; background: #000; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; padding: 56px 50px; }
+  .title { animation: fadeUp 0.5s ease-out 0.1s both; }
+  .title h1 { font-size: 50px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .title p { font-size: 22px; font-weight: 600; color: rgba(255,255,255,0.6); margin-top: 12px; }
+  .grid { flex: 1; display: flex; flex-direction: column; gap: 14px; margin-top: 30px; }
+  .row { display: grid; grid-template-columns: 90px 1fr 120px 60px; gap: 18px; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px 22px; }
+  .row.hero { background: linear-gradient(90deg, rgba(40,217,107,0.18), rgba(40,217,107,0.04)); border-color: rgba(40,217,107,0.4); }
+  .flag { width: 80px; aspect-ratio: 3/2; border-radius: 5px; box-shadow: 0 0 0 1px rgba(255,255,255,0.1); overflow: hidden; }
+  .name { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .name .sub { display: block; font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.5); letter-spacing: 0; margin-top: 3px; }
+  .country { font-size: 18px; font-weight: 700; letter-spacing: 1px; color: rgba(255,255,255,0.85); text-transform: uppercase; }
+  .country.good { color: #28d96b; }
+  .mark { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; line-height: 1; justify-self: end; }
+  .mark.x { background: rgba(255,77,77,0.18); color: #ff4d4d; }
+  .mark.c { background: rgba(40,217,107,0.18); color: #28d96b; }
+  .row:nth-child(1) { animation: fadeInLeft 0.4s ease-out 0.2s both; }
+  .row:nth-child(2) { animation: fadeInLeft 0.4s ease-out 0.3s both; }
+  .row:nth-child(3) { animation: fadeInLeft 0.4s ease-out 0.4s both; }
+  .row:nth-child(4) { animation: fadeInLeft 0.4s ease-out 0.5s both; }
+  .row:nth-child(5) { animation: fadeInLeft 0.4s ease-out 0.6s both; }
+  .row:nth-child(6) { animation: fadeInLeft 0.4s ease-out 0.7s both; }
+  .row.hero       { animation: heroPop 0.6s ease-out 1.0s both; }
+  .tagline { text-align: center; margin-top: 22px; animation: fadeUp 0.7s ease-out 1.3s both; }
+  .tagline .big { font-size: 52px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .tagline .url { font-size: 22px; font-weight: 700; letter-spacing: 6px; color: #28d96b; margin-top: 14px; }
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 75% 70%, rgba(40,217,107,0.10), transparent 50%); z-index: -1; }
+  @keyframes fadeInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes fadeUp     { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes heroPop    { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+</style>
+</head>
+<body>
+  <div class="title">
+    <h1>WHERE YOUR CYBER SECURITY VENDOR IS BASED</h1>
+    <p>Origin of HQ ownership. Where decisions get made. Where your data goes.</p>
+  </div>
+
+  <div class="grid">
+
+    <div class="row">
+      <svg class="flag" viewBox="0 0 9 6" preserveAspectRatio="none"><rect width="9" height="6" fill="#fff"/><rect width="9" height="2" y="2" fill="#0033A0"/><rect width="9" height="2" y="4" fill="#DA291C"/></svg>
+      <div class="name">Kaspersky<span class="sub">Moscow</span></div>
+      <div class="country">Russia</div>
+      <div class="mark x">✕</div>
+    </div>
+
+    <div class="row">
+      <svg class="flag" viewBox="0 0 13 8" preserveAspectRatio="none">
+        <rect width="13" height="8" fill="#fff"/>
+        <g fill="#B22234"><rect width="13" y="0" height="0.62"/><rect width="13" y="1.23" height="0.62"/><rect width="13" y="2.46" height="0.62"/><rect width="13" y="3.69" height="0.62"/><rect width="13" y="4.92" height="0.62"/><rect width="13" y="6.15" height="0.62"/><rect width="13" y="7.38" height="0.62"/></g>
+        <rect width="5.2" height="4.31" fill="#3C3B6E"/>
+      </svg>
+      <div class="name">Huntress<span class="sub">Ellicott City, MD</span></div>
+      <div class="country">USA</div>
+      <div class="mark x">✕</div>
+    </div>
+
+    <div class="row">
+      <svg class="flag" viewBox="0 0 13 8" preserveAspectRatio="none">
+        <rect width="13" height="8" fill="#fff"/>
+        <g fill="#B22234"><rect width="13" y="0" height="0.62"/><rect width="13" y="1.23" height="0.62"/><rect width="13" y="2.46" height="0.62"/><rect width="13" y="3.69" height="0.62"/><rect width="13" y="4.92" height="0.62"/><rect width="13" y="6.15" height="0.62"/><rect width="13" y="7.38" height="0.62"/></g>
+        <rect width="5.2" height="4.31" fill="#3C3B6E"/>
+      </svg>
+      <div class="name">CrowdStrike<span class="sub">Sunnyvale, CA</span></div>
+      <div class="country">USA</div>
+      <div class="mark x">✕</div>
+    </div>
+
+    <div class="row">
+      <svg class="flag" viewBox="0 0 11 8" preserveAspectRatio="none">
+        <rect width="11" height="8" fill="#fff"/>
+        <rect y="2.67" width="11" height="2.67" fill="#0038B8"/>
+        <polygon points="5.5,2 4.6,3.5 6.4,3.5" fill="#0038B8"/>
+        <polygon points="5.5,6 4.6,4.5 6.4,4.5" fill="#0038B8"/>
+      </svg>
+      <div class="name">SentinelOne<span class="sub">Mountain View / Tel Aviv</span></div>
+      <div class="country">USA / Israel</div>
+      <div class="mark x">✕</div>
+    </div>
+
+    <div class="row">
+      <svg class="flag" viewBox="0 0 13 8" preserveAspectRatio="none">
+        <rect width="13" height="8" fill="#fff"/>
+        <g fill="#B22234"><rect width="13" y="0" height="0.62"/><rect width="13" y="1.23" height="0.62"/><rect width="13" y="2.46" height="0.62"/><rect width="13" y="3.69" height="0.62"/><rect width="13" y="4.92" height="0.62"/><rect width="13" y="6.15" height="0.62"/><rect width="13" y="7.38" height="0.62"/></g>
+        <rect width="5.2" height="4.31" fill="#3C3B6E"/>
+      </svg>
+      <div class="name">Sophos<span class="sub">Owned by US private equity (Thoma Bravo)</span></div>
+      <div class="country">USA</div>
+      <div class="mark x">✕</div>
+    </div>
+
+    <div class="row hero">
+      <svg class="flag" viewBox="0 0 1200 600" preserveAspectRatio="none">
+        <rect width="1200" height="600" fill="#00247D"/>
+        <g><path d="M0,0 L600,300 M600,0 L0,300" stroke="#fff" stroke-width="60"/><clipPath id="lc"><rect width="600" height="300"/></clipPath><g clip-path="url(#lc)"><path d="M0,0 L600,300" stroke="#CF142B" stroke-width="20" transform="translate(0,15)"/><path d="M600,0 L0,300" stroke="#CF142B" stroke-width="20" transform="translate(0,-15)"/></g><rect x="0" y="125" width="600" height="50" fill="#fff"/><rect x="275" y="0" width="50" height="300" fill="#fff"/><rect x="0" y="135" width="600" height="30" fill="#CF142B"/><rect x="285" y="0" width="30" height="300" fill="#CF142B"/></g>
+        <g transform="translate(300,450)" fill="#fff"><polygon points="0,-70 16,-22 65,-22 25,8 40,55 0,28 -40,55 -25,8 -65,-22 -16,-22"/></g>
+        <g fill="#fff"><polygon points="900,360 909,388 938,388 915,406 924,434 900,418 876,434 885,406 862,388 891,388"/><polygon points="1050,255 1058,279 1083,279 1063,294 1071,318 1050,304 1029,318 1037,294 1017,279 1042,279"/><polygon points="930,180 938,204 963,204 943,219 951,243 930,229 909,243 917,219 897,204 922,204"/><polygon points="810,300 818,324 843,324 823,339 831,363 810,349 789,363 797,339 777,324 802,324"/><polygon points="975,420 980,432 993,432 982,440 987,452 975,444 963,452 968,440 957,432 970,432"/></g>
+      </svg>
+      <div class="name">Mithras<span class="sub">Sydney, Australia</span></div>
+      <div class="country good">AUSTRALIA</div>
+      <div class="mark c">✓</div>
+    </div>
+
+  </div>
+
+  <div class="tagline">
+    <div class="big">YOUR DATA. YOUR POSTCODE.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+</body>
+</html>

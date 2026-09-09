@@ -27,6 +27,10 @@ export const READ_ONLY_SCOPES = [
     // Mailbox rules (per-user inbox rules via Mail.Read scope and
     // Exchange Online MailboxSettings.Read for the rules collection).
     "MailboxSettings.Read",
+    // Read message metadata + bodies for AI-driven email security
+    // analysis. Required for the m365-email-sweep pipeline. Application
+    // scope (admin consent), not delegated.
+    "Mail.Read",
     // OAuth grants enumeration
     "Application.Read.All",
     // Risk events
@@ -40,6 +44,11 @@ export const READ_ONLY_SCOPES = [
     // userRegistrationDetails report (MFA coverage posture control).
     // Replaces the now-deprecated credentialUserRegistrationDetails endpoint.
     "Reports.Read.All",
+    // Per-user authentication methods. REQUIRED for the free-tier MFA-
+    // coverage fallback — /reports/authenticationMethods/userRegistrationDetails
+    // is gated to Entra ID P1, so we fall back to /users/{id}/authentication/methods
+    // which works on any tenant but needs this scope.
+    "UserAuthenticationMethod.Read.All",
 ];
 
 /** Additional scopes granted by the opt-in remediation consent flow. */
@@ -48,6 +57,9 @@ export const REMEDIATION_SCOPES = [
     "Directory.ReadWrite.All",     // revoke role assignments
     "Application.ReadWrite.All",   // revoke OAuth grants
     "User.RevokeSessions.All",     // force re-MFA / kill sessions
+    // Phase 2 email security: quarantine flagged messages back to the
+    // Junk Email folder, and move them back to the Inbox on release.
+    "Mail.ReadWrite",
 ];
 
 // ----------------------------------------------------------------------------

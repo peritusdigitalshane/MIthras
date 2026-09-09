@@ -84,9 +84,10 @@ export default function ContactSales() {
   return (
     <>
       <Seo
-        title="Talk to sales — Mithras Threat Defence"
-        description="Get in touch with the Mithras team. End customers are matched with a reseller in their region; IT providers can apply to join the channel."
+        title="Contact sales | Mithras Threat Defence"
+        description="Talk to the Mithras team. SMBs get matched to a reseller in their region. MSPs and IT shops apply to the channel. Australian-built, Australia and New Zealand coverage."
         canonical="/contact-sales"
+        keywords="Mithras sales contact, endpoint security quote Australia, MSP partner application, reseller match"
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -178,7 +179,7 @@ export default function ContactSales() {
 
                       <div className="space-y-1.5">
                         <Label htmlFor="region">Region (optional)</Label>
-                        <Input id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Brisbane, AU / Auckland, NZ" />
+                        <Input id="region" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Sydney, AU / Auckland, NZ" />
                       </div>
 
                       <div className="space-y-1.5">

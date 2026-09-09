@@ -8,7 +8,7 @@
 // pipeline — Vite's glob import picks it up on the next bundle.
 
 export type SopAudience =
-  | "peritus_super_admin"
+  | "platform_super_admin"
   | "soc_operator"
   | "distributor"
   | "partner"
@@ -60,7 +60,7 @@ function slugAndAudienceFromPath(path: string): { audience: SopAudience; slug: s
 }
 
 const VALID_AUDIENCES = new Set<SopAudience>([
-  "peritus_super_admin", "soc_operator", "distributor", "partner",
+  "platform_super_admin", "soc_operator", "distributor", "partner",
   "customer_admin", "customer_member", "home_user",
 ]);
 
@@ -92,7 +92,7 @@ const SOPS: Sop[] = Object.entries(rawModules)
   });
 
 export const AUDIENCE_LABELS: Record<SopAudience, string> = {
-  peritus_super_admin: "Peritus operator",
+  platform_super_admin: "Platform operator",
   soc_operator:        "SOC analyst",
   distributor:         "Distributor",
   partner:             "Reseller partner",
@@ -102,7 +102,7 @@ export const AUDIENCE_LABELS: Record<SopAudience, string> = {
 };
 
 export const AUDIENCE_DESCRIPTIONS: Record<SopAudience, string> = {
-  peritus_super_admin: "Channel + platform operations — distributors, credits, billing, AI budgets.",
+  platform_super_admin: "Channel + platform operations — distributors, credits, billing, AI budgets.",
   soc_operator:        "24/7 SOC workflows — triage, response, incident review.",
   distributor:         "Manage your reseller channel and credit pool.",
   partner:             "Run customer organisations, deploy agents, review incidents.",

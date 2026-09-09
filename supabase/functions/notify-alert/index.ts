@@ -14,9 +14,23 @@ import { sanitizeHeader, encodeHeader, isValidEmail, escapeHtml } from "../_shar
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// B4 fix: dedicated rotateable secret for the notify-alert webhook so the
+// service-role key is never used as a shared bearer. If the secret leaks,
+// we rotate it in isolation instead of having to rotate the key that
+// bypasses every RLS policy on every table.
+const NOTIFY_ALERT_SECRET  = Deno.env.get("NOTIFY_ALERT_SECRET") ?? "";
 const SITE_URL             = Deno.env.get("SITE_URL") ?? "https://www.mithras.com.au";
 const SOC_URL              = Deno.env.get("SOC_URL")  ?? "https://soc.mithras.com.au";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Constant-time string compare so an attacker can't time-side-channel
+// our auth check.
+function timingSafeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+}
 
 const SEVERITY_ORDER: Record<string, number> = {
     "low": 0, "moderate": 1, "high": 2, "severe": 3,
@@ -102,9 +116,13 @@ Deno.serve(async (req) => {
     const origin = req.headers.get("origin");
     if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405, origin);
 
-    // Service-role bearer required (the trigger has the key).
+    // B4 fix: accept either a dedicated NOTIFY_ALERT_SECRET (preferred — can be
+    // rotated independently of the service-role key) OR the service-role key
+    // (fallback so an unset env var doesn't break in-flight pg_net triggers).
     const tok = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (tok !== SUPABASE_SERVICE_KEY) return jsonResponse({ error: "service_role_required" }, 401, origin);
+    const okDedicated = NOTIFY_ALERT_SECRET && timingSafeEqual(tok, NOTIFY_ALERT_SECRET);
+    const okFallback  = timingSafeEqual(tok, SUPABASE_SERVICE_KEY);
+    if (!okDedicated && !okFallback) return jsonResponse({ error: "unauthorized" }, 401, origin);
 
     let body: Record<string, unknown> = {};
     try { body = await req.json(); } catch { /* empty */ }

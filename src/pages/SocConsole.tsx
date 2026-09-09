@@ -71,12 +71,15 @@ export default function SocConsole() {
                         value={c?.investigationsToday ?? "-"}
                         sub={`US$${((c?.aiSpendCentsToday ?? 0) / 100).toFixed(2)} spend`}
                     />
-                    <Kpi
-                        icon={<AlertTriangle className="h-4 w-4" />}
-                        label="Active threats"
-                        value={c?.activeThreats ?? "-"}
-                        accent={(c?.activeThreats ?? 0) > 0 ? "danger" : undefined}
-                    />
+                    <Link to="/soc/incidents" className="contents">
+                        <Kpi
+                            icon={<AlertTriangle className="h-4 w-4" />}
+                            label="Active threats"
+                            value={c?.activeThreats ?? "-"}
+                            accent={(c?.activeThreats ?? 0) > 0 ? "danger" : undefined}
+                            sub="open the queue →"
+                        />
+                    </Link>
                     <Kpi
                         icon={<Monitor className="h-4 w-4" />}
                         label="Endpoints online"
@@ -237,7 +240,7 @@ export default function SocConsole() {
                 )}
 
                 <div className="text-[10px] text-muted-foreground flex items-center justify-between">
-                    <span>Custom dashboard — replaces the Grafana view. Updates every 15s + on every event via Supabase Realtime.</span>
+                    <span>Updates every 15 seconds and the instant any event lands.</span>
                     {isSuperAdmin && (
                         <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
                             <a href="https://soc.mithras.com.au" target="_blank" rel="noopener noreferrer">

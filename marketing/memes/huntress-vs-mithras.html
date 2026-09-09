@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Huntress vs Mithras</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; background: #000; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; padding: 60px 50px; }
+  .panels { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; position: relative; }
+  .panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 48px 36px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
+  .panel.left  { animation: fadeInLeft  0.6s ease-out 0.1s both; }
+  .panel.right { animation: fadeInRight 0.6s ease-out 0.5s both; }
+  .brand { font-size: 72px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .brand .subtitle { display: block; font-size: 22px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.55); margin-top: 14px; text-transform: uppercase; }
+  .flag { width: 100%; aspect-ratio: 3/2; border-radius: 14px; box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; margin: 30px 0 28px; }
+  .flag.au { background: #00247D; }
+  .facts { list-style: none; font-size: 22px; font-weight: 600; line-height: 1.45; color: rgba(255,255,255,0.85); }
+  .facts li { padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
+  .facts li:first-child { border-top: none; padding-top: 0; }
+  .facts .x { color: #ff4d4d; font-weight: 900; }
+  .facts .check { color: #28d96b; font-weight: 900; }
+  .vs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 64px; font-weight: 900; color: rgba(255,255,255,0.4); background: #000; width: 110px; height: 110px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.15); z-index: 2; animation: vsPop 0.4s ease-out 0.9s both; }
+  .tagline { text-align: center; margin-top: 36px; animation: fadeUp 0.7s ease-out 1.2s both; }
+  .tagline .big { font-size: 78px; font-weight: 900; letter-spacing: -3px; line-height: 0.95; }
+  .tagline .url { font-size: 24px; font-weight: 700; letter-spacing: 6px; color: #28d96b; margin-top: 22px; }
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 25% 35%, rgba(0,40,104,0.12), transparent 45%), radial-gradient(circle at 75% 35%, rgba(0,36,125,0.18), transparent 45%); z-index: -1; }
+  @keyframes fadeInLeft  { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes fadeInRight { from { opacity: 0; transform: translateX( 30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes vsPop       { from { opacity: 0; transform: translate(-50%, -50%) scale(0.4); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+  @keyframes fadeUp      { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+  <div class="panels">
+    <div class="panel left">
+      <div class="brand">HUNTRESS<span class="subtitle">Ellicott City, USA</span></div>
+      <!-- US flag -->
+      <svg class="flag" viewBox="0 0 1235 650" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1235" height="650" fill="#fff"/>
+        <g fill="#B22234">
+          <rect y="0"   width="1235" height="50"/>
+          <rect y="100" width="1235" height="50"/>
+          <rect y="200" width="1235" height="50"/>
+          <rect y="300" width="1235" height="50"/>
+          <rect y="400" width="1235" height="50"/>
+          <rect y="500" width="1235" height="50"/>
+          <rect y="600" width="1235" height="50"/>
+        </g>
+        <rect width="494" height="350" fill="#3C3B6E"/>
+        <!-- Simplified stars (6 rows × 5 stars + 5 rows × 4 stars offset) -->
+        <g fill="#fff">
+          <g id="star-row">
+            <polygon points="49,30 56,52 79,52 60,66 67,88 49,74 31,88 38,66 19,52 42,52"/>
+          </g>
+          <use href="#star-row" x="98"/>  <use href="#star-row" x="196"/>  <use href="#star-row" x="294"/>  <use href="#star-row" x="392"/>
+          <use href="#star-row" y="58"/>  <use href="#star-row" x="98"  y="58"/>  <use href="#star-row" x="196" y="58"/>  <use href="#star-row" x="294" y="58"/>  <use href="#star-row" x="392" y="58"/>
+          <use href="#star-row" y="116"/> <use href="#star-row" x="98"  y="116"/> <use href="#star-row" x="196" y="116"/> <use href="#star-row" x="294" y="116"/> <use href="#star-row" x="392" y="116"/>
+          <use href="#star-row" y="174"/> <use href="#star-row" x="98"  y="174"/> <use href="#star-row" x="196" y="174"/> <use href="#star-row" x="294" y="174"/> <use href="#star-row" x="392" y="174"/>
+          <use href="#star-row" y="232"/> <use href="#star-row" x="98"  y="232"/> <use href="#star-row" x="196" y="232"/> <use href="#star-row" x="294" y="232"/> <use href="#star-row" x="392" y="232"/>
+          <use href="#star-row" y="290"/> <use href="#star-row" x="98"  y="290"/> <use href="#star-row" x="196" y="290"/> <use href="#star-row" x="294" y="290"/> <use href="#star-row" x="392" y="290"/>
+        </g>
+      </svg>
+      <ul class="facts">
+        <li><span class="x">✕</span> Layers on Microsoft Defender</li>
+        <li><span class="x">✕</span> Sold through MSPs only</li>
+        <li><span class="x">✕</span> Data flows to the United States</li>
+      </ul>
+    </div>
+    <div class="panel right">
+      <div class="brand">MITHRAS<span class="subtitle">Sydney, Australia</span></div>
+      <svg class="flag au" viewBox="0 0 1200 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1200" height="600" fill="#00247D"/>
+        <g>
+          <path d="M0,0 L600,300 M600,0 L0,300" stroke="#fff" stroke-width="60"/>
+          <clipPath id="canton-h"><rect width="600" height="300"/></clipPath>
+          <g clip-path="url(#canton-h)">
+            <path d="M0,0 L600,300" stroke="#CF142B" stroke-width="20" transform="translate(0,15)"/>
+            <path d="M600,0 L0,300" stroke="#CF142B" stroke-width="20" transform="translate(0,-15)"/>
+          </g>
+          <rect x="0" y="125" width="600" height="50" fill="#fff"/>
+          <rect x="275" y="0" width="50" height="300" fill="#fff"/>
+          <rect x="0" y="135" width="600" height="30" fill="#CF142B"/>
+          <rect x="285" y="0" width="30" height="300" fill="#CF142B"/>
+        </g>
+        <g transform="translate(300,450)" fill="#fff"><polygon points="0,-70 16,-22 65,-22 25,8 40,55 0,28 -40,55 -25,8 -65,-22 -16,-22"/></g>
+        <g fill="#fff">
+          <polygon points="900,360 909,388 938,388 915,406 924,434 900,418 876,434 885,406 862,388 891,388" />
+          <polygon points="1050,255 1058,279 1083,279 1063,294 1071,318 1050,304 1029,318 1037,294 1017,279 1042,279" />
+          <polygon points="930,180 938,204 963,204 943,219 951,243 930,229 909,243 917,219 897,204 922,204" />
+          <polygon points="810,300 818,324 843,324 823,339 831,363 810,349 789,363 797,339 777,324 802,324" />
+          <polygon points="975,420 980,432 993,432 982,440 987,452 975,444 963,452 968,440 957,432 970,432" />
+        </g>
+      </svg>
+      <ul class="facts">
+        <li><span class="check">✓</span> 8 capabilities — one subscription</li>
+        <li><span class="check">✓</span> Direct, reseller, or distributor</li>
+        <li><span class="check">✓</span> Australian-owned, hosted in Sydney</li>
+      </ul>
+    </div>
+    <div class="vs">VS</div>
+  </div>
+  <div class="tagline">
+    <div class="big">SAME PRICE. WHOLE STACK.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+</body>
+</html>

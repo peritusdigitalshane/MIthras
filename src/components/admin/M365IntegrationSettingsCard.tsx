@@ -37,7 +37,13 @@ export function M365IntegrationSettingsCard() {
     // Defence in depth: the edge function enforces super-admin server-side,
     // but the card writes platform-wide Azure credentials so it must not
     // render for any non-super-admin even if Settings.tsx is misconfigured.
-    if (!isSuperAdmin) return null;
+    //
+    // The guard is applied below, after the hooks. As an early return it put
+    // four useStates and a useEffect behind a condition, so when isSuperAdmin
+    // resolved (undefined/false -> true as TenantContext loaded) React threw
+    // "Rendered more hooks than during the previous render" and the Settings
+    // page blanked. The effect below is separately gated so a non-super-admin
+    // still never issues the request.
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [hasStoredSecret, setHasStoredSecret] = useState(false);
@@ -49,6 +55,7 @@ export function M365IntegrationSettingsCard() {
     });
 
     useEffect(() => {
+        if (!isSuperAdmin) { setLoading(false); return; }
         (async () => {
             try {
                 const r = await call("get");
@@ -65,7 +72,9 @@ export function M365IntegrationSettingsCard() {
                 setLoading(false);
             }
         })();
-    }, [toast]);
+    }, [toast, isSuperAdmin]);
+
+    if (!isSuperAdmin) return null;
 
     const handleSave = async () => {
         setSaving(true);

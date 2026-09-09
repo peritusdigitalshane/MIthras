@@ -43,7 +43,7 @@ import (
 
 const (
 	AgentVersion     = "0.1.0"
-	HeartbeatEvery   = 60 * time.Second
+	HeartbeatEvery   = 30 * time.Second // v0.7.6: 60→30. Fresh-install default; server-pushed next_check_in tightens to the platform target on first round-trip.
 	InventoryEvery   = 60 * time.Minute
 	AuthEventsEvery  = 60 * time.Second
 	DefaultConfigDir = "/etc/peritus"

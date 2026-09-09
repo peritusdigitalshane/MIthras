@@ -49,6 +49,14 @@ if ($ApiBaseUrl -match '/functions/v[0-9]+$') {
     Write-Host "[install] Stripped /functions/vN suffix from ApiBaseUrl -> $ApiBaseUrl"
 }
 
+# HTTPS-only: the enrolment POST body carries the one-time EnrollmentToken,
+# and the agent-API HMAC scheme assumes TLS for confidentiality (signatures
+# protect integrity, not the payload). Refuse to enroll over plain http to
+# prevent a network observer from capturing the token in transit.
+if ($ApiBaseUrl -notmatch '^https://') {
+    throw "ApiBaseUrl must use https:// (got: $ApiBaseUrl). The enrolment token would leak over plain http."
+}
+
 $AgentRoot      = 'C:\ProgramData\Mithras'
 $InstallRoot    = Join-Path $AgentRoot 'install'
 $ConfigFile     = Join-Path $AgentRoot 'config.dat'

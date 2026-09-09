@@ -125,6 +125,8 @@ export function useCreateEndpointGroup() {
       wdac_policy_id?: string | null;
       uac_policy_id?: string | null;
       windows_update_policy_id?: string | null;
+      gpo_policy_id?: string | null;
+      update_ring_id?: string | null;
     }) => {
       if (!currentOrganization) throw new Error("No organization selected");
 
@@ -138,7 +140,9 @@ export function useCreateEndpointGroup() {
           wdac_policy_id: group.wdac_policy_id || null,
           uac_policy_id: group.uac_policy_id || null,
           windows_update_policy_id: group.windows_update_policy_id || null,
-        })
+          gpo_policy_id: group.gpo_policy_id || null,
+          update_ring_id: group.update_ring_id || null,
+        } as any)
         .select()
         .single();
 
@@ -189,10 +193,12 @@ export function useUpdateEndpointGroup() {
       wdac_policy_id?: string | null;
       uac_policy_id?: string | null;
       windows_update_policy_id?: string | null;
+      gpo_policy_id?: string | null;
+      update_ring_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("endpoint_groups")
-        .update(updates)
+        .update(updates as any)
         .eq("id", id)
         .select()
         .single();

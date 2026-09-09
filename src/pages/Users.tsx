@@ -63,6 +63,7 @@ import { Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
 import { 
   useOrganizationMembers, 
   useAddMember, 
@@ -82,6 +83,22 @@ const roleConfig: Record<OrgRole, { label: string; icon: React.ElementType; colo
 const Users = () => {
   const { currentOrganization, isImpersonating, isLoading: tenantLoading, isSuperAdmin } = useTenant();
   const { user } = useAuth();
+
+  // F3 fix: customer-org members shouldn't see operator user management
+  // (super-admin badges, role toggles). Send them to their portal instead.
+  // Super-admins or partner-admins pivoted into a customer keep access.
+  //
+  // The redirect decision is computed here but ACTED ON below, after every
+  // hook has run. Returning early at this point put 14 hooks behind a
+  // condition: the moment tenantLoading flipped false for a customer org,
+  // React saw fewer hooks than on the previous render and threw
+  // "Rendered fewer hooks than expected", blanking the page.
+  const mustRedirectToCustomerPortal =
+    !tenantLoading &&
+    currentOrganization?.organization_type === "customer" &&
+    !isSuperAdmin &&
+    !isImpersonating;
+
   const { data: members = [], isLoading } = useOrganizationMembers();
   const addMember = useAddMember();
   const updateRole = useUpdateMemberRole();
@@ -183,6 +200,11 @@ const Users = () => {
       });
     }
   };
+
+  // Safe here: every hook above has already run on this render.
+  if (mustRedirectToCustomerPortal) {
+    return <Navigate to="/customer" replace />;
+  }
 
   if (tenantLoading || isLoading) {
     return (

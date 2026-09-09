@@ -1,7 +1,7 @@
 # Mithras SOP style guide
 
 Every Standard Operating Procedure published in `/help/sops` is read by paying
-customers, channel partners, and Peritus operators. Quality is part of the
+customers, channel partners, and Mithras platform operators. Quality is part of the
 product. The bar is tier-1 production SaaS.
 
 This guide is the contract every SOP must meet. If a procedure does not follow
@@ -16,7 +16,7 @@ Every SOP carries this frontmatter, in this order:
 ```markdown
 ---
 title: <Sentence-case statement of the procedure>
-audience: <one of: peritus_super_admin, soc_operator, distributor, partner, customer_admin, customer_member, home_user>
+audience: <one of: platform_super_admin, soc_operator, distributor, partner, customer_admin, customer_member, home_user>
 description: <One sentence, < 160 chars. The catalogue index uses this.>
 order: <Integer. Lower sorts first inside the audience.>
 estimated_minutes: <Realistic read+execute time>
@@ -60,7 +60,7 @@ review_cadence: Quarterly
   *quick and dirty*, *etc*, *and so on*, *blah blah*, *etc*. Replace with
   the precise equivalent.
 - **Forbidden internal slang**: *disty*, *partner-portal*, *mithras land*,
-  *the SOC team* (use *Peritus 24/7 SOC*), *the AI* (use *the AI Triage
+  *the SOC team* (use *Mithras SOC*), *the AI* (use *the AI Triage
   Agent* / *the Commander*), *the platform* without qualifier.
 - **Forbidden hedging**: *probably*, *usually*, *most of the time*. State
   the deterministic condition or omit the sentence.

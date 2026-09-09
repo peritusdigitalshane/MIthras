@@ -1,0 +1,23 @@
+# Source-of-truth for the Mithras frontend container on prod (docker02).
+#
+# This compose runs the nginx:alpine container that serves the built Vite SPA.
+# It is COPIED to /opt/peritus-frontend/docker-compose.yml as part of the
+# deploy-cadence-batch.sh deploy.
+#
+# Recovery: if the container is missing or in a bad state, run on prod:
+#   cd /opt/peritus-frontend && docker compose up -d
+#
+# The deploy script (scripts/prod/deploy-cadence-batch.sh) MUST exclude this
+# file and nginx.conf from its dist-bundle rsync, otherwise rsync --delete
+# wipes them. See the --exclude flags in step 7.
+
+services:
+  peritus-frontend:
+    image: nginx:alpine
+    container_name: peritus-frontend
+    restart: unless-stopped
+    ports:
+      - "9988:80"
+    volumes:
+      - /opt/peritus-frontend:/usr/share/nginx/html:ro
+      - /opt/peritus-frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro

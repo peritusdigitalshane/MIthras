@@ -7,6 +7,7 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { organizationSchema, breadcrumbSchema } from "@/components/seo/jsonLd";
 import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
 import { MockMultiTenantConsole } from "@/components/landing/visuals/MockMultiTenantConsole";
 
@@ -27,7 +28,7 @@ const PILLARS = [
     icon: <FileText className="h-6 w-6" />,
     title: "Monthly customer reports — auto-drafted",
     description:
-      "Auto-generated PDF report for every customer at the end of each month. KPIs, incidents, vulnerabilities, top software, AI-written executive summary. White-label with your branding if you want.",
+      "Auto-generated PDF report for every customer at the end of each month. KPIs, incidents, vulnerabilities, top software, AI-written executive summary. Partner name and contact details included in the report header.",
   },
   {
     icon: <Handshake className="h-6 w-6" />,
@@ -54,7 +55,7 @@ const FEATURES = [
   "End-of-life Windows hardening — skip the Microsoft extended-support bill",
   "Microsegmentation with one-click \"learn → lock down\" workflow",
   "Multi-tenant from day one — strict per-customer data isolation",
-  "Windows + Linux agents (macOS on the roadmap)",
+  "Windows agent (full capability) + Linux agent (heartbeat preview)",
   "Process-level threat detection — full kill-chain visibility",
   "All 16 attack-surface-reduction rules + Defender posture",
   "Application allow-listing (WDAC) with reusable rule sets",
@@ -93,9 +94,17 @@ const ForMsps = () => {
   return (
     <>
       <Seo
-        title="Mithras for MSPs — Multi-tenant endpoint security with channel margins"
-        description="Built for MSPs. AI SOC across every customer, multi-tenant from day one, auto-generated monthly reports, channel margins worth selling on. Sold exclusively through authorised partners across Australia and New Zealand."
+        title="Mithras for MSPs | Multi-tenant endpoint security platform"
+        description="Multi-tenant from day one. AI SOC triages every alert across every customer. Monthly customer reports auto-drafted. Channel margins worth selling on. Built in Australia, sold through authorised partners across Australia and New Zealand."
         canonical="/for-msps"
+        keywords="MSP endpoint security, multi-tenant security console, MSP channel program Australia, MSP Defender management, AI SOC for MSPs"
+        structuredData={[
+          organizationSchema(),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "For MSPs", path: "/for-msps" },
+          ]),
+        ]}
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -118,10 +127,11 @@ const ForMsps = () => {
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-              Multi-tenant from day one. AI SOC triages every alert across
-              every customer. Monthly reports auto-drafted. Channel margins
-              worth a sales team&apos;s effort. Built in Australia, sold
-              through authorised partners.
+              Multi-tenant from the first endpoint you enrol. The AI SOC
+              triages every alert across every customer in one queue. Monthly
+              customer reports draft themselves and email out on the first
+              of the month. Channel margins big enough
+              that you can actually pay a salesperson to sell it.
             </p>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-md sm:max-w-none mx-auto">
               <Button size="lg" className="h-12 px-7 text-base shadow-lg shadow-primary/20 w-full sm:w-auto" asChild>

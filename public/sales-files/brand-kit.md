@@ -18,7 +18,7 @@ Pronunciation: **MITH-rass** (rhymes with "with us"). Stress on first syllable.
 
 > "Named after the Roman god of light, contracts, and protection — Mithras the
 > platform protects Australian small businesses from the ransomware, phishing,
-> and identity attacks the big EDR vendors ignored. Built by Peritus Digital
+> and identity attacks the big EDR vendors ignored. Built by Mithras
 > in Australia."
 
 Use this when someone asks "why Mithras?" Don't go deeper unless asked again.

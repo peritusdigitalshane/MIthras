@@ -300,7 +300,7 @@ export function DirectCustomersSection() {
                 </TableCell>
                 <TableCell className="text-center">
                   <Button
-                    variant={(customer.ai_triage_enabled || customer.ai_investigation_enabled) ? "default" : "outline"}
+                    variant={(customer.ai_triage_enabled || customer.ai_investigation_enabled || customer.ai_email_remediation_enabled || customer.ai_endpoint_remediation_enabled) ? "default" : "outline"}
                     size="sm"
                     className="text-xs"
                     onClick={() =>
@@ -309,6 +309,8 @@ export function DirectCustomersSection() {
                         name: customer.name,
                         ai_triage_enabled: !!customer.ai_triage_enabled,
                         ai_investigation_enabled: !!customer.ai_investigation_enabled,
+                        ai_email_remediation_enabled: !!customer.ai_email_remediation_enabled,
+                        ai_endpoint_remediation_enabled: !!customer.ai_endpoint_remediation_enabled,
                         ai_soc_daily_cap_cents: customer.ai_soc_daily_cap_cents ?? 500,
                       })
                     }

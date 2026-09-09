@@ -9,6 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Download, FileText, RefreshCw, Send, FileType2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +35,9 @@ const CustomerReports = () => {
   const sendReport = useSendReport();
   const [generating, setGenerating] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  // MAJOR fix: confirm before sending — a one-click Send fires off real
+  // emails to the recipient list and there's no undo.
+  const [pendingSendId, setPendingSendId] = useState<string | null>(null);
 
   const generateAdHoc = async () => {
     if (!currentOrganization?.id) return;
@@ -79,6 +86,8 @@ const CustomerReports = () => {
       });
     }
   };
+
+  const requestSend = (reportId: string) => setPendingSendId(reportId);
 
   const send = async (reportId: string) => {
     setSendingId(reportId);
@@ -203,7 +212,7 @@ const CustomerReports = () => {
                             size="sm"
                             variant="default"
                             disabled={!r.pdf_storage_path || sendingId === r.id}
-                            onClick={() => send(r.id)}
+                            onClick={() => requestSend(r.id)}
                             className="gap-1.5"
                           >
                             {sendingId === r.id ? (
@@ -222,6 +231,29 @@ const CustomerReports = () => {
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!pendingSendId} onOpenChange={(open) => !open && setPendingSendId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Send this report now?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Mithras will email the PDF to every active recipient on your report list. There is no undo. The send is also recorded against the report's audit trail.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  const id = pendingSendId;
+                  setPendingSendId(null);
+                  if (id) await send(id);
+                }}
+              >
+                Send report
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

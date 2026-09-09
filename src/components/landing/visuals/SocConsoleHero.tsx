@@ -61,7 +61,9 @@ const STAGES: StageDef[] = [
     label: "Triage",
     icon: Brain,
     role: "Initial classification",
-    model: "gpt-5-mini",
+    // Public marketing label only — we never expose the underlying vendor
+    // model. The real model identifier lives in ai_llm_calls server-side.
+    model: "Mithras Triage v3",
     body:
       "Pattern: 5 failed logons in 3m32s window from a single source IP. " +
       "Cross-referencing tenant allow-list… 198.51.100.42 is not registered. " +
@@ -80,9 +82,9 @@ const STAGES: StageDef[] = [
     label: "Verify",
     icon: ShieldCheck,
     role: "Independent re-classification",
-    model: "claude-sonnet-4-6",
+    model: "Mithras Verify v3",
     body:
-      "Independent re-run with a different model. Pulling 7 supporting rows from " +
+      "Independent re-run by a separately-trained classifier. Pulling 7 supporting rows from " +
       "site_event_logs… all share actor_ip 198.51.100.42 and actor_user_login " +
       "webadmin. Pattern consistent with the wp_brute_force playbook. " +
       "Agrees with Triage. No new doubts surfaced.",
@@ -99,7 +101,7 @@ const STAGES: StageDef[] = [
     label: "Adversarial",
     icon: Sword,
     role: "Refutation attempt",
-    model: "gpt-5-mini",
+    model: "Mithras Adversarial v2",
     body:
       "Steel-manning the opposite verdict. Generating benign explanations and " +
       "testing each against the available evidence:",
@@ -122,7 +124,7 @@ const STAGES: StageDef[] = [
     label: "Investigate",
     icon: FileSearch,
     role: "Cross-tenant forensics",
-    model: "claude-sonnet-4-6",
+    model: "Mithras Hunt v2",
     body:
       "Hunting laterally. Searching for the source IP across all tenant sites " +
       "in the last 24h:",
@@ -146,7 +148,7 @@ const STAGES: StageDef[] = [
     label: "Commander",
     icon: Sparkles,
     role: "Playbook + response",
-    model: "gpt-5-mini",
+    model: "Mithras Commander v3",
     body:
       "Drafting response playbook. Selecting bounded actions allowed under the " +
       "ACME response policy. Issuing commands and arming the customer-confirm " +

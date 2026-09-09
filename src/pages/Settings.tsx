@@ -1,22 +1,15 @@
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTenant } from "@/contexts/TenantContext";
-import { PlatformSettingsSection } from "@/components/admin/PlatformSettingsSection";
-import { VirusTotalSettingsCard } from "@/components/admin/VirusTotalSettingsCard";
-import { M365IntegrationSettingsCard } from "@/components/admin/M365IntegrationSettingsCard";
-import { AnalyticsSettingsCard } from "@/components/admin/AnalyticsSettingsCard";
 import { MfaSettings } from "@/components/settings/MfaSettings";
 import { AlertRecipientsCard } from "@/components/alerts/AlertRecipientsCard";
 import { ChangePassword } from "@/components/settings/ChangePassword";
-import { SmtpSettingsCard } from "@/components/admin/SmtpSettingsCard";
-import { StripeSettingsCard } from "@/components/admin/StripeSettingsCard";
 import { OrgManagementCard } from "@/components/settings/OrgManagementCard";
-import { Building2, Settings as SettingsIcon } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Settings as SettingsIcon, ShieldAlert, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Settings = () => {
-  const { currentOrganization, isSuperAdmin } = useTenant();
+  const { isSuperAdmin } = useTenant();
 
   return (
     <MainLayout>
@@ -28,13 +21,13 @@ const Settings = () => {
           <div>
             <h1 className="text-2xl font-bold">Settings</h1>
             <p className="text-muted-foreground">
-              Manage your account and organization settings
+              Your account and your organisation.
             </p>
           </div>
         </div>
 
         <div className="grid gap-6">
-          {/* Account Security Section */}
+          {/* Account security */}
           <MfaSettings />
           <ChangePassword />
 
@@ -44,16 +37,23 @@ const Settings = () => {
           {/* Alert recipients — who gets emailed when threats fire */}
           <AlertRecipientsCard />
 
-          {/* Super Admin Only Settings */}
+          {/* Super-admin platform settings moved off this page. Surface the
+              link so super-admins know where to go; everyone else never sees
+              this notice. */}
           {isSuperAdmin && (
-            <>
-              <SmtpSettingsCard />
-              <StripeSettingsCard />
-              <PlatformSettingsSection />
-              <VirusTotalSettingsCard />
-              <M365IntegrationSettingsCard />
-              <AnalyticsSettingsCard />
-            </>
+            <Alert>
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Platform settings live separately</AlertTitle>
+              <AlertDescription className="text-sm space-y-2">
+                <p>
+                  SMTP, Stripe, OpenAI, the Microsoft 365 Azure app, VirusTotal, and analytics are super-admin-only and now live under{" "}
+                  <Link to="/admin/settings" className="underline font-medium">Admin → Platform settings</Link>. This keeps the Settings page above identical for every operator regardless of role.
+                </p>
+                <Link to="/admin/settings" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                  Open platform settings <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       </div>

@@ -11,21 +11,25 @@ export function BrowserFrame({
   url,
   children,
   className = "",
-  tilt = false,
+  tilt: _tilt = false,
 }: {
   url: string;
   children: React.ReactNode;
   className?: string;
-  /** Adds a subtle 3D perspective so the frame leans away from the viewer. */
+  /**
+   * No-op as of 2026-06-16. The prop used to apply
+   * `perspective(2400px) rotateX(4deg) rotateY(-2deg)` to lean the frame
+   * away from the viewer, but the rotation made the screenshot's edges
+   * visibly NOT-LEVEL with the FrameLabel text above it on landing pages
+   * (users reported the visual misalignment). Kept as a prop so every
+   * existing call site stays valid; the value is intentionally ignored.
+   * Delete the prop later if you want to retire the cosmetic API.
+   */
   tilt?: boolean;
 }) {
   return (
     <div
       className={`relative rounded-xl border border-border/60 bg-card/70 backdrop-blur shadow-2xl shadow-primary/10 overflow-hidden ${className}`}
-      style={tilt ? {
-        transform: "perspective(2400px) rotateX(4deg) rotateY(-2deg)",
-        transformOrigin: "center top",
-      } : undefined}
     >
       {/* Chrome bar */}
       <div className="flex items-center gap-3 px-3 py-2 border-b border-border/40 bg-card/80">

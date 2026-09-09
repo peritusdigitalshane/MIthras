@@ -54,7 +54,7 @@ The operator. Cross-tenant queries require a record in `public.super_admins`, wh
 2. For organisations whose risk profile or business hours require operator-confirmed action, confirm the autonomous response from `/incidents/:id` and follow the approve-auto-response procedure.
 3. For organisations where the action ran but the customer reports operational impact, follow the rollback path in the approve-auto-response procedure and record the rollback rationale in the tracking incident notes.
 4. Notify each affected channel partner directly. The platform does not auto-distribute campaign briefings; the operator is responsible for partner comms during an active investigation.
-5. If the triage prompt missed the pattern, raise a backlog item against the Peritus SOC prompt-tuning programme with the indicator, the technique chain, and a representative citation set.
+5. If the triage prompt missed the pattern, raise a backlog item against the Mithras SOC prompt-tuning programme with the indicator, the technique chain, and a representative citation set.
 
 ## Verification
 - Every affected organisation has an open incident on its `/incidents` page linked to the indicator.
@@ -67,10 +67,10 @@ The operator. Cross-tenant queries require a record in `public.super_admins`, wh
 - **The SOC chat panel returns a summary with no citation chips.** The model produced an ungrounded answer and the orchestrator suppressed delivery. Re-issue the query with explicit scope (`in the last 24 hours`, `for organisations with active EOL hardening`). Ungrounded answers are never trusted.
 - **A threat-hunting query times out.** The query touches `firewall_audit_logs`, which is large and partitioned by day. Restrict the time range to a forty-eight-hour window and re-run. If the timeout persists, narrow the query to a single organisation and union the results.
 - **An affected organisation has no open incident.** The AI Triage chain produced a `benign` verdict on the original alert. Open an incident manually from `/incidents`, attach the indicator and the tracking incident reference, and force-fire the appropriate response under the four-eyes rule.
-- **Escalation is required.** The pattern affects ten or more customer organisations, the indicators match a publicly disclosed nation-state operation, or the indicator is associated with an unpatched vulnerability. Notify the Peritus on-call duty officer and the leadership channel before any cross-customer comms. Do not publish the briefing externally until leadership has authorised partner distribution.
+- **Escalation is required.** The pattern affects ten or more customer organisations, the indicators match a publicly disclosed nation-state operation, or the indicator is associated with an unpatched vulnerability. Notify the Mithras on-call duty officer and the leadership channel before any cross-customer comms. Do not publish the briefing externally until leadership has authorised partner distribution.
 
 ## Audit and compliance
-- The tracking incident is retained in `public.incidents` for the lifetime of the customer organisation that owns it. Notes, attached query links, and resolution text are retained for seven years in accordance with the Peritus SOC evidentiary standard.
+- The tracking incident is retained in `public.incidents` for the lifetime of the customer organisation that owns it. Notes, attached query links, and resolution text are retained for seven years in accordance with the Mithras SOC evidentiary standard.
 - Every per-organisation disposition writes a row to `public.activity_logs` with the relevant `action_type` and `actor_id = auth.uid()`.
 - Force-fire actions executed during a campaign investigation are flagged in each affected customer's monthly report and surfaced to the channel partner.
 - The saved threat-hunting query is retained against the operator's profile for thirty days; promotion to a permanent hunting pack requires a peer review and a separate procedure.

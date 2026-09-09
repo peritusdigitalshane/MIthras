@@ -29,6 +29,10 @@ export default function Landed() {
   const t = userOrganization?.organization_type;
   if (t === "distributor") return <Navigate to="/distributor" replace />;
   if (t === "customer")    return <Navigate to="/customer" replace />;
+  // E4 fix: home-user subscribers land on their own self-service /account
+  // page, not the SOC console. They have no endpoints to operate beyond
+  // their own PC.
+  if (t === "home_user")   return <Navigate to="/account" replace />;
   // partner OR unknown → existing SOC dashboard (partners operate the platform).
   return <Navigate to="/dashboard" replace />;
 }

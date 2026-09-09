@@ -32,6 +32,11 @@ interface Customer {
   network_module_enabled?: boolean;
   router_module_enabled?: boolean;
   legacy_hardening_enabled?: boolean;
+  ai_triage_enabled?: boolean;
+  ai_investigation_enabled?: boolean;
+  ai_email_remediation_enabled?: boolean;
+  ai_endpoint_remediation_enabled?: boolean;
+  ai_soc_daily_cap_cents?: number;
 }
 
 // Fetch all partner organizations (super admin only)

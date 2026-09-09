@@ -64,6 +64,7 @@ import { useUacPolicies } from "@/hooks/useUacPolicies";
 import { useWindowsUpdatePolicies } from "@/hooks/useWindowsUpdatePolicies";
 import { useRuleSets, useGroupRuleSetAssignments, useRuleSetMutations } from "@/hooks/useRuleSets";
 import { useGpoPolicyOptions } from "@/hooks/useGpoPolicies";
+import { useUpdateRings } from "@/hooks/useUpdateRings";
 import { GroupMembersDialog } from "./GroupMembersDialog";
 
 export function EndpointGroupsManager() {
@@ -73,6 +74,7 @@ export function EndpointGroupsManager() {
   const { data: windowsUpdatePolicies = [] } = useWindowsUpdatePolicies();
   const { data: ruleSets = [] } = useRuleSets();
   const { data: gpoPolicies = [] } = useGpoPolicyOptions();
+  const { data: updateRings = [] } = useUpdateRings();
   const { assignToGroup, removeFromGroup } = useRuleSetMutations();
   const createGroup = useCreateEndpointGroup();
   const updateGroup = useUpdateEndpointGroup();
@@ -90,6 +92,7 @@ export function EndpointGroupsManager() {
     uac_policy_id: "",
     windows_update_policy_id: "",
     gpo_policy_id: "",
+    update_ring_id: "",
   });
   // Rule sets selected for assignment (used during create/edit)
   const [selectedRuleSetIds, setSelectedRuleSetIds] = useState<Set<string>>(new Set());
@@ -106,6 +109,7 @@ export function EndpointGroupsManager() {
       uac_policy_id: "",
       windows_update_policy_id: "",
       gpo_policy_id: "",
+      update_ring_id: "",
     });
     setSelectedRuleSetIds(new Set());
     setDialogOpen(true);
@@ -120,6 +124,7 @@ export function EndpointGroupsManager() {
       uac_policy_id: (group as any).uac_policy_id || "",
       windows_update_policy_id: (group as any).windows_update_policy_id || "",
       gpo_policy_id: (group as any).gpo_policy_id || "",
+      update_ring_id: (group as any).update_ring_id || "",
     });
     // We'll load existing rule set assignments via the hook
     setSelectedRuleSetIds(new Set());
@@ -156,6 +161,7 @@ export function EndpointGroupsManager() {
         uac_policy_id: formData.uac_policy_id || null,
         windows_update_policy_id: formData.windows_update_policy_id || null,
         gpo_policy_id: formData.gpo_policy_id || null,
+        update_ring_id: formData.update_ring_id || null,
       } as any);
       groupId = editingGroup.id;
 
@@ -179,6 +185,7 @@ export function EndpointGroupsManager() {
         uac_policy_id: formData.uac_policy_id || null,
         windows_update_policy_id: formData.windows_update_policy_id || null,
         gpo_policy_id: formData.gpo_policy_id || null,
+        update_ring_id: formData.update_ring_id || null,
       } as any);
       groupId = result.id;
 
@@ -376,6 +383,29 @@ export function EndpointGroupsManager() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Update ring</Label>
+              <Select
+                value={formData.update_ring_id}
+                onValueChange={(v) => setFormData({ ...formData, update_ring_id: v === "none" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a ring..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No ring</SelectItem>
+                  {updateRings.map((ring) => (
+                    <SelectItem key={ring.id} value={ring.id}>
+                      {ring.name}{ring.is_default ? " (default)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Patch deployment tier. Pilot rolls Patch Tuesday immediately; Production defers 7 days; Critical-only skips the monthly cumulative.
+              </p>
             </div>
 
             <div className="space-y-2">

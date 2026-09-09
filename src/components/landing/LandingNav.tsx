@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronDown, Shield, Briefcase, Warehouse, Home, Menu, X,
-  Bot, History, Network, Lock, ShieldCheck, Users, BookOpen, FileText,
+  Bot, History, Network, Lock, ShieldCheck, Users, BookOpen, FileText, Activity, Mail,
 } from "lucide-react";
 
 /**
@@ -36,6 +36,7 @@ export function LandingNav() {
           <PlatformDropdown />
           <SolutionsDropdown />
           <NavLink to="/pricing">Pricing</NavLink>
+          <NavLink to="/intel">Threat Intel</NavLink>
           <NavLink to="/channel-program">Partners</NavLink>
         </div>
 
@@ -103,6 +104,9 @@ export function LandingNav() {
           <div className="container mx-auto px-4 sm:px-6 py-4 max-h-[calc(100vh-64px)] overflow-y-auto">
             <MobileSection title="Platform">
               <MobileLink to="/ai-soc" icon={<Bot className="h-4 w-4" />} title="AI SOC" detail="5-agent triage" onClick={() => setMobileOpen(false)} />
+              <MobileLink to="/phishing-protection" icon={<Mail className="h-4 w-4" />} title="Email security" detail="Phishing + BEC protection for M365" onClick={() => setMobileOpen(false)} />
+              <MobileLink to="/identity-defence" icon={<Lock className="h-4 w-4" />} title="Identity Defence" detail="CA outcomes without P1" onClick={() => setMobileOpen(false)} />
+              <MobileLink to="/m365-shield" icon={<Shield className="h-4 w-4" />} title="M365 Shield" detail="PIM, risk, OAuth — skip Premium upgrade" onClick={() => setMobileOpen(false)} />
               <MobileLink to="/eol-windows" icon={<History className="h-4 w-4" />} title="EOL Windows" detail="Defend Win 7/8.1/Server 2012 R2" onClick={() => setMobileOpen(false)} />
               <MobileLink to="/platform" icon={<Network className="h-4 w-4" />} title="The full platform" detail="All 8 capabilities" onClick={() => setMobileOpen(false)} />
             </MobileSection>
@@ -111,6 +115,7 @@ export function LandingNav() {
               <MobileLink to="/personal" icon={<Home className="h-4 w-4" />} title="For home" detail="$6/mo for your personal devices" onClick={() => setMobileOpen(false)} />
             </MobileSection>
             <MobileSection title="More">
+              <MobileLink to="/intel" icon={<Activity className="h-4 w-4" />} title="Threat Intel" detail="Live SMB threat landscape" onClick={() => setMobileOpen(false)} />
               <MobileLink to="/pricing" icon={<FileText className="h-4 w-4" />} title="Pricing" detail="Per-endpoint, predictable" onClick={() => setMobileOpen(false)} />
               <MobileLink to="/channel-program" icon={<Users className="h-4 w-4" />} title="Partners" detail="Channel program + become a partner" onClick={() => setMobileOpen(false)} />
               <MobileLink to="/blog" icon={<BookOpen className="h-4 w-4" />} title="Blog" detail="Recent posts" onClick={() => setMobileOpen(false)} />
@@ -155,6 +160,9 @@ function PlatformDropdown() {
         <DropdownMenuLabel className="text-xs text-muted-foreground">Capabilities</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DesktopMenuItem to="/ai-soc" icon={<Bot className="h-4 w-4 text-primary" />} title="AI SOC" detail="Five agents triage every alert" />
+        <DesktopMenuItem to="/phishing-protection" icon={<Mail className="h-4 w-4 text-cyan-500" />} title="Email security" detail="AI phishing + BEC protection for M365" />
+        <DesktopMenuItem to="/identity-defence" icon={<Lock className="h-4 w-4 text-rose-500" />} title="Identity Defence" detail="Conditional Access outcomes without P1" />
+        <DesktopMenuItem to="/m365-shield" icon={<Shield className="h-4 w-4 text-primary" />} title="M365 Shield" detail="PIM, risk scoring, OAuth — skip the Premium upgrade" />
         <DesktopMenuItem to="/eol-windows" icon={<History className="h-4 w-4 text-amber-500" />} title="EOL Windows hardening" detail="Cover Win 7 / 8.1 / Server 2012 R2" />
         <DesktopMenuItem to="/platform#microseg" icon={<Network className="h-4 w-4 text-blue-500" />} title="Microsegmentation" detail="Learn-mode firewall, lock-down workflow" />
         <DesktopMenuItem to="/platform#defender" icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />} title="Defender management" detail="All 16 ASR rules, no E5 required" />

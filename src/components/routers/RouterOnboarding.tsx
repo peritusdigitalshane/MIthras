@@ -53,7 +53,7 @@ export function RouterOnboarding() {
       label: form.label,
       max_uses: form.max_uses ? parseInt(form.max_uses) : undefined,
     });
-    setSelectedToken(result.token);
+    setSelectedToken(result.plaintext_token);
     setJustCreated(true);
     setOpen(false);
     setForm({ label: "", max_uses: "" });
@@ -63,7 +63,10 @@ export function RouterOnboarding() {
     }, 100);
   };
 
-  const activeToken = selectedToken || tokens?.[0]?.token;
+  // Only a token minted in THIS browser session can populate the scripts —
+  // enrolment tokens are hashed at rest, so an existing row cannot be
+  // re-displayed. Falling back to tokens[0] would render a broken command.
+  const activeToken = selectedToken;
 
   const curlExample = `curl -X POST ${CHECKIN_URL} \\
   -H "Content-Type: application/json" \\
@@ -178,13 +181,15 @@ curl -s -X POST "$API" \\
               </TableHeader>
               <TableBody>
                 {tokens?.map(t => (
-                  <TableRow key={t.id} className={selectedToken === t.token ? "bg-muted/50" : ""}>
+                  <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.label}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{t.token.slice(0, 12)}...</code>
-                        <CopyButton text={t.token} />
-                      </div>
+                      <span
+                        className="text-xs text-muted-foreground"
+                        title="Enrolment tokens are stored hashed. The plaintext is shown once, when the token is created."
+                      >
+                        Shown once at creation
+                      </span>
                     </TableCell>
                     <TableCell>{t.use_count}{t.max_uses ? ` / ${t.max_uses}` : ""}</TableCell>
                     <TableCell>
@@ -193,9 +198,6 @@ curl -s -X POST "$API" \\
                         : <Badge variant="secondary">Inactive</Badge>}
                     </TableCell>
                     <TableCell className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedToken(t.token)}>
-                        <Terminal className="h-3.5 w-3.5" />
-                      </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(t.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -268,8 +270,14 @@ curl -s -X POST "$API" \\
             <AlertDialogDescription>Routers already enrolled will continue to work, but no new routers can use this token.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { if (deleteTarget) { deleteToken.mutate(deleteTarget); setDeleteTarget(null); } }}>Delete</AlertDialogAction>
+            <AlertDialogCancel disabled={deleteToken.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteToken.isPending}
+              onClick={() => { if (deleteTarget) { deleteToken.mutate(deleteTarget); setDeleteTarget(null); } }}
+            >
+              {deleteToken.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -162,7 +162,7 @@ export default function CustomerDashboard() {
                       <div className="text-xs text-muted-foreground">Your Mithras reseller</div>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Threats are actioned by {reseller.name}'s SOC team automatically — you don't need to respond unless they reach out.
+                      Mithras handles threats automatically. {reseller.name} will reach out if anything needs your attention.
                     </p>
                     <Button asChild variant="outline" size="sm" className="w-full">
                       <Link to="/customer/contact">View contact details <ArrowUpRight className="h-3 w-3 ml-1" /></Link>
@@ -241,7 +241,7 @@ function CustomerFirstTimeCard({ reseller }: { reseller: { name: string } | null
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-13">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-12">
           <Tour line="The big numbers above tell you how many machines are protected and whether anything is going wrong." />
           <Tour line='"Protected machines" = your Windows PCs and servers. "Currently online" means they checked in recently.' />
           <Tour line='"Threats" are spotted automatically. Most are blocked instantly — you only hear from us if something needs your attention.' />

@@ -107,5 +107,8 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // Tailwind plugins are loaded by CommonJS require per Tailwind's own
+  // docs; ESM imports here break the config loader.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 } satisfies Config;

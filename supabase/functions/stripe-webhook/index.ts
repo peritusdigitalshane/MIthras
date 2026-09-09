@@ -92,6 +92,7 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
     const orgName = `Home: ${email}`;
     const slug    = slugFromEmail(email);
 
+    // Step 1: org row
     const { data: orgRow, error: orgErr } = await supabase
         .from("organizations")
         .insert({
@@ -99,6 +100,7 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
             slug,
             organization_type: "home_user",
             home_user_email: email,
+            billing_email: email,
             stripe_customer_id:      stripeCustomerId,
             stripe_subscription_id:  stripeSubscriptionId,
             stripe_status:           "active",
@@ -110,22 +112,101 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
         .single();
     if (orgErr) throw new Error(`org_insert_failed: ${orgErr.message}`);
 
-    // Single-use enrolment token the agent installer will use.
+    // Step 2: auth user (do this FIRST so we have an id for enrolment_tokens
+    // and organization_memberships). The trigger on auth.users honours the
+    // user_metadata.home_user flag to bypass the channel-code requirement.
+    let authUserId: string | null = null;
+    {
+        const existing = await supabase.auth.admin.listUsers();
+        const found = existing.data.users.find((u: any) => (u.email || "").toLowerCase() === email);
+        if (found) {
+            authUserId = found.id;
+        } else {
+            const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+                email,
+                email_confirm: true,
+                user_metadata: { home_user: true, org_id: orgRow.id },
+            });
+            if (createErr) {
+                // Don't silently swallow — Stripe should retry if we can't
+                // provision the user. The trigger raises specific exceptions
+                // that surface here.
+                throw new Error(`auth_user_create_failed: ${createErr.message}`);
+            }
+            authUserId = created?.user?.id ?? null;
+            if (!authUserId) throw new Error("auth_user_create_returned_null");
+        }
+    }
+
+    // Step 3: enrolment token. created_by is NOT NULL, so it MUST be set —
+    // use the new auth user's id. The schema has no is_active column.
     const code = generateEnrolmentCode();
-    await supabase.from("enrollment_tokens").insert({
+    const { error: tokErr } = await supabase.from("enrollment_tokens").insert({
         token: code,
         organization_id: orgRow.id,
-        is_active: true,
+        created_by: authUserId,
         max_uses: 1,
+        channel: "stable",
+        // 90 days gives the customer a generous window to reinstall on
+        // another PC if needed before they need to issue a fresh code.
+        expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
     } as any);
+    if (tokErr) throw new Error(`enrollment_token_insert_failed: ${tokErr.message}`);
 
-    // Fire off the welcome email — non-fatal if it fails (we'll retry from
-    // the admin console).
+    // Step 4: owner membership.
+    const { error: memErr } = await supabase.from("organization_memberships").insert({
+        organization_id: orgRow.id,
+        user_id: authUserId,
+        role: "owner",
+    } as any);
+    if (memErr && !memErr.message.includes("duplicate key")) {
+        throw new Error(`membership_insert_failed: ${memErr.message}`);
+    }
+
+    // Step 5: report recipients (best-effort; a DB trigger may already
+    // seed this, in which case the unique constraint short-circuits).
+    try {
+        await supabase.from("org_report_recipients").insert({
+            organization_id: orgRow.id,
+            email,
+            monthly: true,
+        } as any);
+    } catch { /* trigger may have already inserted */ }
+
+    // Generate the account-setup magic link BEFORE the welcome email so we
+    // can include it in the single welcome message. GoTrue's generateLink
+    // returns the URL; it does NOT email it. We deliver via SMTP ourselves
+    // by passing the URL through to send-home-user-welcome.
+    let accountSetupUrl: string | null = null;
+    if (authUserId) {
+        try {
+            const linkResp = await supabase.auth.admin.generateLink({
+                type: "magiclink",
+                email,
+                options: { redirectTo: `${Deno.env.get("SITE_URL") ?? "https://www.mithras.com.au"}/account` },
+            });
+            accountSetupUrl = (linkResp as any)?.data?.properties?.action_link ?? null;
+            if (!accountSetupUrl) {
+                console.error("generateLink succeeded but action_link was empty", linkResp);
+            }
+        } catch (e) {
+            console.error("magic link generation failed", e);
+        }
+    }
+
+    // Fire off the welcome email with both install instructions AND the
+    // account-setup link. Non-fatal if it fails (we can retry from the
+    // admin console).
     try {
         await fetch(`${SUPABASE_URL}/functions/v1/send-home-user-welcome`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}` },
-            body: JSON.stringify({ org_id: orgRow.id, email, enrolment_code: code }),
+            body: JSON.stringify({
+                org_id: orgRow.id,
+                email,
+                enrolment_code: code,
+                account_setup_url: accountSetupUrl,
+            }),
         });
     } catch (e) {
         console.error("welcome email dispatch failed", e);
@@ -135,7 +216,14 @@ async function handleCheckoutCompleted(session: any): Promise<void> {
 async function handleSubscriptionChange(sub: any, statusOverride?: string): Promise<void> {
     const subId  = String(sub.id);
     const status = statusOverride ?? String(sub.status);
-    const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
+    // Stripe moved current_period_end from the subscription root to
+    // items.data[0].current_period_end in their flexible billing model.
+    // Prefer the item-level value; fall back to the root for older
+    // subscriptions or events emitted before the schema change.
+    const itemPeriodEnd = sub.items?.data?.[0]?.current_period_end ?? null;
+    const rootPeriodEnd = sub.current_period_end ?? null;
+    const periodEndSec  = itemPeriodEnd ?? rootPeriodEnd;
+    const periodEnd     = periodEndSec ? new Date(periodEndSec * 1000).toISOString() : null;
 
     await supabase.from("organizations").update({
         stripe_status: status,

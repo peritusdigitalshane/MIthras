@@ -1,0 +1,49 @@
+# Self-healing boot unit for the Mithras frontend container.
+#
+# Why this exists: incident 2026-06-19. After a Vultr host reboot, the
+# original peritus-frontend container failed to start because an earlier
+# rsync had corrupted /opt/peritus-frontend/nginx.conf into an empty
+# directory. There was no automatic recovery — www.mithras.com.au went
+# dark until someone diagnosed and manually rebuilt the container.
+#
+# What this does on every boot (and any time docker.service restarts):
+#   1. If /opt/peritus-frontend/nginx.conf is a directory or missing,
+#      restore the file from /opt/peritus-frontend.bak/nginx.conf
+#   2. If /opt/peritus-frontend/docker-compose.yml is missing, restore
+#      from /opt/peritus-frontend.bak/docker-compose.yml
+#   3. docker compose up -d  (idempotent — no-op if already running)
+#
+# Install:
+#   sudo cp peritus-frontend-boot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now peritus-frontend-boot.service
+
+[Unit]
+Description=Self-heal Mithras frontend container on boot
+Documentation=https://github.com/peritus/mithras (incident 2026-06-19)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/peritus-frontend
+ExecStart=/bin/bash -c '\
+  set -e; \
+  if [ -d /opt/peritus-frontend/nginx.conf ] || [ ! -f /opt/peritus-frontend/nginx.conf ]; then \
+    echo "nginx.conf in bad state — restoring from backup"; \
+    rm -rf /opt/peritus-frontend/nginx.conf; \
+    cp /opt/peritus-frontend.bak/nginx.conf /opt/peritus-frontend/nginx.conf; \
+  fi; \
+  if [ ! -f /opt/peritus-frontend/docker-compose.yml ]; then \
+    echo "docker-compose.yml missing — restoring from backup"; \
+    cp /opt/peritus-frontend.bak/docker-compose.yml /opt/peritus-frontend/docker-compose.yml 2>/dev/null || \
+      echo "WARN: no backup of docker-compose.yml — manual intervention needed"; \
+  fi; \
+  cd /opt/peritus-frontend && /usr/bin/docker compose up -d \
+'
+ExecStop=/usr/bin/docker compose -f /opt/peritus-frontend/docker-compose.yml down
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target

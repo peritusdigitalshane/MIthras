@@ -108,7 +108,7 @@ export default function AdminAuditLogs() {
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
             <AlertDescription>
-              Cross-tenant audit logs are restricted to Peritus platform operators. Org-scoped audit history is available at <code className="text-xs">/activity</code>.
+              Cross-tenant audit logs are restricted to Mithras platform operators. Org-scoped audit history is available at <code className="text-xs">/activity</code>.
             </AlertDescription>
           </Alert>
         </div>
@@ -125,7 +125,7 @@ export default function AdminAuditLogs() {
             Cross-tenant audit log
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Append-only activity ledger across every customer organisation. Records are retained for 24 months per the platform data retention policy.
+            Activity ledger across every customer organisation. Records are retained for 12 months on a rolling window; a nightly job purges anything older.
           </p>
         </div>
 

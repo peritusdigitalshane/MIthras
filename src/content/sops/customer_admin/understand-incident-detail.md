@@ -1,7 +1,7 @@
 ---
 title: Read and act on an incident detail page
 audience: customer_admin
-description: Interpret every card on /incidents/:id, confirm or reverse the autonomous response, and know when the Peritus 24/7 SOC will act for you.
+description: Interpret every card on /incidents/:id, confirm or reverse the autonomous response, and know when the Mithras SOC will act for you.
 order: 4
 estimated_minutes: 10
 updated_at: 2026-06-12
@@ -28,7 +28,7 @@ Customer administrators whose `organization_memberships.role` is `admin` or `own
 2. Read the **Header** card. It states:
    - **Severity** — the classification assigned by the AI Commander. Values are `Severe`, `High`, `Moderate`, `Low`.
    - **Status** — one of `Open`, `Triaging`, `In progress`, `Resolved`, `False positive`.
-   - **Service Level Agreement (SLA)** — the time within which the Peritus 24/7 SOC commits to resolution: one hour for `Severe`, four hours for `High`, one business day for `Moderate`, seven days for `Low`.
+   - **Response target** — the window the AI Commander uses to drive autonomous response steps. One hour for `Severe`, four hours for `High`, one business day for `Moderate`, seven days for `Low`. These are internal targets used to sequence automated containment, not a contractual SLA.
    - **Commander kind** — the precise incident class (for example `malware`, `credential_compromise`, `ransomware_precursor`).
 3. Read the **AI Commander summary** card. The single-line operator summary is written by the Incident Commander Agent. The collapsible **Customer-facing summary** is the version reproduced in your monthly customer report.
 4. Read the **Playbook** card. It lists the ordered response stages: `forensics_complete`, `contained`, `customer_notified`, `review_scheduled`, `resolved`. The active stage is marked **In progress**; completed stages display the timestamp of completion.
@@ -36,7 +36,7 @@ Customer administrators whose `organization_memberships.role` is `admin` or `own
    - **Triage** — the first-line classification by the AI Triage Agent.
    - **Verification** — an independent re-classification by a second model.
    - **Adversarial** — a counter-argument that attempts to refute the verdict. A value of `not_refuted` indicates the verdict survived adversarial review.
-   When all three verdicts agree and the adversarial result is `not_refuted`, the consensus is trusted and the playbook advances autonomously. Disagreement routes the incident to the Peritus 24/7 SOC for human review.
+   When all three verdicts agree and the adversarial result is `not_refuted`, the consensus is trusted and the playbook advances autonomously. Disagreement holds the incident at the current stage and surfaces it for operator review at `/soc/incidents`.
 6. Read the **Autonomous response** card. The card states:
    - **Action kind** — for example `isolate_network`, `kill_process`, `quarantine_file`.
    - **Status** — `executing`, `executed`, `customer_confirmed`, or `rolled_back`.
@@ -46,7 +46,7 @@ Customer administrators whose `organization_memberships.role` is `admin` or `own
    - To make the containment permanent, select **Confirm action**. The button calls the `confirm_ai_action` RPC and sets the status to `customer_confirmed`. The auto-rollback is cancelled.
    - To reverse the containment, select **Rollback now**. The agent receives the reversal command at the next heartbeat. Provide a written reason of at least twenty characters; the reason is retained in the audit trail.
    - To take no decision, allow the auto-rollback timer to expire. The action is reversed automatically at the timestamp shown on the banner.
-8. Read the **Customer notifications** card. Each email dispatched by the AI Comms Agent is listed with its delivery status. A `failed` row indicates a delivery error; the platform automatically disarms the auto-rollback when no notification reached you, and the Peritus 24/7 SOC is alerted.
+8. Read the **Customer notifications** card. Each email dispatched by the AI Comms Agent is listed with its delivery status. A `failed` row indicates a delivery error; the platform automatically disarms the auto-rollback when no notification reached you, and the Mithras SOC is alerted.
 9. After closure, read the **Resolution notes** card. The notes are written by the operator who closed the case and are reproduced in your monthly customer report.
 
 ## Verification
@@ -57,9 +57,9 @@ Customer administrators whose `organization_memberships.role` is `admin` or `own
 
 ## Troubleshooting
 - **The Confirm action and Rollback now buttons are disabled.** Your `organization_memberships.role` is `member`. Ask an administrator or owner in your organisation to act, or escalate to your reseller for a role change.
-- **The Auto-rollback armed banner shows an expiry in the past.** The rollback has already executed. Refresh the page; the **Status** chip will display `rolled_back`. Re-issuing the original action requires a fresh incident or a manual request to the Peritus 24/7 SOC.
-- **The Agent consensus card shows disagreement and the playbook has not advanced.** The incident is queued for the Peritus 24/7 SOC. Expected handling time is the SLA shown in the header. No customer action is required until the SOC contacts you.
-- **A customer notification row is `failed`.** The associated auto-rollback has been disarmed. The Peritus 24/7 SOC has been alerted and will contact you through a fallback channel. Confirm the **Notification recipients** configuration at `/settings` to prevent recurrence.
+- **The Auto-rollback armed banner shows an expiry in the past.** The rollback has already executed. Refresh the page; the **Status** chip will display `rolled_back`. Re-issuing the original action requires a fresh incident or a manual request to the Mithras SOC.
+- **The Agent consensus card shows disagreement and the playbook has not advanced.** The incident is queued for the Mithras SOC. Expected handling time is the SLA shown in the header. No customer action is required until the SOC contacts you.
+- **A customer notification row is `failed`.** The associated auto-rollback has been disarmed. The Mithras SOC has been alerted and will contact you through a fallback channel. Confirm the **Notification recipients** configuration at `/settings` to prevent recurrence.
 
 ## Audit and compliance
 - The action record is retained in `public.ai_agent_actions` for 24 months in accordance with the customer's data retention configuration.

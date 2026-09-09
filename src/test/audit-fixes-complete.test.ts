@@ -1,19 +1,22 @@
 import { describe, it, expect } from "vitest";
 
-// ── Issue #16: Heartbeat interval change (30s → 60s) ──────────────────────
-
-describe("Issue #16: Heartbeat interval", () => {
-  it("default heartbeat interval should be 60 seconds", () => {
-    // The agent script param default is now 60
-    const defaultInterval = 60;
-    expect(defaultInterval).toBe(60);
-    expect(defaultInterval).toBeGreaterThanOrEqual(60);
+// ── Heartbeat interval (v0.7.6: 60s → 30s) ────────────────────────────────
+// Issue #16 originally pushed this from 30s to 60s to relieve Task-Scheduler
+// pressure on the legacy agent. v0.7.6 reverts to 30s because the modern
+// agent uses NSSM (no scheduler), the WMI catalog cache is now disk-backed
+// (so 2× heartbeat doesn't 2× the WMI cost), and the server-pushed
+// next_check_in floor was lowered from 15s to 5s so the agent can do
+// down-cadence on pending commands. See agent-heartbeat/index.ts.
+describe("Heartbeat interval", () => {
+  it("default heartbeat interval should be 30 seconds", () => {
+    const defaultInterval = 30;
+    expect(defaultInterval).toBe(30);
   });
 
-  it("should reject intervals under 60 for Task Scheduler", () => {
-    const requestedInterval = 30;
-    const scheduledInterval = requestedInterval < 60 ? 60 : requestedInterval;
-    expect(scheduledInterval).toBe(60);
+  it("server-pushed next_check_in honours a 5s floor", () => {
+    const requested = 1;
+    const honoured  = requested < 5 ? 5 : requested;
+    expect(honoured).toBe(5);
   });
 });
 

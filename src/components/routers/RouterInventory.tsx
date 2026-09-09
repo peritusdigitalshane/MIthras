@@ -259,8 +259,14 @@ export function RouterInventory() {
             <AlertDialogDescription>This will remove the router and all associated DNS zones, tunnels, and firewall rules.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { if (deleteTarget) { deleteRouter.mutate(deleteTarget.id); setDeleteTarget(null); } }}>Delete</AlertDialogAction>
+            <AlertDialogCancel disabled={deleteRouter.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteRouter.isPending}
+              onClick={() => { if (deleteTarget) { deleteRouter.mutate(deleteTarget.id); setDeleteTarget(null); } }}
+            >
+              {deleteRouter.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

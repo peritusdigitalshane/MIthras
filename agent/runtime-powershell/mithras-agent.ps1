@@ -12,7 +12,12 @@
 
 [CmdletBinding()]
 param(
-    [int]$HeartbeatIntervalSeconds = 60
+    # v0.7.6: default fast-start cadence. The server-pushed `next_check_in`
+    # value on every heartbeat overrides this within a few seconds anyway,
+    # but a fresh-install agent uses this until it makes its first round-
+    # trip. 30s gives the SOC operator a near-immediate connection signal
+    # after install without measurable load.
+    [int]$HeartbeatIntervalSeconds = 30
 )
 
 Set-StrictMode -Version Latest
@@ -37,6 +42,7 @@ Import-Module (Join-Path $PSScriptRoot 'lib/EventLogCollector.psm1')    -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/ProcessEventCollector.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/PersistenceCollector.psm1') -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/CommandExecutor.psm1')      -Force
+Import-Module (Join-Path $PSScriptRoot 'lib/CodeSigning.psm1')          -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/Updater.psm1')              -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/PolicyEnforcer.psm1')       -Force
 Import-Module (Join-Path $PSScriptRoot 'lib/FirewallAuditCollector.psm1') -Force
@@ -734,9 +740,10 @@ while ($true) {
     # eager-check hint are dead code that we keep deliberately removed.
 
     # v0.6.3: deduct loop-body elapsed time from the configured cadence so
-    # actual heartbeat cadence converges on the target (~60s) instead of
-    # silently drifting to 115-130s as the retest review caught. Honours the
-    # server's next_check_in suggestion (15-900s window, default 60s).
+    # actual heartbeat cadence converges on the target instead of silently
+    # drifting (e.g. 30s param + 5s loop body would otherwise give 35s).
+    # Honours the server's next_check_in (5-900s window, default 30s as of
+    # v0.7.6).
     $elapsed = (Get-Date) - $loopStart
     $target  = if ($script:NextSleepSeconds -gt 0) { $script:NextSleepSeconds } else { $HeartbeatIntervalSeconds }
     $sleep   = [int]([Math]::Max(5, $target - [Math]::Floor($elapsed.TotalSeconds)))

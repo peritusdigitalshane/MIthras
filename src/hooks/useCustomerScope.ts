@@ -18,6 +18,12 @@ export interface ResellerContact {
   name: string;
   slug: string;
   organization_type: string;
+  // MAJOR fix (CustomerContact): the reseller's actual support email + URL
+  // come from partner_branding. Without them we used to show two strings of
+  // placeholder text where the contact details belonged.
+  support_email?: string | null;
+  support_url?: string | null;
+  brand_name?: string | null;
 }
 
 // Returns the currently-active customer org id, or null if the active org
@@ -62,7 +68,22 @@ export function useCustomerReseller() {
         .eq("id", org.parent_partner_id)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as ResellerContact | null;
+      if (!data) return null;
+      // Pull branding alongside the org row — partner_branding has the
+      // support email / URL the customer actually needs to reach their
+      // reseller. RLS on partner_branding is public-read so this works
+      // from the customer's authenticated session.
+      const { data: branding } = await supabase
+        .from("partner_branding")
+        .select("brand_name, support_email, support_url")
+        .eq("organization_id", (data as any).id)
+        .maybeSingle();
+      return {
+        ...(data as any),
+        brand_name:    branding?.brand_name    ?? null,
+        support_email: branding?.support_email ?? null,
+        support_url:   branding?.support_url   ?? null,
+      } as ResellerContact;
     },
   });
 }

@@ -1,7 +1,6 @@
 import { Brain, ShieldCheck, AlertTriangle, HelpCircle, Sword, Loader2, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     useAgentVerdicts,
     type AgentVerdict,
@@ -142,9 +141,9 @@ export function MultiAgentVerdictTrail({ decision }: Props) {
                 {/* Footer: value statement */}
                 <div className="text-[11px] text-muted-foreground border-t border-border/40 pt-3 leading-relaxed">
                     Decision reviewed by {list.length} independent AI agents.
-                    {" "}<strong>Triage</strong> classifies, <strong>Verification</strong> re-runs with a
-                    different model, and <strong>Adversarial</strong> tries to disprove the verdict. The
-                    final call is the consensus — no single LLM can drive an automated response.
+                    {" "}<strong>Triage</strong> classifies, <strong>Verification</strong> re-runs the case
+                    independently, and <strong>Adversarial</strong> tries to disprove the verdict. The
+                    final call is the consensus — no single classifier can drive an automated response.
                 </div>
             </CardContent>
         </Card>
@@ -195,6 +194,8 @@ interface AgentCardProps {
 }
 
 function AgentCard({ title, role, icon, verdict, kind, skippedReason }: AgentCardProps) {
+    // Model + cost are super-admin-only. Partners/customers see the role
+    // and the verdict — nothing about the underlying vendor or model name.
     // Not run state. For the Adversarial agent this is the common case
     // (only fires for TP or disagreement), so distinguish "skipped on purpose"
     // from "still running".
@@ -236,22 +237,7 @@ function AgentCard({ title, role, icon, verdict, kind, skippedReason }: AgentCar
                     {icon}
                     <span>{title}</span>
                 </div>
-                {verdict.model && (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="text-[10px] text-muted-foreground font-mono cursor-help">
-                                    {verdict.model}
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs">
-                                <div>Model: {verdict.model}</div>
-                                {verdict.latency_ms != null && <div>Latency: {verdict.latency_ms}ms</div>}
-                                {cost != null && <div>Cost: ${cost.toFixed(4)}</div>}
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                )}
+                <span className="text-[10px] text-muted-foreground">Mithras SOC Agent</span>
             </div>
 
             <div className="text-[11px] text-muted-foreground">{role}</div>

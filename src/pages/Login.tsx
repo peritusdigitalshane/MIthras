@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, CheckCircle, XCircle, Building2, Smartphone, Info, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useValidateEnrollmentCode } from "@/hooks/useEnrollmentCodes";
+import { Seo } from "@/components/seo/Seo";
 
 // Portal role chosen on the marketing site dropdown. Determines post-auth
 // landing — anyone without ?role= still goes to /dashboard, preserving the
@@ -356,6 +357,13 @@ const Login = () => {
   }
 
   return (
+    <>
+    <Seo
+      title="Sign in to Mithras Threat Defence"
+      description="Sign in to your Mithras Threat Defence console. Customer, partner, and distributor portals."
+      canonical={location.pathname === "/signup" ? "/signup" : "/login"}
+      noindex
+    />
     <div className="min-h-screen bg-background flex flex-col">
       {/* Back Link */}
       <div className="p-6">
@@ -393,7 +401,7 @@ const Login = () => {
               {portalRole
                 ? ROLE_META[portalRole].tagline
                 : (isSignUp
-                    ? "Start your free trial or enter an enrollment code"
+                    ? "Enter your enrolment code to create an account."
                     : "Sign in to your Mithras Threat Defence account")}
             </CardDescription>
             {portalRole && !isSignUp && (
@@ -408,7 +416,7 @@ const Login = () => {
                 <>
                   {/* No more free trial — channel-only paid model. The user
                       must have received an enrolment code from a reseller,
-                      distributor, or Peritus. Prospects without a code get
+                      distributor, or the platform team. Prospects without a code get
                       bounced to /contact-sales below. */}
                   <Alert>
                     <Info className="h-4 w-4" />
@@ -480,6 +488,60 @@ const Login = () => {
                   required
                 />
               </div>
+              {/*
+                Home-customer rescue: anyone who bought via Stripe has an
+                account created by the webhook but never set a password.
+                Without a visible passwordless option here they hit a dead-end
+                trying to enter a password they don't have. Promote the magic-
+                link option to a full-width button BEFORE the password field
+                so the path is obvious. The existing tiny link below remains
+                for muscle memory.
+              */}
+              {!isSignUp && (
+                <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                  <p className="text-xs font-medium text-foreground">No password? No problem.</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Home subscribers and anyone who lost their password can sign in with a one-click email link.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-background"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      if (!email.trim()) {
+                        toast({ title: "Enter your email first", description: "We'll send a sign-in link to that address.", variant: "destructive" });
+                        return;
+                      }
+                      setIsLoading(true);
+                      try {
+                        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, "");
+                        await fetch(`${supabaseUrl}/functions/v1/send-signin-link`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+                        });
+                        toast({
+                          title: "Sign-in link sent",
+                          description: "Check your email. The link expires in 24 hours.",
+                        });
+                      } catch (e) {
+                        toast({
+                          title: "Couldn't send sign-in link",
+                          description: e instanceof Error ? e.message : "Try again or email support@mithras.com.au.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                  >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Email me a sign-in link
+                  </Button>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -506,38 +568,75 @@ const Login = () => {
                 {isSignUp ? "Create Account" : "Sign In"}
               </Button>
               {!isSignUp && (
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  className="block mx-auto text-xs text-muted-foreground hover:text-foreground hover:underline mt-3 disabled:opacity-50 disabled:pointer-events-none"
-                  onClick={async () => {
-                    if (!email.trim()) {
-                      toast({ title: "Enter your email", description: "We'll send a reset link to that address.", variant: "destructive" });
-                      return;
-                    }
-                    setIsLoading(true);
-                    try {
-                      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                        redirectTo: `${window.location.origin}/reset-password`,
-                      });
-                      if (error) throw error;
-                      toast({
-                        title: "Reset link sent",
-                        description: "Check your email. If you don't get it within a few minutes, ask your administrator to mint one for you.",
-                      });
-                    } catch (e) {
-                      toast({
-                        title: "Couldn't send reset email",
-                        description: e instanceof Error ? e.message : "Email may not be configured yet — ask your admin to reset it from the dashboard.",
-                        variant: "destructive",
-                      });
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }}
-                >
-                  Forgot password?
-                </button>
+                <div className="mt-3 flex flex-col items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    className="text-xs text-primary hover:underline disabled:opacity-50 disabled:pointer-events-none"
+                    onClick={async () => {
+                      if (!email.trim()) {
+                        toast({ title: "Enter your email first", description: "We'll send a sign-in link to that address.", variant: "destructive" });
+                        return;
+                      }
+                      setIsLoading(true);
+                      try {
+                        const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, "");
+                        await fetch(`${supabaseUrl}/functions/v1/send-signin-link`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+                        });
+                        // We always succeed visibly so we don't leak account existence.
+                        toast({
+                          title: "Sign-in link sent",
+                          description: "Check your email. The link expires in 24 hours. You can request a new one any time.",
+                        });
+                      } catch (e) {
+                        toast({
+                          title: "Couldn't send sign-in link",
+                          description: e instanceof Error ? e.message : "Try again or email support@mithras.com.au.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                  >
+                    Email me a sign-in link (no password needed)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline disabled:opacity-50 disabled:pointer-events-none"
+                    onClick={async () => {
+                      if (!email.trim()) {
+                        toast({ title: "Enter your email", description: "We'll send a reset link to that address.", variant: "destructive" });
+                        return;
+                      }
+                      setIsLoading(true);
+                      try {
+                        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                          redirectTo: `${window.location.origin}/reset-password`,
+                        });
+                        if (error) throw error;
+                        toast({
+                          title: "Reset link sent",
+                          description: "Check your email. If you don't get it within a few minutes, ask your administrator to mint one for you.",
+                        });
+                      } catch (e) {
+                        toast({
+                          title: "Couldn't send reset email",
+                          description: e instanceof Error ? e.message : "Email may not be configured yet — ask your admin to reset it from the dashboard.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               )}
             </form>
             <div className="mt-6 text-center text-sm">
@@ -569,6 +668,7 @@ const Login = () => {
         </Card>
       </div>
     </div>
+    </>
   );
 };
 

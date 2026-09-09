@@ -18,8 +18,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 10000; // 10 seconds minimum between heartbeats per endpoint
 
-function checkRateLimit(endpointId: string, action: string): boolean {
-  const key = `${endpointId}:${action}`;
+// C1 fix: partition rate-limit keys by organization_id so a compromised
+// endpoint from Org A cannot evict the rate-limit slots of Org B endpoints
+// whose UUIDs it has observed.
+function checkRateLimit(orgId: string, endpointId: string, action: string): boolean {
+  const key = `${orgId}:${endpointId}:${action}`;
   const now = Date.now();
   const lastRequest = rateLimitMap.get(key) || 0;
   if (now - lastRequest < RATE_LIMIT_MS) {
@@ -236,6 +239,11 @@ Deno.serve(async (req) => {
       return await handleSysmonEvents(req);
     }
 
+    // Route: GET /mesh-config - MeshCentral group config for install_mesh_agent
+    if (path === "/mesh-config" && req.method === "GET") {
+      return await handleGetMeshConfig(req);
+    }
+
     // Route: GET /dns-policy - Fetch the DNS policy assigned to this endpoint
     if (path === "/dns-policy" && req.method === "GET") {
       return await handleGetDnsPolicy(req);
@@ -269,6 +277,11 @@ Deno.serve(async (req) => {
     // Route: GET /windows-update-policy - Get assigned Windows Update policy
     if (path === "/windows-update-policy" && req.method === "GET") {
       return await handleGetWindowsUpdatePolicy(req);
+    }
+
+    // Route: GET /update-ring - Effective patch deployment ring for this endpoint
+    if (path === "/update-ring" && req.method === "GET") {
+      return await handleGetUpdateRing(req);
     }
 
     // Route: GET /gpo-policy - Get assigned GPO policy
@@ -336,7 +349,13 @@ function generateAgentToken(): string {
 async function validateAgentToken(req: Request) {
   const token = req.headers.get("x-agent-token");
   if (!token) {
-    console.error(`[${VERSION}] validateAgentToken: No x-agent-token header found. Headers: ${JSON.stringify(Object.fromEntries([...new Headers(req.headers).entries()].filter(([k]) => k !== 'authorization')))}`);
+    // Log only header NAMES. The previous version dumped every header value
+    // except authorization, which put x-agent-token itself -- a live bearer
+    // credential -- into the function logs on any malformed request.
+    console.error(
+      `[${VERSION}] validateAgentToken: no x-agent-token header. Headers present: ` +
+      [...new Headers(req.headers).keys()].join(","),
+    );
     throw new Error("Missing agent token");
   }
 
@@ -348,7 +367,12 @@ async function validateAgentToken(req: Request) {
     .maybeSingle();
 
   if (error || !endpoint) {
-    console.error(`[${VERSION}] validateAgentToken: Token lookup failed. tokenLength=${trimmedToken.length}, tokenPrefix=${trimmedToken.substring(0, 8)}..., dbError=${error?.message || 'none'}, found=${!!endpoint}`);
+    // No token prefix. 8 hex characters is 32 bits of a live credential and
+    // logs are retained, exportable, and read by more people than the DB is.
+    console.error(
+      `[${VERSION}] validateAgentToken: lookup failed. tokenLength=${trimmedToken.length}, ` +
+      `dbError=${error?.message || "none"}, found=${!!endpoint}`,
+    );
     throw new Error("Invalid agent token");
   }
 
@@ -360,6 +384,21 @@ async function validateAgentToken(req: Request) {
   if (endpoint.is_active === false) {
     console.error(`[${VERSION}] validateAgentToken: endpoint ${endpoint.id} is deactivated; rejecting`);
     throw new Error("Endpoint deactivated");
+  }
+
+  // A3 fix: gate on parent org's is_active / stripe_status. Cancelled
+  // subscriptions previously kept phoning home indefinitely because the
+  // legacy bearer path never joined organizations.
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("is_active, stripe_status, organization_type")
+    .eq("id", endpoint.organization_id)
+    .maybeSingle();
+  if (!org || org.is_active === false) {
+    throw new Error("Organization suspended");
+  }
+  if (org.organization_type === "home_user" && org.stripe_status && !["active","trialing","past_due"].includes(org.stripe_status)) {
+    throw new Error(`Subscription ${org.stripe_status}`);
   }
 
   return endpoint;
@@ -383,7 +422,7 @@ async function handleHeartbeat(req: Request) {
   const body = await req.json();
 
   // Rate limit heartbeats to reduce write pressure
-  if (!checkRateLimit(endpoint.id, "heartbeat")) {
+  if (!checkRateLimit(endpoint.organization_id as string, endpoint.id, "heartbeat")) {
     return new Response(
       JSON.stringify({ success: true, message: "Heartbeat rate limited", rate_limited: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -407,6 +446,49 @@ async function handleHeartbeat(req: Request) {
       console.log(`[${VERSION}] agent_update_log: ${endpoint.id} ${endpoint.agent_version} -> ${body.agent_version}`);
     } catch (e) {
       console.error(`[${VERSION}] agent_update_log insert failed:`, e);
+    }
+
+  }
+
+  // v0.7.20: continuous upgrade_agent auto-ack. Independent of the version
+  // flip — runs on every heartbeat where the endpoint reports a version.
+  //
+  // The agent-side "save pending results to disk, recover on startup" dance
+  // is fragile across service swaps; if the file write or read races the
+  // SCM stop/start, the command sits in `dispatched` until the 45-minute
+  // expiry cron buries it as a false "agent never reported back". Operators
+  // then see successful upgrades reported as failures.
+  //
+  // Resilient fix: if the endpoint's reported version equals the command's
+  // target_version, the upgrade clearly succeeded — ack it. Idempotent via
+  // the .in(status, [queued, dispatched]) filter.
+  if (body.agent_version) {
+    try {
+      const reportedVersion = String(body.agent_version);
+      const { data: pending } = await supabase
+        .from("agent_commands")
+        .select("id, params, issued_at")
+        .eq("endpoint_id",  endpoint.id)
+        .eq("command_type", "upgrade_agent")
+        .in("status",       ["queued", "dispatched"]);
+      for (const cmd of (pending ?? []) as Array<{ id: string; params: { target_version?: string } | null; issued_at: string }>) {
+        const target = cmd.params?.target_version;
+        if (target && target === reportedVersion) {
+          await supabase
+            .from("agent_commands")
+            .update({
+              status:       "succeeded",
+              completed_at: new Date().toISOString(),
+              result:       { inferred_from: "agent_version_matches_target", reported_version: reportedVersion, target_version: target },
+              error_message: null,
+            })
+            .eq("id",     cmd.id)
+            .in("status", ["queued", "dispatched"]);
+          console.log(`[${VERSION}] upgrade_agent ${cmd.id}: auto-ack — endpoint now at target ${target}`);
+        }
+      }
+    } catch (e) {
+      console.error(`[${VERSION}] upgrade_agent auto-ack failed:`, e);
     }
   }
 
@@ -729,6 +811,10 @@ async function handleThreats(req: Request) {
           .from("endpoint_threats")
           .update({
             status: threat.status,
+            // Bump initial_detection_time on re-detection so the UI's freshness
+            // sort surfaces the row. If the agent didn't send one, fall back to
+            // last_threat_status_change_time, which Defender always sets.
+            initial_detection_time: threat.initial_detection_time || threat.last_threat_status_change_time || new Date().toISOString(),
             last_threat_status_change_time: threat.last_threat_status_change_time,
             raw_data: threat.raw_data,
             ...(shouldClearManualResolution
@@ -809,6 +895,9 @@ async function ingestThreats(endpointId: string, threats: any[]) {
       } else {
         await supabase.from("endpoint_threats").update({
           status: threat.status,
+          // Bump initial_detection_time on re-detection so the UI's freshness
+          // sort surfaces the row. Falls back to status-change time then now().
+          initial_detection_time: threat.initial_detection_time || threat.last_threat_status_change_time || new Date().toISOString(),
           last_threat_status_change_time: threat.last_threat_status_change_time,
           // Also refresh resources -- the latest detection's file path matters operationally.
           resources: threat.resources,
@@ -1120,6 +1209,10 @@ async function handleLogs(req: Request) {
             severity: threat.severity,
             category: threat.category,
             status: threat.status,
+            // Bump initial_detection_time on re-detection so the UI's
+            // freshness sort surfaces the row. Falls back to status-change
+            // time then now().
+            initial_detection_time: threat.initial_detection_time || threat.last_threat_status_change_time || new Date().toISOString(),
             last_threat_status_change_time: threat.last_threat_status_change_time,
             resources: threat.resources as any,
             raw_data: threat.raw_data as any,
@@ -1643,6 +1736,60 @@ async function handleGetWindowsUpdatePolicy(req: Request) {
     JSON.stringify({ has_policy: false }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
+}
+
+// GET /update-ring - Effective patch deployment ring for this endpoint.
+//
+// Walks endpoint -> group -> update_rings. Returns the ring's defer-days,
+// install window, critical-only flag, and concurrency cap so the agent
+// can write matching WUfB registry keys and gate scheduled installs.
+//
+// Response shape:
+//   { has_ring: false }
+//   { has_ring: true, ring: { name, quality_update_defer_days, ... } }
+async function handleGetUpdateRing(req: Request) {
+    const endpoint = await validateAgentToken(req);
+
+    // Membership search. If the endpoint is in multiple groups, prefer
+    // groups that have a non-null update_ring_id, preferring is_default
+    // groups (stable, predictable choice).
+    const { data: memberships } = await supabase
+        .from("endpoint_group_memberships")
+        .select(`
+            group_id,
+            endpoint_groups (
+                id, name, is_default, update_ring_id
+            )
+        `)
+        .eq("endpoint_id", endpoint.id);
+
+    let chosenRingId: string | null = null;
+    for (const m of (memberships ?? [])) {
+        const g = (m as any).endpoint_groups as { id: string; name: string; is_default: boolean; update_ring_id: string | null } | null;
+        if (!g?.update_ring_id) continue;
+        if (g.is_default) { chosenRingId = g.update_ring_id; break; }
+        if (!chosenRingId) chosenRingId = g.update_ring_id;
+    }
+
+    if (!chosenRingId) {
+        return new Response(JSON.stringify({ has_ring: false }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+
+    const { data: ring, error } = await supabase
+        .from("update_rings")
+        .select("id, name, description, quality_update_defer_days, feature_update_defer_days, install_window_start_local, install_window_end_local, critical_only, max_concurrent_installs, updated_at")
+        .eq("id", chosenRingId)
+        .maybeSingle();
+    if (error || !ring) {
+        return new Response(JSON.stringify({ has_ring: false }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+    return new Response(JSON.stringify({ has_ring: true, ring }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 }
 
 // GET /gpo-policy - Get assigned GPO policy for an endpoint (via group, with priority)
@@ -2221,6 +2368,68 @@ async function handleSysmonEvents(req: Request) {
 }
 
 // GET /dns-policy - Return the DNS policy assigned to the requesting endpoint
+// ============================================================================
+// GET /mesh-config — MeshCentral enrolment config for install_mesh_agent.
+//
+// The mesh group id is a shared remote-access enrolment secret: anyone
+// holding it can enrol a device into the Mithras remote-control group. Until
+// v0.7.21 it was a hardcoded default inside CommandExecutor.psm1 — committed
+// to git and shipped in cleartext to every customer endpoint.
+//
+// It now lives in platform_settings (super-admin RLS, no anon/authenticated
+// grants after 20260812000000) and is handed out only here, behind the
+// agent's own credentials. Note this is deliberately NOT exposed to the web
+// console: putting it in the React bundle would be exactly as public as
+// baking it into the agent.
+// ============================================================================
+async function handleGetMeshConfig(req: Request) {
+  const endpoint = await validateAgentToken(req);
+
+  const { data: rows, error } = await supabase
+    .from("platform_settings")
+    .select("key, value")
+    .in("key", ["mesh_group_id", "mesh_server_url"]);
+
+  if (error) {
+    console.error(`[${VERSION}] mesh-config: settings read failed:`, error.message);
+    return new Response(
+      JSON.stringify({ success: false, error: "settings_unavailable", _version: VERSION }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const map: Record<string, string> = {};
+  for (const r of rows ?? []) map[r.key] = (r.value ?? "").trim();
+
+  const meshId = map["mesh_group_id"] ?? "";
+  const meshUrl = map["mesh_server_url"] || "https://remote.mithras.com.au";
+
+  if (!meshId) {
+    // Fail loudly rather than returning a half-config the agent will reject
+    // with a less specific message.
+    console.error(
+      `[${VERSION}] mesh-config: platform_settings.mesh_group_id is not set — ` +
+      `remote access cannot be provisioned for endpoint ${endpoint.id}`,
+    );
+    return new Response(
+      JSON.stringify({ success: false, error: "mesh_group_id_not_configured", _version: VERSION }),
+      { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, mesh_url: meshUrl, mesh_id: meshId, _version: VERSION }),
+    {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+        // Never let a proxy or browser retain a remote-access enrolment secret.
+        "Cache-Control": "no-store, private",
+      },
+    },
+  );
+}
+
 async function handleGetDnsPolicy(req: Request) {
   console.log(`[${VERSION}] handleGetDnsPolicy called`);
   const endpoint = await validateAgentToken(req);
@@ -2377,7 +2586,7 @@ async function handleGetFirewallPolicy(req: Request) {
   // Resolve source group IPs for allow_from_groups rules
   const resolvedRules = await Promise.all(
     (rules || []).map(async (rule) => {
-      let resolvedSourceIps: string[] = [...(rule.allowed_source_ips || [])];
+      const resolvedSourceIps: string[] = [...(rule.allowed_source_ips || [])];
 
       if (rule.action === "allow_from_groups" && rule.allowed_source_groups?.length) {
         // Get endpoints in source groups and resolve their last known IPs
@@ -2720,7 +2929,7 @@ async function maybeQueueAgentUpgrade(endpointId: string, orgId: string, reporte
 
   const { data: latest } = await supabase
     .from("agent_versions")
-    .select("version, download_url, sha256")
+    .select("version, download_url, sha256, ed25519_sig")
     .eq("runtime", "powershell")
     .eq("channel", "stable")
     .eq("is_active", true)
@@ -2729,6 +2938,20 @@ async function maybeQueueAgentUpgrade(endpointId: string, orgId: string, reporte
     .maybeSingle();
 
   if (!latest || cmpSemver(reportedVersion, latest.version) >= 0) return;
+
+  // v0.7.21: never auto-queue an unsigned bundle. Agents from 0.7.21 refuse
+  // these anyway (CommandExecutor.Invoke-UpgradeAgent), so queuing one would
+  // just generate a failed command on every endpoint on every heartbeat.
+  // Loud log, because a stable channel with no signature means the release
+  // pipeline was run without SIGNING_KEY and the whole fleet has silently
+  // stopped receiving updates.
+  if (!latest.ed25519_sig) {
+    console.error(
+      `[${VERSION}] agent_versions ${latest.version} (powershell/stable) has no ed25519_sig — ` +
+      `refusing to auto-queue upgrades. Re-publish with scripts/phase2a/build-release.sh and SIGNING_KEY set.`,
+    );
+    return;
+  }
 
   // Dedup: skip if an upgrade already queued/dispatched and not yet expired.
   const nowIso = new Date().toISOString();
@@ -2753,6 +2976,7 @@ async function maybeQueueAgentUpgrade(endpointId: string, orgId: string, reporte
         target_version: latest.version,
         download_url: latest.download_url,
         sha256: latest.sha256,
+        ed25519_sig: latest.ed25519_sig,
         reason: "heartbeat_version_drift",
         from_version: reportedVersion,
       },

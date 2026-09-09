@@ -9,6 +9,11 @@
 #     so any failure has a discoverable cause.
 #   - Self-deletes the scheduled task after swap completes.
 
+# Updater depends on the Ed25519 verifier. Imported here as well as from
+# mithras-agent.ps1 so the module is usable standalone (Pester, manual
+# recovery) without silently losing signature enforcement.
+Import-Module (Join-Path $PSScriptRoot 'CodeSigning.psm1') -Force -DisableNameChecking
+
 function _UpLog($msg) {
     $logDir = 'C:\ProgramData\Mithras\logs'
     if (-not (Test-Path $logDir)) { try { New-Item -ItemType Directory -Path $logDir -Force | Out-Null } catch {} }
@@ -17,17 +22,68 @@ function _UpLog($msg) {
     } catch {}
 }
 
+# Hosts we will accept an agent bundle from. The download URL arrives inside
+# a server-issued command, so without this list a single bad/forged command
+# row could point every endpoint at an attacker-controlled host. Compare on
+# the parsed URI host only -- never a substring match, which "api.mithras.com.au.evil.tld"
+# would sail straight through.
+$script:AllowedBundleHosts = @(
+    'api.mithras.com.au',
+    'njdcyjxgtckgtzgzoctw.supabase.co',
+    'apidev.peritusdigital.com.au'
+)
+
+function Test-BundleUrlAllowed {
+    [OutputType([bool])]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Url)
+    try {
+        $u = [System.Uri]$Url
+    } catch {
+        return $false
+    }
+    if ($u.Scheme -ne 'https') { return $false }
+    return ($script:AllowedBundleHosts -contains $u.Host)
+}
+
 function Invoke-AgentSelfUpdate {
+    <#
+    .SYNOPSIS
+        Download, verify and stage an agent bundle for swap-on-restart.
+    .DESCRIPTION
+        Three independent gates, all of which must pass before a single byte
+        is extracted:
+
+          1. The download URL resolves to an allow-listed HTTPS host.
+          2. The bundle's SHA-256 matches the expected digest.
+          3. The Ed25519 signature over that digest verifies against the
+             release public key baked into CodeSigning.psm1.
+
+        Gate 3 is the one that matters. Gates 1 and 2 are both satisfied by
+        anything the server says, because the server supplies both the URL
+        and the hash -- only the signature proves the bundle came from a
+        build machine holding the private key.
+
+        There is deliberately NO bypass switch. An unsigned or
+        wrongly-signed bundle throws, the command is reported failed, and
+        the endpoint stays on its current version. Getting stuck on an old
+        build is recoverable; running an attacker's payload as SYSTEM is not.
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$DownloadUrl,
         [Parameter(Mandatory)][string]$ExpectedSha256,
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Ed25519Signature,
         [Parameter(Mandatory)][string]$TargetVersion,
         [Parameter(Mandatory)][string]$AgentRoot,
         [string]$ServiceName = 'MithrasAgent'
     )
 
     _UpLog "Invoke-AgentSelfUpdate v=$TargetVersion url=$DownloadUrl"
+
+    if (-not (Test-BundleUrlAllowed -Url $DownloadUrl)) {
+        _UpLog "REJECTED: download URL is not an allow-listed HTTPS host: $DownloadUrl"
+        throw "Self-update: refusing bundle from untrusted host '$DownloadUrl'"
+    }
 
     $stage     = Join-Path $AgentRoot 'update'
     $installed = Join-Path $AgentRoot 'install'
@@ -49,12 +105,18 @@ function Invoke-AgentSelfUpdate {
         throw "Self-update: download failed - $($_.Exception.Message)"
     }
 
-    $actualSha = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
-    _UpLog "sha actual=$actualSha expected=$($ExpectedSha256.ToLower())"
-    if ($actualSha -ne $ExpectedSha256.ToLower()) {
-        _UpLog "SHA MISMATCH"
+    # ── Integrity + authenticity ──────────────────────────────────────────
+    # Test-AgentBundleSignature re-hashes the file, cross-checks the expected
+    # digest, and verifies the Ed25519 signature over that digest against the
+    # baked-in release key. Both halves in one call so neither can be skipped.
+    $verdict = Test-AgentBundleSignature -Path $zipPath `
+                                         -SignatureBase64 $Ed25519Signature `
+                                         -ExpectedSha256  $ExpectedSha256
+    _UpLog "verify: valid=$($verdict.valid) sha=$($verdict.sha256) reason=$($verdict.reason)"
+    if (-not $verdict.valid) {
+        _UpLog "BUNDLE REJECTED: $($verdict.reason)"
         try { Remove-Item -Path $stage -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        throw "Self-update: SHA256 mismatch"
+        throw "Self-update: bundle rejected - $($verdict.reason)"
     }
 
     $unpacked = Join-Path $stage 'unpacked'
@@ -218,4 +280,4 @@ function Read-PendingCommandResults {
     }
 }
 
-Export-ModuleMember -Function Invoke-AgentSelfUpdate, Save-PendingCommandResults, Read-PendingCommandResults
+Export-ModuleMember -Function Invoke-AgentSelfUpdate, Save-PendingCommandResults, Read-PendingCommandResults, Test-BundleUrlAllowed

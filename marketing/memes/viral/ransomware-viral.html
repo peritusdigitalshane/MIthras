@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ransomware Math — viral</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; background: #000; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px; }
+
+  /* === SCENE 1: 0-3s — HOOK === */
+  .s1 { animation: s1 3s linear 0s both; background: #000; }
+  .s1 h1 { font-size: 82px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -3px; max-width: 95%; }
+  .s1 h1 .acc { color: #ff4040; }
+  .s1 p { font-size: 28px; font-weight: 600; color: rgba(255,255,255,0.55); margin-top: 30px; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* === SCENE 2: 3-15s — RECEIPT === */
+  .s2 { animation: s2 12s linear 3s both; padding: 50px; }
+  .receipt {
+    background: #fff8e7; color: #1a1a1a; width: 100%; height: 100%;
+    padding: 36px 40px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+  .receipt::before, .receipt::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 18px;
+    background: radial-gradient(circle at 9px 9px, #000 5px, transparent 6px);
+    background-size: 18px 18px;
+  }
+  .receipt::before { top: -9px; }
+  .receipt::after  { bottom: -9px; transform: scaleY(-1); }
+
+  .r-head { text-align: center; padding-bottom: 16px; border-bottom: 2px dashed #888; }
+  .r-head .org { font-size: 28px; font-weight: 700; }
+  .r-head .sub { font-size: 14px; color: #555; margin-top: 4px; letter-spacing: 1px; }
+  .r-head .src { font-size: 11px; color: #888; margin-top: 8px; letter-spacing: 0.8px; }
+
+  .lines { margin-top: 16px; font-size: 22px; }
+  .line { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dotted rgba(0,0,0,0.15); opacity: 0; }
+  .line .amt { font-weight: 700; }
+
+  /* Stagger receipt lines */
+  .line.l1 { animation: printLine 0.3s ease-out 4.2s both; }
+  .line.l2 { animation: printLine 0.3s ease-out 5.0s both; }
+  .line.l3 { animation: printLine 0.3s ease-out 5.8s both; }
+  .line.l4 { animation: printLine 0.3s ease-out 6.6s both; }
+  .line.l5 { animation: printLine 0.3s ease-out 7.4s both; }
+  .line.l6 { animation: printLine 0.3s ease-out 8.2s both; }
+
+  .line.subtotal {
+    border-top: 3px solid #444;
+    border-bottom: none;
+    padding-top: 14px;
+    margin-top: 14px;
+    font-size: 28px;
+    animation: subtotalIn 0.5s ease-out 9.0s both;
+  }
+  .line.subtotal .amt { color: #d9220c; font-size: 36px; }
+
+  @keyframes printLine {
+    0%   { opacity: 0; transform: translateY(-8px); }
+    50%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 1; }
+  }
+  @keyframes subtotalIn {
+    0%   { opacity: 0; transform: scale(0.9); }
+    60%  { opacity: 1; transform: scale(1.05); background: rgba(217,34,12,0.1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  .line.alt {
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(40,217,107,0.18);
+    border: 3px solid #28a558;
+    border-radius: 8px;
+    font-size: 26px;
+    font-weight: 700;
+    opacity: 0;
+    animation: altIn 0.6s ease-out 11.5s both;
+  }
+  .line.alt .amt { color: #1a8744; font-size: 36px; }
+  .line.alt .desc { color: #1a8744; }
+  @keyframes altIn {
+    0%   { opacity: 0; transform: translateY(20px) scale(0.95); }
+    60%  { opacity: 1; transform: translateY(0) scale(1.05); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes s2 { 0% { opacity: 0; } 4% { opacity: 1; } 96% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* === SCENE 3: 15-20s — CTA === */
+  .s3 { animation: s3 5s linear 15s both; background: #000; }
+  .s3::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.20), transparent 70%);
+  }
+  .s3 .save { font-size: 36px; font-weight: 700; color: #28d96b; letter-spacing: 2px; animation: fadeUp 0.5s ease-out 0.0s both; }
+  .s3 .big { font-size: 200px; font-weight: 900; letter-spacing: -6px; line-height: 1; color: #28d96b; margin-top: 14px; animation: pop 0.6s ease-out 0.4s both; }
+  .s3 .roi { font-size: 32px; font-weight: 700; color: rgba(255,255,255,0.85); margin-top: 18px; animation: fadeUp 0.5s ease-out 0.9s both; }
+  .s3 .brand { font-size: 100px; font-weight: 900; letter-spacing: -3px; margin-top: 48px; animation: fadeUp 0.5s ease-out 1.4s both; }
+  .s3 .cta { margin-top: 30px; padding: 20px 60px; background: #28d96b; color: #000; font-size: 32px; font-weight: 900; border-radius: 14px; animation: fadeUp 0.5s ease-out 1.8s both; }
+  .s3 .url { font-size: 24px; font-weight: 700; letter-spacing: 8px; color: #28d96b; margin-top: 30px; animation: fadeUp 0.5s ease-out 2.2s both; }
+
+  @keyframes s3 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pop { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <h1>What does a<br/>ransomware breach<br/><span class="acc">actually cost?</span></h1>
+    <p>Let's do the maths a vendor never shows you.</p>
+  </div>
+
+  <div class="scene s2">
+    <div class="receipt">
+      <div class="r-head">
+        <div class="org">SMB BREACH ESTIMATE</div>
+        <div class="sub">25-seat Australian business · 2026 averages</div>
+        <div class="src">— SOURCES: IBM COST OF A DATA BREACH REPORT · ASD ACSC · NOTIFIABLE BREACHES REGISTER —</div>
+      </div>
+      <div class="lines">
+        <div class="line l1"><span class="desc">Average ransom demand</span><span class="amt">$850,000</span></div>
+        <div class="line l2"><span class="desc">Downtime — 24 days @ $2,500/day</span><span class="amt">$60,000</span></div>
+        <div class="line l3"><span class="desc">Forensics + incident response</span><span class="amt">$80,000</span></div>
+        <div class="line l4"><span class="desc">Legal + notifiable data breach</span><span class="amt">$25,000</span></div>
+        <div class="line l5"><span class="desc">Insurance excess + premium hike</span><span class="amt">$45,000</span></div>
+        <div class="line l6"><span class="desc">Lost customers (18% post-breach churn)</span><span class="amt">$120,000</span></div>
+        <div class="line subtotal"><span class="desc">TOTAL</span><span class="amt">$1,180,000</span></div>
+        <div class="line alt"><span class="desc">— OR — Mithras 25 × $11 × 12</span><span class="amt">$3,300</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene s3">
+    <div class="save">YOU SAVE</div>
+    <div class="big">$1,176,700</div>
+    <div class="roi">PER YEAR. 357× RETURN ON A SECURITY SUBSCRIPTION.</div>
+    <div class="brand">MITHRAS</div>
+    <div class="cta">$11/seat. Everything in.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

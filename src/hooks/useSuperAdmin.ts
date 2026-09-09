@@ -17,6 +17,8 @@ interface Organization {
   ai_triage_enabled?: boolean;
   ai_investigation_enabled?: boolean;
   ai_soc_daily_cap_cents?: number;
+  ai_email_remediation_enabled?: boolean;
+  ai_endpoint_remediation_enabled?: boolean;
   subscription_plan?: "free" | "pro" | "business";
   device_quota_override?: number | null;
   parent_partner_id?: string | null;
@@ -284,17 +286,27 @@ export function useUpdateOrganizationAiSoc() {
       aiTriageEnabled,
       aiInvestigationEnabled,
       aiSocDailyCapCents,
+      aiEmailRemediationEnabled,
+      aiEndpointRemediationEnabled,
     }: {
       id: string;
       aiTriageEnabled?: boolean;
       aiInvestigationEnabled?: boolean;
       aiSocDailyCapCents?: number;
+      aiEmailRemediationEnabled?: boolean;
+      aiEndpointRemediationEnabled?: boolean;
     }) => {
       const patch: Record<string, unknown> = {};
       if (typeof aiTriageEnabled === "boolean") patch.ai_triage_enabled = aiTriageEnabled;
       if (typeof aiInvestigationEnabled === "boolean") patch.ai_investigation_enabled = aiInvestigationEnabled;
       if (typeof aiSocDailyCapCents === "number" && aiSocDailyCapCents >= 0) {
         patch.ai_soc_daily_cap_cents = aiSocDailyCapCents;
+      }
+      if (typeof aiEmailRemediationEnabled === "boolean") {
+        patch.ai_email_remediation_enabled = aiEmailRemediationEnabled;
+      }
+      if (typeof aiEndpointRemediationEnabled === "boolean") {
+        patch.ai_endpoint_remediation_enabled = aiEndpointRemediationEnabled;
       }
       if (Object.keys(patch).length === 0) {
         throw new Error("nothing to update");

@@ -342,7 +342,7 @@ const ENTRIES: GlossaryEntry[] = [
     category: "Identity & auth",
     longer: (
       <p>
-        Mithras is multi-tenant: Peritus (or your MSP) operates many customer organisations,
+        Mithras is multi-tenant: your MSP operates many customer organisations,
         each with its own endpoints, policies, users. Super-admins see all orgs; org members
         see only their own — Mithras refuses every cross-tenant read at the data layer, so
         a misclick or a UI bug can't expose another customer's data.

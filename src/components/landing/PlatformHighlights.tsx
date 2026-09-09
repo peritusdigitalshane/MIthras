@@ -1,7 +1,13 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, History, Network, ShieldCheck, Lock } from "lucide-react";
+import { ArrowRight, History, Network, ShieldCheck, Lock, Mail } from "lucide-react";
 
 const HIGHLIGHTS = [
+  {
+    href: "/phishing-protection",
+    icon: <Mail className="h-5 w-5" />,
+    title: "M365 email security",
+    line: "AI phishing + BEC triage. Bulk action. Per-tenant block rules.",
+  },
   {
     href: "/eol-windows",
     icon: <History className="h-5 w-5" />,
@@ -41,7 +47,7 @@ export function PlatformHighlights() {
             every layer the agents enforce.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
           {HIGHLIGHTS.map((h) => (
             <Link
               key={h.href}

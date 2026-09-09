@@ -2,15 +2,12 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- Schedule cleanup-old-data to run daily at 03:00 UTC
-SELECT cron.schedule(
-  'daily-cleanup-old-data',
-  '0 3 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://njdcyjxgtckgtzgzoctw.supabase.co/functions/v1/cleanup-old-data',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZGN5anhndGNrZ3R6Z3pvY3R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMDc0NzgsImV4cCI6MjA4NDU4MzQ3OH0.Dgzlv9Wk_Mxb8I8OYttjspVimEGSWswBnWBFhlt-jBw"}'::jsonb,
-    body := concat('{"time": "', now(), '"}')::jsonb
-  ) AS request_id;
-  $$
-);
+-- 2026-06-14 scrubbed: this migration originally hard-coded the URL and
+-- anon JWT for the now-abandoned cloud project (njdcyjxgtckgtzgzoctw).
+-- The cron job is unscheduled below and the post-launch cleanup cron is
+-- now configured via app settings on the self-hosted stack instead. The
+-- old anon JWT is treated as revoked; rotation is not required because
+-- the cloud project itself is frozen.
+DO $$ BEGIN
+    PERFORM cron.unschedule('daily-cleanup-old-data');
+EXCEPTION WHEN OTHERS THEN NULL; END $$;

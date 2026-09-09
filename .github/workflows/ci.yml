@@ -1,0 +1,134 @@
+name: CI
+
+# The repo had no CI at all until 2026-09-09. Three test suites existed in
+# three runtimes and only one of them (vitest) could run on a developer
+# machine — the 17 Deno tests covering HMAC canonicalisation and CORS, and the
+# Pester suites covering the agent, were never executed by anything.
+#
+# Every job here runs on its own runner so a failure in one suite doesn't mask
+# the others.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint, types, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # npm ci, not npm install: the Dockerfile's `npm install --legacy-peer-deps`
+      # means production images are not built from the lockfile. CI at least
+      # holds the line on a reproducible tree.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Vite + SWC transpiles without typechecking, so nothing else in the
+      # pipeline would notice a type error. The ratchet fails only if the
+      # count rises above the committed baseline — see typecheck-baseline.json
+      # for why the baseline is not zero yet.
+      - name: Typecheck (ratchet)
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build:nopr
+        env:
+          VITE_SUPABASE_URL: https://example.supabase.co
+          # Not a real key — a syntactically valid placeholder so the build's
+          # fail-fast env check in src/integrations/supabase/client.ts passes.
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+  edge-functions:
+    name: Edge functions (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # These cover the HMAC canonicalisation that agent auth depends on and
+      # the CORS allow-list. They are the most security-relevant tests in the
+      # repo and vitest's `include: ["src/**"]` silently excluded them.
+      - name: Test shared modules
+        run: deno test --allow-net --allow-env supabase/functions/_shared/
+
+      - name: Typecheck edge functions
+        run: |
+          # Not fatal yet — several functions predate the shared helpers and
+          # have their own drift. Surfacing it is the first step.
+          deno check supabase/functions/*/index.ts || \
+            echo "::warning::deno check reported errors in one or more edge functions"
+
+  agent:
+    name: Agent (Pester)
+    # Windows: SecureConfig.Tests.ps1 exercises DPAPI and NTFS ACLs, which
+    # have no equivalent on Linux. The rest of the suite is host-independent.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Pester
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'agent/runtime-powershell/tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          $cfg.TestResult.Enabled = $true
+          $cfg.TestResult.OutputPath = 'pester-results.xml'
+          Invoke-Pester -Configuration $cfg
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-results
+          path: pester-results.xml
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      # Production dependencies only. Advisory, not blocking: as of 2026-09-09
+      # the remaining high-severity findings are all transitive under
+      # swagger-ui-react and puppeteer and need major-version bumps. Blocking
+      # on them today would just wedge every PR.
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev || \
+            echo "::warning::npm audit found vulnerabilities in production dependencies"

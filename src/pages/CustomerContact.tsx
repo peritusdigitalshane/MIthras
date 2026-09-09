@@ -40,13 +40,27 @@ export default function CustomerContact() {
                 <ContactCard
                   icon={<Mail className="h-4 w-4" />}
                   label="Email"
-                  value="(contact your reseller — details on your invoices)"
+                  value={
+                    reseller.support_email ? (
+                      <a className="underline" href={`mailto:${reseller.support_email}`}>{reseller.support_email}</a>
+                    ) : (
+                      "Listed on your monthly invoice from your reseller."
+                    )
+                  }
                   hint="Best for non-urgent questions and routine requests."
                 />
                 <ContactCard
                   icon={<Phone className="h-4 w-4" />}
-                  label="Phone"
-                  value="(contact your reseller — details on your invoices)"
+                  label="Web"
+                  value={
+                    reseller.support_url ? (
+                      <a className="underline" href={reseller.support_url} target="_blank" rel="noreferrer">
+                        {reseller.support_url.replace(/^https?:\/\//, "")}
+                      </a>
+                    ) : (
+                      "Phone details are on your reseller's invoice or website."
+                    )
+                  }
                   hint="Best for time-sensitive issues during business hours."
                 />
               </div>
@@ -128,7 +142,7 @@ export default function CustomerContact() {
   );
 }
 
-function ContactCard({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: string; hint: string }) {
+function ContactCard({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint: string }) {
   return (
     <div className="rounded-lg border bg-background p-4 space-y-1.5">
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">

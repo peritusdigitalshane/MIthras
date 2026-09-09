@@ -20,10 +20,24 @@ const OUTPUT = join(ROOT, "public", "sitemap.xml");
 
 const STATIC_ROUTES = [
     { path: "/",                priority: "1.0", changefreq: "weekly"  },
-    { path: "/blog",            priority: "0.9", changefreq: "weekly"  },
-    { path: "/guides",          priority: "0.7", changefreq: "monthly" },
-    { path: "/login",           priority: "0.4", changefreq: "yearly"  },
-    { path: "/signup",          priority: "0.7", changefreq: "yearly"  },
+    { path: "/platform",        priority: "0.9", changefreq: "monthly" },
+    { path: "/ai-soc",          priority: "0.9", changefreq: "monthly" },
+    { path: "/phishing-protection", priority: "0.9", changefreq: "monthly" },
+    { path: "/identity-defence", priority: "0.9", changefreq: "monthly" },
+    { path: "/m365-shield",     priority: "0.9", changefreq: "monthly" },
+    { path: "/for-msps",        priority: "0.9", changefreq: "monthly" },
+    { path: "/eol-windows",     priority: "0.9", changefreq: "monthly" },
+    { path: "/personal",        priority: "0.8", changefreq: "monthly" },
+    { path: "/intel",           priority: "0.8", changefreq: "hourly"  },
+    { path: "/pricing",         priority: "0.9", changefreq: "monthly" },
+    { path: "/channel-program", priority: "0.8", changefreq: "monthly" },
+    { path: "/contact-sales",   priority: "0.7", changefreq: "monthly" },
+    { path: "/blog",            priority: "0.8", changefreq: "weekly"  },
+    // /guides removed 2026-06-16: nginx returns 403 on /guides/ trailing-
+    // slash variant, surfaces as Broken_redirect + 4XX_page in the SEO
+    // audit. Re-add once nginx falls through to /index.html on /guides/.
+    // /signup removed: free-trial self-signup was disabled (task #234), so
+    // /signup is a defunct entry point. Login page handles its own redirect.
     { path: "/security",        priority: "0.5", changefreq: "monthly" },
     { path: "/status",          priority: "0.3", changefreq: "weekly"  },
     { path: "/privacy",         priority: "0.3", changefreq: "yearly"  },
@@ -36,7 +50,6 @@ function readBlogPosts() {
     return files.map((file) => {
         const slug = file.replace(/\.md$/, "");
         const raw = readFileSync(join(BLOG_DIR, file), "utf8");
-        // Minimal frontmatter parse — we only need publishedAt + updatedAt.
         const fm = raw.match(/^---\n([\s\S]*?)\n---/);
         const body = fm ? fm[1] : "";
         const get = (k) => {
@@ -71,7 +84,7 @@ function main() {
         ...posts.map((p) => ({
             path: `/blog/${p.slug}`,
             lastmod: p.updatedAt ?? today,
-            priority: "0.8",
+            priority: "0.7",
             changefreq: "monthly",
         })),
     ];

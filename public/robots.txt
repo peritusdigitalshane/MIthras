@@ -1,8 +1,8 @@
 User-agent: *
 Allow: /
 
-# Don't index authenticated app pages — they 401 to crawlers anyway, but
-# this saves the crawl budget for the marketing surface.
+# Authenticated app surfaces. They 401 anonymous crawlers anyway, but
+# enumerating them keeps the crawl budget on marketing pages.
 Disallow: /dashboard
 Disallow: /endpoints
 Disallow: /threats
@@ -10,6 +10,7 @@ Disallow: /policies
 Disallow: /logs
 Disallow: /activity
 Disallow: /admin
+Disallow: /admin/*
 Disallow: /settings
 Disallow: /alerts
 Disallow: /incidents
@@ -31,6 +32,47 @@ Disallow: /group-policy
 Disallow: /deploy
 Disallow: /legacy-hardening
 Disallow: /help
+Disallow: /help/*
 Disallow: /reset-password
+Disallow: /glossary
+Disallow: /account
+Disallow: /account/*
+Disallow: /customer
+Disallow: /customer/*
+Disallow: /partner
+Disallow: /partner/*
+Disallow: /distributor
+Disallow: /distributor/*
+Disallow: /m365
+Disallow: /m365/*
+Disallow: /soc
+Disallow: /soc/*
+Disallow: /hunt
+Disallow: /ai-activity
+Disallow: /api-keys
+Disallow: /api-docs
+Disallow: /app-whitelisting
+Disallow: /agents
+Disallow: /sales-kit
+Disallow: /portal-invoices
+
+# Crawlers should respect this — AI scrapers, leave the platform alone.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
 
 Sitemap: https://www.mithras.com.au/sitemap.xml

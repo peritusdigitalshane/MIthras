@@ -7,6 +7,7 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { organizationSchema, softwareApplicationSchema, breadcrumbSchema } from "@/components/seo/jsonLd";
 import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
 import { MockSocDashboard } from "@/components/landing/visuals/MockSocDashboard";
 
@@ -111,11 +112,11 @@ const PILLARS: Pillar[] = [
     id: "agents",
     name: "Cross-platform agents",
     icon: <ServerCog className="h-6 w-6" />,
-    tagline: "Lightweight, signed, tamper-protected. Windows and Linux today.",
+    tagline: "Lightweight, signed, tamper-protected. Windows today, Linux heartbeat preview.",
     description:
       "Outbound-only agents (no inbound firewall holes), HMAC-authenticated heartbeats, automatic version management, signed bundles, and tamper protection on the service + install directory.",
     bullets: [
-      "Windows 7+ and Linux (Ubuntu, RHEL, Debian)",
+      "Windows 7+ (full platform capability) · Linux heartbeat + inventory preview",
       "Outbound HTTPS only",
       "Tamper-protected service + DACL",
       "Automatic version management",
@@ -141,9 +142,18 @@ const Platform = () => {
   return (
     <>
       <Seo
-        title="The Mithras Platform — AI SOC, EOL hardening, Defender management, microseg"
-        description="Eight integrated capabilities in one platform: AI SOC, microsegmentation, EOL Windows hardening, Defender management, WDAC application control, AI vulnerability scanning, tamper-protected cross-platform agents, and browser-based remote access."
+        title="Mithras Platform | AI SOC, Defender management, microsegmentation"
+        description="One agent. One console. Eight capabilities. AI SOC, Defender posture management, microsegmentation, WDAC application control, end-of-life Windows hardening, AI vulnerability scanning, tamper-protected agents, browser-based remote access."
         canonical="/platform"
+        keywords="Mithras platform, endpoint security platform, Defender management console, WDAC application control, microsegmentation MSP, multi-tenant endpoint security"
+        structuredData={[
+          organizationSchema(),
+          softwareApplicationSchema(),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Platform", path: "/platform" },
+          ]),
+        ]}
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -167,10 +177,11 @@ const Platform = () => {
               Eight capabilities.
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed">
-              AI SOC, microsegmentation, EOL Windows hardening, Defender
-              management, application control, AI vulnerability scanning,
-              cross-platform agents, and remote access &mdash; integrated end
-              to end, multi-tenant from day one.
+              Defender posture management. Microsegmentation at the Windows
+              Firewall layer. End-of-life Windows hardened by the same agent
+              you run on Server 2022. Application control, vulnerability scans,
+              browser-based remote access. All wired into one AI SOC that
+              triages, verifies, and responds without waking anyone up.
             </p>
           </div>
 

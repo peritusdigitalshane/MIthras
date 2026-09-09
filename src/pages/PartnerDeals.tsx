@@ -227,7 +227,7 @@ export default function PartnerDeals() {
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="d-region">Region</Label>
-                      <Input id="d-region" value={pRegion} onChange={(e) => setPRegion(e.target.value)} placeholder="Brisbane, AU" />
+                      <Input id="d-region" value={pRegion} onChange={(e) => setPRegion(e.target.value)} placeholder="Sydney, AU" />
                     </div>
                   </div>
                   <div className="space-y-1.5">

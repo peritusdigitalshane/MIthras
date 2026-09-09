@@ -81,9 +81,16 @@ const Policies = () => {
       }
       setEditorOpen(false);
     } catch (e) {
+      // MAJOR fix: actually surface the error. A blanket "Please try again"
+      // hid the only feedback the admin had — usually RLS denials or
+      // duplicate-name constraints, both of which retrying won't solve.
+      const msg = e instanceof Error ? e.message : String(e ?? "Unknown error");
+      const friendly = /row-level security|permission denied|policy/i.test(msg)
+        ? `${msg} — your account may not have admin/owner access to this organisation.`
+        : msg;
       toast({
         title: "Failed to save policy",
-        description: "Please try again.",
+        description: friendly,
         variant: "destructive",
       });
     }

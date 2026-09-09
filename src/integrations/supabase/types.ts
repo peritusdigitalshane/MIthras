@@ -6835,6 +6835,8 @@ export type Database = {
       }
       organizations: {
         Row: {
+          ai_email_remediation_enabled: boolean
+          ai_endpoint_remediation_enabled: boolean
           ai_investigation_enabled: boolean
           ai_soc_daily_cap_cents: number
           ai_soc_enabled: boolean
@@ -6855,6 +6857,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_email_remediation_enabled?: boolean
+          ai_endpoint_remediation_enabled?: boolean
           ai_investigation_enabled?: boolean
           ai_soc_daily_cap_cents?: number
           ai_soc_enabled?: boolean
@@ -6875,6 +6879,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_email_remediation_enabled?: boolean
+          ai_endpoint_remediation_enabled?: boolean
           ai_investigation_enabled?: boolean
           ai_soc_daily_cap_cents?: number
           ai_soc_enabled?: boolean
@@ -7372,7 +7378,7 @@ export type Database = {
           label: string
           max_uses: number | null
           organization_id: string
-          token: string
+          token_hash: string
           use_count: number
         }
         Insert: {
@@ -7384,7 +7390,7 @@ export type Database = {
           label?: string
           max_uses?: number | null
           organization_id: string
-          token?: string
+          token_hash?: string
           use_count?: number
         }
         Update: {
@@ -7396,7 +7402,7 @@ export type Database = {
           label?: string
           max_uses?: number | null
           organization_id?: string
-          token?: string
+          token_hash?: string
           use_count?: number
         }
         Relationships: [
@@ -7626,7 +7632,7 @@ export type Database = {
       }
       routers: {
         Row: {
-          agent_token: string | null
+          agent_token_hash: string | null
           config_profile: Json | null
           created_at: string
           firmware_version: string | null
@@ -7647,7 +7653,7 @@ export type Database = {
           wan_ip: string | null
         }
         Insert: {
-          agent_token?: string | null
+          agent_token_hash?: string | null
           config_profile?: Json | null
           created_at?: string
           firmware_version?: string | null
@@ -7668,7 +7674,7 @@ export type Database = {
           wan_ip?: string | null
         }
         Update: {
-          agent_token?: string | null
+          agent_token_hash?: string | null
           config_profile?: Json | null
           created_at?: string
           firmware_version?: string | null
@@ -10292,6 +10298,39 @@ export type Database = {
           organization_id: string
           organization_name: string
           role: Database["public"]["Enums"]["org_role"]
+        }[]
+      }
+      mint_router_enrollment_token: {
+        Args: {
+          p_organization_id: string
+          p_label?: string | null
+          p_max_uses?: number | null
+          p_expires_at?: string | null
+        }
+        Returns: {
+          token_id: string
+          plaintext_token: string
+        }[]
+      }
+      reserve_router_enrollment_slot: {
+        Args: { p_token: string }
+        Returns: {
+          organization_id: string
+          use_count: number
+          max_uses: number
+        }[]
+      }
+      router_heartbeat_by_token: {
+        Args: {
+          p_token: string
+          p_wan_ip?: string | null
+          p_firmware_version?: string | null
+          p_is_online?: boolean | null
+        }
+        Returns: {
+          id: string
+          hostname: string
+          organization_id: string
         }[]
       }
     }

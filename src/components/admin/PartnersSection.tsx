@@ -576,12 +576,14 @@ function PartnerCustomersSheet({
                             name: customer.name,
                             ai_triage_enabled: !!customer.ai_triage_enabled,
                             ai_investigation_enabled: !!customer.ai_investigation_enabled,
+                            ai_email_remediation_enabled: !!customer.ai_email_remediation_enabled,
+                            ai_endpoint_remediation_enabled: !!customer.ai_endpoint_remediation_enabled,
                             ai_soc_daily_cap_cents: customer.ai_soc_daily_cap_cents ?? 500,
                           })
                         }
                         title="AI SOC settings"
                       >
-                        <Brain className={`h-3 w-3 ${(customer.ai_triage_enabled || customer.ai_investigation_enabled) ? "text-primary" : ""}`} />
+                        <Brain className={`h-3 w-3 ${(customer.ai_triage_enabled || customer.ai_investigation_enabled || customer.ai_email_remediation_enabled || customer.ai_endpoint_remediation_enabled) ? "text-primary" : ""}`} />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setRenamingId(customer.id); setRenameValue(customer.name); }}>
                         <Pencil className="h-3 w-3" />

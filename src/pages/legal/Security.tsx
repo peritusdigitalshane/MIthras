@@ -36,12 +36,12 @@ const Security = () => (
 
       <h2>Access controls</h2>
       <ul>
-        <li>Strong password requirements on the platform; SSO available on Enterprise.</li>
+        <li>Strong password requirements on the platform. Magic-link sign-in is available for every account; SSO integration is available on request for qualifying customers.</li>
         <li>
           Internal access to production infrastructure is limited to a small number of
           named engineers, authenticated via SSH key + bastion.
         </li>
-        <li>Audit logs are immutable and retained for 12 months.</li>
+        <li>Activity logs are retained for 12 months and access-controlled by row-level security. Tamper-evident immutability hardening is on our roadmap.</li>
       </ul>
 
       <h2>Current compliance posture</h2>
@@ -55,15 +55,17 @@ const Security = () => (
 
       <h2>Backups and continuity</h2>
       <p>
-        The database is backed up daily, with point-in-time recovery available for
-        rollback. Backups are encrypted and retained for 30 days. We test restoration
-        from backup quarterly.
+        Automated database backups are the top item on our current production-readiness
+        list. At this time, snapshots are taken manually before significant changes;
+        a fully automated daily backup schedule with documented restore drills is on
+        our near-term roadmap. We will disclose progress here as it lands and notify
+        customers on contract before any production deployment we consider material.
       </p>
 
       <h2>Responsible disclosure</h2>
       <p>
         If you've found a security issue, please email
-        <a href="mailto:security@peritusdigital.com.au"> security@peritusdigital.com.au</a>.
+        <a href="mailto:security@mithras.com.au"> security@mithras.com.au</a>.
         We acknowledge reports within 2 business days and will work with you on a
         coordinated disclosure timeline. We do not currently pay bounties but we will
         publicly credit researchers who responsibly report issues.

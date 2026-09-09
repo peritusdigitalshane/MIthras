@@ -8,6 +8,7 @@ import {
   Users,
   FileText,
   Activity,
+  Lock,
   ChevronLeft,
   ChevronDown,
   Download,
@@ -38,6 +39,9 @@ import {
   Coins,
   Target,
   KeyRound,
+  Layers,
+  Copy,
+  Cable,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -89,6 +93,7 @@ const navSections: NavSection[] = [
     icon: ShieldCheck,
     items: [
       { name: "SOC Console", href: "/soc", icon: Activity },
+      { name: "Active incidents", href: "/soc/incidents", icon: ShieldAlert },
       { name: "AI Agents", href: "/agents", icon: Sparkles },
       { name: "Cross-tenant Hunt", href: "/hunt", icon: Crosshair },
       { name: "AI Activity", href: "/ai-activity", icon: Sparkles },
@@ -101,8 +106,18 @@ const navSections: NavSection[] = [
       { name: "App Whitelisting", href: "/app-whitelisting", icon: ShieldCheck },
       { name: "Process Telemetry", href: "/telemetry", icon: Activity },
       { name: "Vulnerabilities", href: "/vulnerabilities", icon: Bug },
-      { name: "Identity (M365)", href: "/m365", icon: Cloud },
-      { name: "M365 posture",    href: "/m365/posture", icon: ShieldCheck },
+    ],
+  },
+  {
+    label: "M365 Security",
+    icon: Cloud,
+    items: [
+      { name: "Overview",           href: "/m365",                       icon: Cloud },
+      { name: "M365 posture",       href: "/m365/posture",               icon: ShieldCheck },
+      { name: "Conditional Access", href: "/m365/conditional-access",    icon: Lock },
+      { name: "Identity Defence",   href: "/m365/identity-defence",      icon: ShieldCheck },
+      { name: "M365 Shield",        href: "/m365/shield",                icon: Shield },
+      { name: "Email security",     href: "/email-security",             icon: Bell },
     ],
   },
   {
@@ -110,6 +125,8 @@ const navSections: NavSection[] = [
     icon: Cog,
     items: [
       { name: "Policies", href: "/policies", icon: FileText },
+      { name: "Update rings", href: "/update-rings", icon: Layers },
+      { name: "SIEM forwarding", href: "/integrations/siem", icon: Cable },
       { name: "Group Policy", href: "/group-policy", icon: SlidersHorizontal },
       { name: "Network", href: "/network", icon: Network, requiresNetworkModule: true },
       { name: "DNS Filtering", href: "/dns-filtering", icon: Globe, requiresDnsModule: true },
@@ -162,6 +179,7 @@ const adminNavigation = [
   { name: "Audit logs", href: "/admin/audit-logs", icon: FileText },
   { name: "API keys", href: "/settings/api-keys", icon: KeyRound },
   { name: "API docs", href: "/api-docs", icon: BookOpen },
+  { name: "Platform settings", href: "/admin/settings", icon: Settings },
 ];
 
 const socNavigation = [
@@ -176,8 +194,10 @@ const partnerNavigation = [
   { name: "Credits", href: "/partner/credits", icon: Coins },
   { name: "Billing", href: "/partner/billing", icon: Receipt },
   { name: "Invoices", href: "/partner/invoices", icon: FileText },
+  { name: "Policy templates", href: "/partner/templates", icon: Copy },
   { name: "Sales kit", href: "/partner/resources", icon: BookOpen },
   { name: "SOPs", href: "/help/sops/partner", icon: BookOpen },
+  { name: "Settings", href: "/partner/settings", icon: Settings },
 ];
 
 const distributorNavigation = [

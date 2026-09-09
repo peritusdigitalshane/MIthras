@@ -18,25 +18,26 @@ export function HeroSection() {
           {/* Top eyebrow */}
           <div className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-[11px] sm:text-xs font-medium tracking-wide uppercase mb-6 sm:mb-8 border border-primary/20 max-w-full">
             <Bot className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>AI-first endpoint security &middot; built in Australia</span>
+            <span>AI-first endpoint security. Built in Australia.</span>
           </div>
 
           {/* Hero headline */}
           <h1 className="text-[2.25rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.05] text-balance">
-            Your{" "}
+            A SOC that{" "}
             <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/50 bg-clip-text text-transparent">
-              24/7 AI SOC.
+              never sleeps.
             </span>
             <span className="block mt-2 text-foreground/90">
-              Always on. Always watching.
+              Five AI agents. One bill.
             </span>
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            Five specialised AI agents triage every alert, cross-check each
-            other, and respond in seconds &mdash; for a fraction of what a
-            traditional MDR costs. Built for MSPs who want SOC coverage that
-            never sleeps, never burns out, and cites every conclusion it makes.
+            Mithras runs five purpose-built AI agents over your fleet around the
+            clock and triages every Microsoft 365 inbox for phishing, BEC and
+            malware. Cross-checked verdicts in under a minute. Every conclusion
+            cites the evidence that drove it. No analyst backlog, no $30k MDR
+            contract, and you keep ownership of every endpoint.
           </p>
 
           {/* Primary + secondary CTA */}
@@ -64,13 +65,13 @@ export function HeroSection() {
         <div className="max-w-3xl mx-auto text-center mt-10">
           <p className="text-xs text-muted-foreground mb-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 px-2">
             <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>Sold through authorised channel partners across Australia and New Zealand.</span>
+            <span>Sold through authorised partners across Australia and New Zealand.</span>
           </p>
           <p className="text-xs text-muted-foreground flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 px-2">
             <Home className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>Just want it for your home PC?</span>
+            <span>Protecting your own PC?</span>
             <Link to="/personal" className="text-primary font-medium hover:underline">
-              Get Mithras Personal &mdash; $6/mo &rarr;
+              Mithras Personal is $6/mo &rarr;
             </Link>
           </p>
         </div>

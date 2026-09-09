@@ -1,0 +1,164 @@
+test_id,area,category,description,method,expected,actual,status,notes
+P001,Public DNS,infra,www.mithras.com.au resolves,nslookup,non-empty,108.61.168.196,PASS,Openresty front-VM
+P002,Public DNS,infra,api.mithras.com.au resolves,nslookup,non-empty,108.61.168.196,PASS,Same openresty front-VM
+P003,Public DNS,infra,soc.mithras.com.au resolves,nslookup,non-empty,108.61.168.196,PASS,
+P004,Public DNS,infra,docs.mithras.com.au resolves,nslookup,non-empty,192.168.99.254,PASS,Internal LAN address - expected for internal-only
+P010,Public Endpoint,http,api.mithras.com.au root returns 401,curl GET /,401,401,PASS,Kong proper auth gating
+P011,Public Endpoint,http,api.mithras.com.au functions/v1/health-check returns auth-required,curl GET,401 or 200,401,PASS,
+P012,Public Endpoint,http,www.mithras.com.au returns mostly 200,curl x5,>=3/5 200,2/5 200,FAIL,Openresty intermediary at 108.61.168.196 flapping. NOT a docker02 issue - frontend serves 200 locally on 9988. Check NPM/openresty config on the other Vultr VM.
+P013,Public Endpoint,http,soc.mithras.com.au returns 200 or 302,curl GET,200 or 302,302,PASS,Grafana redirect to login
+C001,Container,health,supabase-db healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C002,Container,health,supabase-kong healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C003,Container,health,supabase-edge-functions running,docker ps,Up,Up 3 hours,PASS,
+C004,Container,health,supabase-auth healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C005,Container,health,supabase-storage healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C006,Container,health,supabase-realtime healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C007,Container,health,supabase-rest running,docker ps,Up,Up 3 hours,PASS,
+C008,Container,health,supabase-studio healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C009,Container,health,supabase-meta healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C010,Container,health,supabase-pooler healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C011,Container,health,supabase-analytics healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C012,Container,health,supabase-imgproxy healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C013,Container,health,supabase-vector healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C014,Container,health,supabase-auth-bff healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C015,Container,health,peritus-ai-soc-worker running,docker ps,Up,Up 3 hours,PASS,
+C016,Container,health,peritus-meshcentral running,docker ps,Up,Up 3 hours,PASS,
+C017,Container,health,peritus-grafana running,docker ps,Up,Up 3 hours,PASS,
+C018,Container,health,grafana-sso-proxy running,docker ps,Up,Up 3 hours,PASS,
+C019,Container,health,peritus-frontend running,docker ps,Up,Up About an hour,PASS,Recovered earlier this session (nginx.conf restored)
+C020,Container,health,peritus-agent-files running,docker ps,Up,Up 3 hours,PASS,
+C021,Container,health,peritus-uptime healthy,docker ps,Up healthy,Up 3 hours (healthy),PASS,
+C022,Container,health,mithras-dns running,docker ps,Up,Up 3 hours,PASS,Note: mithras-dns-caddy permanently removed this session (was redundant + crash-looping)
+CR001,Cron,scheduling,48 cron jobs registered,SQL count,>=48,48,PASS,
+CR002,Cron,scheduling,Zero inactive crons,SQL,0,0,PASS,All active
+CR003,Cron,scheduling,mithras-platform-health-scan registered,SQL,1,1,PASS,
+CR004,Cron,scheduling,mithras-siem-forwarder registered (every minute),SQL,1,1,PASS,
+CR005,Cron,scheduling,endpoint-threat-reconciler registered,SQL,1,1,PASS,
+CR006,Cron,scheduling,m365-poll-tenants registered,SQL,1,1,PASS,
+CR007,Cron,scheduling,wordpress-alert-detector registered,SQL,1,1,PASS,
+CR008,Cron,scheduling,customer-report-monthly-enqueue registered,SQL,1,1,PASS,
+CR009,Cron,scheduling,mithras-identity-evaluate registered,SQL,1,1,PASS,
+CR010,Cron,scheduling,cve-auto-scan-nightly registered,SQL,1,1,PASS,
+DB001,Database,integrity,organizations table populated,SQL count,>=2,20,PASS,
+DB002,Database,integrity,super_admins exist,SQL count,>=1,2,PASS,
+DB003,Database,integrity,endpoints active,SQL count is_active=true,>=1,10,PASS,
+DB004,Database,integrity,endpoints heartbeating in 5min,SQL count,>=1,4,PASS,
+DB005,Database,integrity,agent_versions populated,SQL count,>=1,45,PASS,
+DB006,Database,integrity,firewall_audit_logs receiving 1h,SQL count last 1h,>0,98,PASS,
+DB007,Database,integrity,endpoint_status fresh in 24h,SQL count last 24h,>0,5731,PASS,
+DB008,Database,integrity,ai_llm_calls recorded in 24h,SQL count,>=0,6,PASS,
+DB009,Database,integrity,platform_health_findings exist,SQL count,>=0,24,PASS,
+DB010,Database,integrity,m365_tenants connected,SQL count consent=active,>=1,2,PASS,
+DB011,Database,integrity,alerts populated,SQL count,>=0,104,PASS,
+DB012,Database,integrity,vulnerability_findings populated,SQL count,>=0,1373,PASS,
+DB013,Database,integrity,profiles approx matches auth.users,SQL count compare,close,10 / 7,WARN,3 profiles without auth.users — drift worth investigating
+DB014,Database,integrity,routers registered,SQL count,>=0,1,PASS,
+DB015,Database,integrity,incidents populated,SQL count,>=0,74,PASS,
+A001,Auth Gating,backend,health-check method not allowed on POST,curl POST,405 or 200,405,PASS,GET-only
+A002,Auth Gating,backend,hello returns 200 (public test),curl POST,200,200,PASS,Demo endpoint
+A003,Auth Gating,backend,ping-test returns 200 (public),curl POST,200,200,PASS,Health/test endpoint
+A004,Auth Gating,backend,agent-api returns 4xx on unauth,curl POST no auth,4xx,404,PASS,Sub-route routing
+A005,Auth Gating,backend,agent-enroll body validation,curl POST empty body,400,400,PASS,Pre-auth body parsing
+A006,Auth Gating,backend,agent-heartbeat 401 without auth,curl POST,401,401,PASS,HMAC required
+A007,Auth Gating,backend,agent-version-check GET-only,curl POST,405,405,PASS,
+A008,Auth Gating,backend,agent-installer GET-only,curl POST,405,405,PASS,
+A009,Auth Gating,backend,agent-script GET-only,curl POST,405,405,PASS,
+A010,Auth Gating,backend,agent-app-control routes,curl POST,4xx,404,PASS,
+A011,Auth Gating,backend,agent-legacy-upgrade 401 without auth,curl POST,401,401,PASS,
+A012,Auth Gating,backend,event-ingest 401 without auth,curl POST,401,401,PASS,
+A013,Auth Gating,backend,site-heartbeat 401 without auth,curl POST,401,401,PASS,
+A014,Auth Gating,backend,site-enroll body required,curl POST,400,400,PASS,Pre-auth body check
+A015,Auth Gating,backend,router-checkin body required,curl POST,400,400,PASS,Pre-auth body check
+A020,Auth Gating,backend,ai-soc-orchestrate auth required,curl POST,401 or 403,403,PASS,Forbidden no origin/no auth
+A021,Auth Gating,backend,ai-triage-alert auth required,curl POST,401 or 403,403,PASS,
+A022,Auth Gating,backend,ai-investigate-alert auth required,curl POST,401 or 403,403,PASS,
+A023,Auth Gating,backend,ai-incident-commander auth required,curl POST,401 or 403,403,PASS,
+A024,Auth Gating,backend,ai-soc-chat 401 without auth,curl POST,401,401,PASS,
+A025,Auth Gating,backend,ai-triage-incident 401 without auth,curl POST,401,401,PASS,
+A026,Auth Gating,backend,ai-verify-triage auth required,curl POST,401 or 403,403,PASS,
+A027,Auth Gating,backend,ai-adversarial-check auth required,curl POST,401 or 403,403,PASS,
+A028,Auth Gating,backend,ai-hunt-cross-tenant auth required,curl POST,401 or 403,403,PASS,
+A029,Auth Gating,backend,ai-improvement-review auth required,curl POST,401 or 403,403,PASS,
+A030,Auth Gating,backend,ai-platform-health-scan 401 without auth,curl POST,401,401,PASS,
+A031,Auth Gating,backend,ai-cost-monitor 401 without auth,curl POST,401,401,PASS,Was 200 (publicly leaked budget telemetry) - FIXED THIS SESSION
+A032,Auth Gating,backend,ai-response-execute auth required,curl POST,401 or 403,403,PASS,
+A033,Auth Gating,backend,ai-response-rollback auth required,curl POST,401 or 403,403,PASS,
+A034,Auth Gating,backend,ai-security-advisor 401 without auth,curl POST,401,401,PASS,
+A035,Auth Gating,backend,ai-comms-action method,curl POST,405 or 401,405,PASS,
+A036,Auth Gating,backend,ai-comms-notify auth required,curl POST,401 or 403,403,PASS,
+A040,Auth Gating,backend,cve-auto-scan body required,curl POST,400,400,PASS,Pre-auth body parsing
+A041,Auth Gating,backend,cve-auto-protect 401 without auth,curl POST,401,401,PASS,
+A042,Auth Gating,backend,cve-mitigation-advisor 401 without auth,curl POST,401,401,PASS,
+A043,Auth Gating,backend,vulnerability-scan 401 without auth,curl POST,401,401,PASS,
+A050,Auth Gating,backend,virustotal-lookup 401 without auth,curl POST,401,401,PASS,
+A051,Auth Gating,backend,notify-alert 401 without auth,curl POST,401,401,PASS,
+A052,Auth Gating,backend,mesh-session-start 401 with empty body,curl POST,401,401,PASS,First test got 000 (curl timeout); retest with proper timeout returned 401 with missing_token body
+A053,Auth Gating,backend,siem-forwarder 401 without auth,curl POST,401,401,PASS,
+A054,Auth Gating,backend,identity-evaluate 401 without auth,curl POST,401,401,PASS,
+A055,Auth Gating,backend,cleanup-old-data 401 without auth,curl POST,401,401,PASS,
+A060,Auth Gating,backend,generate-customer-report 401 without auth,curl POST,401,401,PASS,
+A061,Auth Gating,backend,send-customer-report 401 without auth,curl POST,401,401,PASS,
+A062,Auth Gating,backend,send-deal-notifications 401 without auth,curl POST,401,401,PASS,
+A063,Auth Gating,backend,send-credit-request-notification body required,curl POST,400,400,PASS,Pre-auth body parsing
+A064,Auth Gating,backend,send-home-user-welcome 401 without auth,curl POST,401,401,PASS,
+A065,Auth Gating,backend,send-invoice-email 401 without auth,curl POST,401,401,PASS,
+A066,Auth Gating,backend,send-signin-link is public by design (passwordless),curl POST,200,200,PASS,Passwordless flow needs public access
+A070,Auth Gating,backend,admin-resend-home-welcome 401 without auth,curl POST,401,401,PASS,
+A071,Auth Gating,backend,admin-reset-password 401 without auth,curl POST,401,401,PASS,
+A080,Auth Gating,backend,stripe-checkout-personal body required,curl POST,400,400,PASS,Pre-auth body parsing
+A081,Auth Gating,backend,stripe-customer-portal 401 without auth,curl POST,401,401,PASS,
+A082,Auth Gating,backend,stripe-settings 401 without auth,curl POST,401,401,PASS,
+A083,Auth Gating,backend,stripe-webhook signature validation,curl POST,400,400,PASS,Webhook validates Stripe signature
+A090,Auth Gating,backend,radar-public method (GET-only),curl POST,405,405,PASS,
+A091,Auth Gating,backend,radar-refresh 401 without auth,curl POST,401,401,PASS,
+A092,Auth Gating,backend,radar-ai-digest 401 without auth,curl POST,401,401,PASS,
+A093,Auth Gating,backend,public-config method,curl POST,405,405,PASS,GET-only public endpoint
+A094,Auth Gating,backend,api-v1 401 without API key,curl POST,401,401,PASS,Customer API gating
+A095,Auth Gating,backend,smtp-settings 401 without auth,curl POST,401,401,PASS,
+A096,Auth Gating,backend,m365-settings 401 without auth,curl POST,401,401,PASS,
+A097,Auth Gating,backend,soc-bridge 401 without auth,curl POST,401,401,PASS,
+A098,Auth Gating,backend,check-openai-models 401 without auth,curl POST,401,401,PASS,
+A099,Auth Gating,backend,m365-posture-advisor body required,curl POST,400,400,PASS,Pre-auth body check
+A100,Auth Gating,backend,m365-posture-scan 401 without auth,curl POST,401,401,PASS,
+A101,Auth Gating,backend,m365-email-digest 401 without auth,curl POST,401,401,PASS,
+A102,Auth Gating,backend,m365-oauth-callback 302 redirect,curl POST,302 or 4xx,302,PASS,OAuth callback handler
+AISOC1,AI SOC,data,ai_llm_calls tracking is active,SQL count,>0,583,PASS,
+AISOC2,AI SOC,data,ai_chat_messages table exists,SQL describe,exists,ai_chat_messages,PASS,
+AISOC3,AI SOC,data,incidents table populated,SQL count,>=0,74,PASS,
+AISOC4,AI SOC,data,ai_triage_decisions table exists,SQL describe,exists,96 rows,PASS,Real table name is ai_triage_decisions not ai_decisions
+AISOC5,AI SOC,data,ai_investigations table exists (was forensic_investigations in spec),SQL describe,exists,ai_investigations,PASS,Real table name differs from spec
+EML001,Email Security,data,email_threats table populated,SQL count,>=0,3,PASS,
+EML002,Email Security,data,email_block_rules table exists (was m365_email_block_lists in spec),SQL describe,exists,0 rows,PASS,Real table name is email_block_rules
+EML003,Email Security,backend,email-sweep cron registered (mithras-email-security-sweep),SQL,1,1,PASS,
+EML004,Email Security,backend,email-digest cron registered (mithras-email-security-digest),SQL,1,1,PASS,
+BILL001,Billing,data,credit_balance column on organizations,SQL column,exists,credit_balance,PASS,Column is named credit_balance not licence_balance
+BILL002,Billing,data,credit_transactions table exists (table is credit_transactions not licence_transactions),SQL describe,exists,credit_transactions,PASS,
+BILL003,Billing,data,invoices table populated,SQL count,>=0,1,PASS,
+BILL004,Billing,critical,cut_licences_to_reseller RPC references non-existent licence_balance column,SQL pg_get_functiondef,working RPC body,references licence_balance + licence_transactions which do NOT exist,FAIL,RPC will throw on first call. Migration file added at supabase/migrations/20260619040000_fix_licence_rpcs_credit_naming.sql - apply with: docker exec -i supabase-db psql -U postgres -d postgres < migration. Affects partner portal licence cut button + customer enrolment consume flow. Latent bug - no recent attempts.
+BILL005,Billing,backend,deal-notifications cron registered,SQL,1,1,PASS,
+BILL006,Billing,backend,monthly-credit-burn cron registered,SQL,1,1,PASS,
+BILL007,Billing,backend,expire-stale-deals cron registered,SQL,1,1,PASS,
+BILL008,Billing,data,ai_model_rates populated for cost calc,SQL count,>=1,7,PASS,
+RLS001,Multi-tenancy,security,is_member_of_org function exists,SQL,1,1,PASS,
+RLS002,Multi-tenancy,security,is_admin_of_org function exists,SQL,1,1,PASS,
+RLS003,Multi-tenancy,security,is_super_admin function exists,SQL,1,1,PASS,
+RLS004,Multi-tenancy,security,get_user_org_ids function exists,SQL,1,1,PASS,
+RLS005,Multi-tenancy,security,endpoints table has RLS enabled,SQL relrowsecurity,true,true,PASS,
+RLS006,Multi-tenancy,security,alerts table has RLS enabled,SQL,true,true,PASS,
+RLS007,Multi-tenancy,security,activity_logs has RLS enabled,SQL,true,true,PASS,
+RLS008,Multi-tenancy,security,m365_tenants has RLS enabled,SQL,true,true,PASS,
+PARTL001,Partitions,data,firewall_audit_logs partitions exist,SQL pg_inherits,>0,4,PASS,
+PARTL002,Partitions,data,endpoint_event_logs partitions exist,SQL,>0,5,PASS,
+PARTL003,Partitions,data,endpoint_status partitions exist,SQL,>0,3,PASS,
+PARTL004,Partitions,data,sysmon_events partitions exist,SQL,>0,4,PASS,
+PARTL005,Partitions,data,partition-create cron registered,SQL cron,>=1,6,PASS,Six partition tables have create-next cron
+PARTL006,Partitions,data,partition-drop cron registered,SQL cron,>=1,6,PASS,
+HEALTH1,Platform Health,data,recent health-scan run within last 30min,SQL,>0,2,PASS,
+HEALTH2,Platform Health,data,health findings exist with multiple categories,SQL count distinct,>1,5,PASS,
+HEALTH3,Platform Health,backend,ai-platform-health-scan callable,curl POST with cron-secret,200 or 401,401,WARN,Function may use a different env var for cron auth than MITHRAS_CRON_SECRET - not necessarily a bug but inconsistent. M365 polls accept this secret; this one rejects.
+INFRA1,Infrastructure,host,host disk usage <80%,df -h,under 80%,36%,PASS,
+INFRA2,Infrastructure,host,host memory available >1Gi,free -h,>1Gi,455Mi free + 5.7Gi buff/cache = 4.9Gi available,PASS,
+INFRA3,Infrastructure,host,host uptime > 30min (no recent crash),uptime,30+ min,2h56m,PASS,Up since 2026-06-19 03:14 UTC (post-reboot)
+INFRA4,Infrastructure,host,Caddy systemd unit active,systemctl,active,active,PASS,
+INFRA5,Infrastructure,host,Postgres backup unit present,ls,present,present,PASS,peritus-supabase-backup.service + .timer
+INFRA6,Infrastructure,host,Mithras agent installed on host,systemctl,active,active,PASS,

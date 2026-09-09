@@ -38,7 +38,7 @@ export default function AdminOverview() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>The channel command centre is for Peritus operators.</AlertDescription>
+            <AlertDescription>The channel command centre is for Mithras platform operators.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>
@@ -55,7 +55,7 @@ export default function AdminOverview() {
           eyebrow="Platform admin"
           eyebrowIcon={<Sparkles className="h-3.5 w-3.5" />}
           title="Channel command centre"
-          subtitle="Everything across every distributor, reseller, customer, and endpoint — in one screen. Refreshes every minute."
+          subtitle="Everything across every distributor, reseller, customer, and endpoint — in one screen."
           actions={
             <Button asChild size="sm" className="shadow-sm">
               <Link to="/admin/channel"><Plus className="h-4 w-4 mr-1" /> Add channel partner</Link>
@@ -223,7 +223,7 @@ export default function AdminOverview() {
           <CardHeader>
             <CardTitle className="text-base">Channel by distributor</CardTitle>
             <CardDescription>
-              Per-distributor rollup of resellers, customers, endpoints, and what Peritus invoices the distributor each cycle.
+              Per-distributor rollup of resellers, customers, endpoints, and what the platform invoices the distributor each cycle.
               The "Direct" row covers resellers signed up without a distributor.
             </CardDescription>
           </CardHeader>
@@ -240,7 +240,7 @@ export default function AdminOverview() {
                     <TableHead className="text-right">Resellers</TableHead>
                     <TableHead className="text-right">Customers</TableHead>
                     <TableHead className="text-right">Endpoints</TableHead>
-                    <TableHead className="text-right">Peritus MRR</TableHead>
+                    <TableHead className="text-right">Platform MRR</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>

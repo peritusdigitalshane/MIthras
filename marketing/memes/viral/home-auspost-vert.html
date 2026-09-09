@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The Australia Post text — vertical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; background: #000; color: #fff; font-family: 'Inter', -apple-system, system-ui, sans-serif; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; padding: 100px 60px; justify-content: center; align-items: center; }
+
+  /* SCENE 1: 0-3s — Hook */
+  .s1 { animation: s1 3s linear 0s both; gap: 40px; }
+  .s1 h1 { font-size: 130px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -4px; }
+  .s1 h1 .acc { color: #ff4040; }
+  .s1 p { font-size: 42px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: center; }
+
+  /* SCENE 2: 3-9s — The SMS arrives */
+  .s2 { animation: s2 6s linear 3s both; gap: 30px; padding-top: 80px; padding-bottom: 80px; justify-content: flex-start; }
+  .s2 .device {
+    background: #1c1c1e;
+    border-radius: 60px;
+    border: 14px solid #2a2a2c;
+    padding: 60px 50px;
+    width: 700px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    margin-top: 100px;
+  }
+  .s2 .notch { width: 220px; height: 35px; background: #000; border-radius: 18px; margin: -20px auto 30px; }
+  .s2 .status-bar { display: flex; justify-content: space-between; font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 26px; padding: 0 8px; }
+  .s2 .sender-block { background: #fff; color: #000; padding: 24px; border-radius: 16px; opacity: 0; animation: smsIn 0.5s ease-out 1.0s both; }
+  .s2 .sender { font-size: 22px; font-weight: 700; color: #999; letter-spacing: 1px; }
+  .s2 .sender-name { font-size: 30px; font-weight: 700; color: #000; margin-top: 4px; }
+  .s2 .time { font-size: 18px; color: #888; margin-top: 4px; }
+  .s2 .msg-body { font-size: 32px; line-height: 1.4; color: #000; margin-top: 16px; font-weight: 500; }
+  .s2 .msg-body .link { color: #007aff; font-weight: 600; text-decoration: underline; }
+  .s2 .reality {
+    margin-top: 40px;
+    background: rgba(255,64,64,0.12);
+    border: 2px solid rgba(255,64,64,0.4);
+    border-radius: 14px;
+    padding: 24px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #ff8080;
+    text-align: center;
+    opacity: 0;
+    animation: fadeUp 0.5s ease-out 4.0s both;
+  }
+  @keyframes smsIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SCENE 3: 9-15s — The aftermath */
+  .s3 { animation: s3 6s linear 9s both; gap: 40px; padding-top: 100px; justify-content: flex-start; }
+  .s3 .bank {
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
+    border: 2px solid rgba(255,255,255,0.08);
+    padding: 50px;
+    width: 100%;
+    margin-top: 50px;
+  }
+  .s3 .bank-head { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 4px; text-transform: uppercase; }
+  .s3 .bank-name { font-size: 48px; font-weight: 800; margin-top: 8px; }
+  .s3 .bank-bal-label { font-size: 28px; color: rgba(255,255,255,0.55); margin-top: 30px; letter-spacing: 2px; text-transform: uppercase; }
+  .s3 .bank-bal { font-family: 'JetBrains Mono', monospace; font-size: 120px; font-weight: 700; color: #ff4040; margin-top: 12px; line-height: 1; }
+  .s3 .bank-bal .small { font-size: 60px; }
+  .s3 .tx-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 22px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 26px;
+    opacity: 0;
+  }
+  .s3 .tx-row.first { margin-top: 30px; }
+  .s3 .tx-row .desc { font-weight: 600; }
+  .s3 .tx-row .amount { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #ff4040; }
+  .s3 .tx-row:nth-child(4) { animation: rowIn 0.3s ease-out 1.4s both; }
+  .s3 .tx-row:nth-child(5) { animation: rowIn 0.3s ease-out 1.8s both; }
+  .s3 .tx-row:nth-child(6) { animation: rowIn 0.3s ease-out 2.2s both; }
+  .s3 .tx-row:nth-child(7) { animation: rowIn 0.3s ease-out 2.6s both; }
+  .s3 .lost { font-size: 38px; font-weight: 800; color: #ff4040; text-align: center; margin-top: 30px; opacity: 0; animation: fadeUp 0.4s ease-out 3.2s both; }
+
+  /* SCENE 4: 15-20s — CTA */
+  .s4 { animation: s4 5s linear 15s both; gap: 30px; }
+  .s4::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.18), transparent 70%); }
+  .s4 .tag { font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #28d96b; text-transform: uppercase; animation: fadeUp 0.5s ease-out 0.0s both; }
+  .s4 h1 { font-size: 110px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -3px; animation: fadeUp 0.5s ease-out 0.3s both; }
+  .s4 h1 .acc { color: #28d96b; }
+  .s4 .brand { font-size: 180px; font-weight: 900; letter-spacing: -6px; margin-top: 30px; animation: fadeUp 0.5s ease-out 0.9s both; }
+  .s4 .cta { padding: 28px 70px; background: #28d96b; color: #000; font-size: 50px; font-weight: 900; border-radius: 18px; animation: fadeUp 0.5s ease-out 1.4s both; }
+  .s4 .url { font-size: 36px; font-weight: 700; letter-spacing: 12px; color: #28d96b; margin-top: 40px; animation: fadeUp 0.5s ease-out 1.8s both; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s2 { 0% { opacity: 0; } 4% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s3 { 0% { opacity: 0; } 4% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s4 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes rowIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <h1>Your antivirus<br/>didn't even<br/><span class="acc">notice this.</span></h1>
+    <p>Because it isn't looking.</p>
+  </div>
+
+  <div class="scene s2">
+    <div class="device">
+      <div class="notch"></div>
+      <div class="status-bar"><span>9:47</span><span>📶 100%</span></div>
+      <div class="sender-block">
+        <div class="sender">SMS</div>
+        <div class="sender-name">Australia Post</div>
+        <div class="time">Yesterday 14:32</div>
+        <div class="msg-body">
+          AusPost: Your parcel is on hold. A $2.50 redelivery fee is required. Pay here: <span class="link">aus-post-au.click/r/89234</span>
+        </div>
+      </div>
+    </div>
+    <div class="reality">
+      ⚠ NOT AUSTRALIA POST. NOT $2.50. NOT YOUR DAY.
+    </div>
+  </div>
+
+  <div class="scene s3">
+    <div class="bank">
+      <div class="bank-head">Commonwealth Bank</div>
+      <div class="bank-name">Smart Access</div>
+      <div class="bank-bal-label">Available balance</div>
+      <div class="bank-bal">$0<span class="small">.00</span></div>
+      <div class="tx-row first"><span class="desc">Card payment · INSTASHOP</span><span class="amount">−$1,847.20</span></div>
+      <div class="tx-row"><span class="desc">Card payment · WISE TRANSFER</span><span class="amount">−$4,000.00</span></div>
+      <div class="tx-row"><span class="desc">Card payment · GIFT CARDS RU</span><span class="amount">−$2,500.00</span></div>
+      <div class="tx-row"><span class="desc">Card payment · CRYPTO EXCH</span><span class="amount">−$3,200.00</span></div>
+    </div>
+    <div class="lost">$11,547 — in 4 minutes.</div>
+  </div>
+
+  <div class="scene s4">
+    <div class="tag">Mithras blocks the link.</div>
+    <h1>Not the<br/><span class="acc">scan.</span></h1>
+    <div class="brand">MITHRAS</div>
+    <div class="cta">$6/month per device</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
 import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,8 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building2, ChevronDown, LogOut, Eye, Users } from "lucide-react";
+import { Building2, ChevronDown, LogOut, Eye, Users, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMemo, useState } from "react";
 
 export function TenantSwitcher() {
   const {
@@ -23,8 +25,13 @@ export function TenantSwitcher() {
     setImpersonatedOrg,
   } = useTenant();
 
-  // Only show for super admins or partner admins with customers
-  if (!isSuperAdmin && (!isPartnerAdmin || partnerCustomers.length === 0)) return null;
+  // Only show for super admins or partner admins with customers.
+  //
+  // Computed here, returned below the hooks. As an early return it put
+  // useState/useMemo behind a condition, so the hook count changed the moment
+  // a partner's customer list loaded (partnerCustomers.length 0 -> n) and
+  // React threw "Rendered more hooks than during the previous render".
+  const shouldHide = !isSuperAdmin && (!isPartnerAdmin || partnerCustomers.length === 0);
 
   const handleExitImpersonation = () => {
     setImpersonatedOrg(null);
@@ -33,6 +40,18 @@ export function TenantSwitcher() {
   // Determine which organizations to show
   const availableOrgs = isSuperAdmin ? allOrganizations : partnerCustomers;
   const switcherLabel = isSuperAdmin ? "View as Tenant" : "Switch Customer";
+
+  // MAJOR fix: a dropdown of 200+ tenants without search forces operators to
+  // scroll-mash every time they want a specific customer. Add a tiny in-list
+  // filter.
+  const [query, setQuery] = useState("");
+  const filteredOrgs = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return availableOrgs;
+    return availableOrgs.filter(o => o.name?.toLowerCase().includes(q) || (o as any).slug?.toLowerCase().includes(q));
+  }, [availableOrgs, query]);
+
+  if (shouldHide) return null;
 
   return (
     <div className="flex items-center gap-2">
@@ -64,12 +83,28 @@ export function TenantSwitcher() {
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+        <DropdownMenuContent align="end" className="w-72 max-h-96 overflow-hidden flex flex-col">
           <DropdownMenuLabel>
             {isSuperAdmin ? "Select Tenant" : "Select Customer"}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          
+
+          <div className="px-2 pb-1.5">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={availableOrgs.length > 8 ? `Search ${availableOrgs.length} tenants…` : "Search…"}
+                className="h-8 pl-7 text-sm"
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+          <DropdownMenuSeparator />
+
+          <div className="flex-1 overflow-y-auto">
           {isImpersonating && (
             <>
               <DropdownMenuItem onClick={handleExitImpersonation}>
@@ -80,7 +115,7 @@ export function TenantSwitcher() {
             </>
           )}
 
-          {availableOrgs.map((org) => (
+          {filteredOrgs.map((org) => (
             <DropdownMenuItem
               key={org.id}
               onClick={() => setImpersonatedOrg(org)}
@@ -102,11 +137,12 @@ export function TenantSwitcher() {
             </DropdownMenuItem>
           ))}
 
-          {availableOrgs.length === 0 && (
+          {filteredOrgs.length === 0 && (
             <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-              No organizations found
+              {availableOrgs.length === 0 ? "No organizations found" : "No matches"}
             </div>
           )}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

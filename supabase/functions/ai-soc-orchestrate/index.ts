@@ -275,7 +275,7 @@ async function runOrchestration(alertId: string, force: boolean): Promise<Record
     const triageSaidTP = triageDecision.verdict === "true_positive";
     const agentsDisagree = !!verifyVerdict && verifyVerdict !== triageDecision.verdict;
     let advRefuted: boolean | null = null;
-    let advCounterVerdict: string | null = null;
+    const advCounterVerdict: string | null = null;
     let adversarialFailed = false;
 
     if (triageSaidTP || agentsDisagree) {

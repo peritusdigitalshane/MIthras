@@ -64,7 +64,7 @@ const AcceptableUse = () => (
       <h2>Reporting abuse</h2>
       <p>
         If you believe Mithras is being used to attack you or your systems, contact
-        <a href="mailto:abuse@peritusdigital.com.au"> abuse@peritusdigital.com.au</a>.
+        <a href="mailto:abuse@mithras.com.au"> abuse@mithras.com.au</a>.
       </p>
     </article>
   </MarketingShell>

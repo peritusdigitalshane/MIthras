@@ -7,6 +7,7 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { organizationSchema, breadcrumbSchema } from "@/components/seo/jsonLd";
 import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
 import { MockEolFleet } from "@/components/landing/visuals/MockEolFleet";
 
@@ -58,9 +59,17 @@ const EolWindows = () => {
   return (
     <>
       <Seo
-        title="Defend EOL Windows — Win 7 / 8.1 / Server 2012 R2 without the ESU bill"
-        description="Microsoft is sunsetting your endpoints. Most modern EDR products won't even install on them. Mithras covers Windows 7, 8.1, Server 2008/2012 R2 with the same agent and AI SOC as your current fleet — no Extended Security Updates bill required."
+        title="End-of-life Windows hardening | Win 7, 8.1, Server 2012 R2"
+        description="Microsoft has walked away from these boxes. Most modern EDRs refuse to install. Mithras covers Windows 7 SP1 onward, Server 2008 R2, Server 2012 R2 with the same agent and AI SOC as your current fleet. No Extended Security Updates bill."
         canonical="/eol-windows"
+        keywords="EOL Windows security, Windows 7 EDR, Server 2012 R2 hardening, end of life Windows protection, legacy Windows EDR, Windows 8.1 security"
+        structuredData={[
+          organizationSchema(),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "End-of-life Windows", path: "/eol-windows" },
+          ]),
+        ]}
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -83,11 +92,11 @@ const EolWindows = () => {
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-              Microsoft is sunsetting Windows 7, 8.1, Server 2008 R2 and
-              Server 2012 R2. Most modern EDR products won&apos;t even
-              install on them. Mithras covers them with the same agent and
-              the same AI SOC as your current fleet &mdash; without the
-              Microsoft Extended Security Updates bill.
+              Windows 7. Server 2008 R2. Server 2012 R2. Microsoft has shifted
+              the goalposts and the EDR vendors quietly followed. Your accountant
+              still runs MYOB on a 2014 Dell that nobody is allowed to touch
+              until June. Mithras runs on it. Same agent, same SOC, same monthly
+              report as the Server 2022 box next to it. No ESU contract.
             </p>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-md sm:max-w-none mx-auto">
               <Button size="lg" className="h-12 px-7 text-base shadow-lg shadow-primary/20 w-full sm:w-auto" asChild>

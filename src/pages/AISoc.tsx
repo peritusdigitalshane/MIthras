@@ -7,6 +7,7 @@ import {
 import { LandingNav } from "@/components/landing/LandingNav";
 import { Footer } from "@/components/landing/CTAFooter";
 import { Seo } from "@/components/seo/Seo";
+import { organizationSchema, breadcrumbSchema } from "@/components/seo/jsonLd";
 import { SocConsoleHero } from "@/components/landing/visuals/SocConsoleHero";
 import { ThreatIntelFeed } from "@/components/landing/visuals/ThreatIntelFeed";
 import { BrowserFrame } from "@/components/landing/visuals/BrowserFrame";
@@ -124,9 +125,17 @@ const AISoc = () => {
   return (
     <>
       <Seo
-        title="The Mithras AI SOC — 5 agents, always on. Endpoint security AI for MSPs."
-        description="Meet the five-agent AI SOC behind Mithras Threat Defence: triage, verification, adversarial review, response, and communications. Each alert gets independent cross-checking, citation-enforced reasoning, and bounded auto-response — 24/7/365."
+        title="AI SOC for MSPs | Mithras Threat Defence"
+        description="Five purpose-built AI agents run the SOC. Triage, verification, adversarial review, response, and customer comms. Each alert gets cross-checked by independent models with citation-enforced reasoning and bounded auto-response. Always on."
         canonical="/ai-soc"
+        keywords="AI SOC, autonomous SOC, AI security operations centre, AI alert triage, MSP AI security, EDR AI triage Australia"
+        structuredData={[
+          organizationSchema(),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "AI SOC", path: "/ai-soc" },
+          ]),
+        ]}
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -145,14 +154,16 @@ const AISoc = () => {
             <h1 className="text-[2.25rem] sm:text-5xl md:text-6xl font-bold tracking-tight mb-6 leading-[1.05] text-balance">
               Five agents.{" "}
               <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/50 bg-clip-text text-transparent">
-                One unified verdict.
+                One verdict you can audit.
               </span>
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-              Every alert passes through a chain of independent AI agents
-              before any action runs. They check each other's work, refuse
-              to act without consensus, and document every decision so you
-              can audit exactly how a conclusion was reached.
+              Every alert runs through a chain of five purpose-built agents
+              before anything happens on the endpoint. They use different
+              models. They check each other's work. They refuse to act
+              without consensus. And every conclusion comes with the
+              evidence behind it, so your team can read exactly why the
+              system decided what it decided.
             </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 max-w-3xl mx-auto text-sm mb-12 sm:mb-14">
               <ProofPoint icon={<Clock className="h-4 w-4" />} label="Triage in seconds" />

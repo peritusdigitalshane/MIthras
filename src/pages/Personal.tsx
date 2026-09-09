@@ -22,7 +22,7 @@ const INCLUDED = [
   "Threat alerts emailed within minutes if something serious happens",
   "Monthly security report sent to your inbox",
   "Suspicious-process detection",
-  "Ransomware behaviour protection",
+  "Ransomware alerts via Microsoft Defender",
   "Auto-update of the agent",
   "Cancel anytime — no contract",
 ];
@@ -76,9 +76,10 @@ export default function Personal() {
   return (
     <>
       <Seo
-        title="Personal — Mithras Threat Defence"
-        description="Protect your personal Windows PC for $6/month. The same Defender-hardening and threat-monitoring stack we sell to Australian businesses, tuned for home use."
+        title="Mithras Personal | Home PC security for $6 a month"
+        description="The same Defender hardening and threat monitoring we sell to Australian businesses, tuned for a home Windows PC. $6 AUD a month per machine. Cancel anytime."
         canonical="/personal"
+        keywords="home PC security Australia, personal Defender hardening, home computer protection, antivirus subscription, Microsoft Defender for home use"
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -95,12 +96,13 @@ export default function Personal() {
               <span className="text-xs font-medium uppercase tracking-wider">For personal use</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-              Enterprise-grade security<br className="hidden sm:inline" /> for your home PC.
+              The security stack we sell to businesses.<br className="hidden sm:inline" /> Tuned for your home PC.
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              The same Defender-hardening, threat-detection, and monitoring stack we sell to Australian businesses —
-              tuned for one home PC, billed at <strong>${PERSONAL_PRICE_AUD}/month</strong>. No dashboard, no
-              cybersecurity homework. We just protect your machine.
+              The same agent, the same Defender hardening, the same threat
+              monitoring. Just nothing to log in to. We watch your PC and
+              email if anything looks off. <strong>${PERSONAL_PRICE_AUD} AUD a month</strong>.
+              One PC per subscription. Cancel from your inbox.
             </p>
           </div>
         </section>
@@ -115,7 +117,7 @@ export default function Personal() {
                     <span className="text-5xl font-bold tabular-nums">${PERSONAL_PRICE_AUD}</span>
                     <span className="text-sm text-muted-foreground">AUD</span>
                   </div>
-                  <div className="text-sm text-muted-foreground">per month · cancel anytime</div>
+                  <div className="text-sm text-muted-foreground">per month, inc. GST · cancel anytime</div>
                 </div>
 
                 {stripeUnconfigured ? (
@@ -231,12 +233,17 @@ export default function Personal() {
               end of your billing cycle; the agent uninstalls itself automatically after that.
             </Faq>
             <Faq q="What if the agent finds something serious?">
-              We email you with what we saw and what to do. If you don't respond and the threat is active, we
-              email again with steps to remediate. For active ransomware we'll call you at the number on file.
+              We email you with what we saw and what we did about it, including any recommended next steps you
+              should take. Reply to that email and we'll help you work through it — typical response is within
+              one Australian business day.
             </Faq>
             <Faq q="Do I get a portal to log into?">
-              No — that's the point. Personal plans are hands-off by design. If you want a portal, you want our
-              business plan via a reseller — <Link to="/contact-sales" className="underline">talk to sales</Link>.
+              Yes, a simple one. Sign in at <Link to="/login" className="underline">mithras.com.au/login</Link> with a
+              magic-link email — no password to manage. You'll see which of your devices are protected, the latest
+              threats Mithras blocked, your Defender posture, and a one-click Stripe link to manage billing. It's
+              intentionally minimal — most weeks you won't need it. If you want the full SOC console (cross-device
+              dashboards, policy editing, hunting), that's the business plan via a reseller —{" "}
+              <Link to="/contact-sales" className="underline">talk to sales</Link>.
             </Faq>
           </div>
         </section>

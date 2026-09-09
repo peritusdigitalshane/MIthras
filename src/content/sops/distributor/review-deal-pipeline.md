@@ -24,33 +24,33 @@ Distribution operations staff whose home organisation has `organizations.org_typ
 
 ## Procedure
 
+The distributor pipeline view is **read-only**. Distributors do not approve, reject, or extend deals — resellers manage their own pipeline directly. Your role is portfolio coordination: spot stalled deals, surface conflicts, and drive close-cycle hygiene through direct conversations with resellers.
+
 1. Navigate to `/distributor/deals`. The view rolls up every row in `deal_registrations` for resellers in your channel.
 2. Familiarise yourself with the column semantics before acting.
-   - `Stage` progresses through `registered`, `qualified`, `proposal`, `closed_won`, and `closed_lost`. Resellers advance the stage; you may override.
-   - `Margin lock` shows the protected reseller margin captured at registration and enforced at conversion.
+   - `Stage` progresses through `qualified` → `demo` → `poc` → `quote` → `won` or `lost` (and `expired` if the protection window lapses). Resellers advance the stage themselves.
+   - `Wholesale price` shows the locked reseller wholesale rate captured at registration and enforced at conversion.
    - `Days in stage` is amber from thirty days and red from sixty days.
-   - `Expiry` reflects the ninety-day registration window. A fourteen-day warning is dispatched to the reseller; a seven-day warning is copied to the account manager on file.
-3. Sort by `Days in stage` descending and review every red row. Open the detail panel, read the most recent entry in the `Activity` timeline, and contact the responsible account manager if the deal is materially stalled.
-4. Apply the filter `Stage = registered` and `Approval = pending` to surface registrations awaiting your decision. For each row, open the detail panel and select either `Approve registration` or `Reject registration` with a written reason. Approval locks the margin at the registered percentage; rejection notifies the reseller by email and permits resubmission with revised terms.
-5. Apply the filter `Expiry <= 14 days` to surface expiring registrations. For each row, select `Extend by 30 days` only where commercial circumstances justify the extension. The deal-registration mechanism is designed to drive close-cycle urgency; routine extensions undermine it.
-6. Apply the filter `Stage = closed_won` and date range `This month` to confirm the wins that will convert into monthly recurring revenue through the customer-create flow. Cross-check the count against the `Closed won (MTD)` tile on `/distributor`.
+   - `Expiry` reflects the per-stage protection window (qualified/demo: 60 days, poc: 90 days, quote: 30 days; see `public.deal_stage_window`). A fourteen-day warning is dispatched to the reseller.
+3. Sort by `Days in stage` descending and review every red row. Open the detail panel, read the most recent entry in the `Activity` timeline, and contact the responsible reseller if the deal is materially stalled.
+4. Apply the filter `Stage = qualified` to surface freshly-registered deals. For each row, confirm there is no channel conflict with another reseller in your portfolio; if there is, mediate directly with the resellers.
+5. Apply the filter `Expiry <= 14 days` to surface expiring registrations. Contact the reseller and confirm whether they intend to advance the stage (which resets the window) or let the registration lapse.
+6. Apply the filter `Stage = won` and date range `This month` to confirm the wins that will convert into monthly recurring revenue through the customer-create flow. Cross-check the count against the `Won (MTD)` tile on `/distributor`.
 
 ## Verification
-- Every row with `Days in stage > 30` has either an `Activity` entry dated within the last seven days or an open follow-up assigned to the account manager on file.
-- The `Pending approval` filter returns zero rows on completion of the review.
-- The `Closed won (MTD)` tile on `/distributor` matches the row count produced by the `Stage = closed_won` filter for the current month.
-- The `Activity` timeline on each actioned deal records your `approve`, `reject`, or `extend` action with `actor_id = auth.uid()` and the current timestamp.
+- Every row with `Days in stage > 30` has either an `Activity` entry dated within the last seven days, or you have logged a follow-up with the responsible reseller.
+- No two active rows in your portfolio target the same prospect (channel conflict check).
+- The `Won (MTD)` tile on `/distributor` matches the row count produced by the `Stage = won` filter for the current month.
 
 ## Troubleshooting
-- **A deal registration locked margin at an incorrect percentage.** Registrations capture the margin at the moment of submission and the lock is immutable. Reject the registration with a written reason and instruct the reseller to resubmit at the correct percentage. Do not edit historical registrations.
-- **A reseller reports that an approved deal is no longer visible to them.** Confirm the registration has not been rejected under your `Rejected` filter; rejected registrations are hidden from the reseller's `/partner/deals` view. If the registration was rejected in error, contact Peritus channel operations to restore the row, since rejection is terminal from your console.
-- **The `Convert to customer` action is unavailable on a `closed_won` deal.** The receiving reseller's pool holds fewer than one credit. Top up the reseller's pool through [Top up a reseller's credit pool](/help/sops/distributor/top-up-credits) before the reseller retries the conversion.
-- **A deal in `closed_won` has not converted within thirty days.** Open the detail panel and confirm the reseller has provisioned the customer. If provisioning has stalled, contact the reseller's account manager directly; the platform does not auto-expire `closed_won` rows.
+- **A deal registration locked the wholesale price at an incorrect figure.** Locks are captured at the moment of registration from the reseller's pricing record and are immutable. Ask the reseller to `Mark lost` and re-register the deal at the corrected price; the prior row is retained for audit.
+- **A reseller reports that a registration is no longer visible to them.** Confirm the registration has not been marked `lost` or `expired` by checking the `Stage` filter for those values. Both are terminal states from the reseller's portal.
+- **The `Convert to customer` action is unavailable on a `won` deal.** The receiving reseller's pool holds fewer than one credit. Top up the reseller's pool through [Top up a reseller's credit pool](/help/sops/distributor/top-up-credits) before the reseller retries the conversion.
+- **A deal in `won` has not converted within thirty days.** Open the detail panel and confirm the reseller has provisioned the customer at `/partner`. If provisioning has stalled, contact the reseller directly; the platform does not auto-expire `won` rows.
 
 ## Audit and compliance
-- Every approve, reject, and extend action writes a row to `public.activity_logs` with `action_type` set to `deal_approved`, `deal_rejected`, or `deal_extended`, `actor_id = auth.uid()`, and the affected `deal_registrations.id`.
-- Margin locks are captured at registration on the `deal_registrations` row and are retained for the life of the resulting customer relationship plus seven years.
-- Rejection reasons are stored verbatim on the `deal_registrations` row and surfaced to the reseller through their portal and through an email to the addresses configured in `org_report_recipients` for category `deals`.
+- Every reseller-driven stage advance, conversion, or loss writes a row to `public.activity_logs` keyed against the affected `deal_registrations.id`.
+- Wholesale-price locks are captured at registration on the `deal_registrations` row and are retained for the life of the resulting customer relationship plus seven years.
 
 ## Related procedures
 - [Onboard a new reseller partner](/help/sops/distributor/onboard-reseller)

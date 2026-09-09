@@ -103,7 +103,7 @@ export default function AdminResellers() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Cross-distributor reseller visibility is a Peritus operation.</AlertDescription>
+            <AlertDescription>Cross-distributor reseller visibility is restricted to Mithras platform operators.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>

@@ -308,6 +308,67 @@ function Apply-WindowsUpdatePolicy {
 }
 
 # ---------------------------------------------------------------------------
+# UPDATE RING (group-assigned patch deployment tier)
+#
+# The ring overrides the WU policy's defer-days + active-hours when set,
+# because the ring is the more authoritative group-level decision. We
+# only touch the four keys the ring owns; the WU policy still controls
+# AUOptions, pause flags, etc.
+#
+# `critical_only` rings push a 365-day feature update defer and pin the
+# branch-readiness level so the machine only takes security cumulatives.
+# ---------------------------------------------------------------------------
+function Apply-UpdateRing {
+    param([Parameter(Mandatory)]$RingPayload)
+    if (-not $RingPayload -or -not $RingPayload.has_ring) { return $false }
+    $r = $RingPayload.ring
+    if (-not $r) { return $false }
+    Write-PolicyLog "Applying update ring: $($r.name)"
+    try {
+        Ensure-RegPath $script:WuRegPath
+
+        # Defer days. Ring wins over WU policy for these two keys.
+        if ($null -ne $r.quality_update_defer_days) {
+            Set-ItemProperty -Path $script:WuRegPath -Name 'DeferQualityUpdatesPeriodInDays' `
+                -Value ([int]$r.quality_update_defer_days) -Type DWord -Force
+        }
+        if ($null -ne $r.feature_update_defer_days) {
+            Set-ItemProperty -Path $script:WuRegPath -Name 'DeferFeatureUpdatesPeriodInDays' `
+                -Value ([int]$r.feature_update_defer_days) -Type DWord -Force
+        }
+
+        # Install window mapped to ActiveHoursStart / ActiveHoursEnd. Windows
+        # Update won't restart for non-business installs during this window;
+        # outside it, deferred installs may proceed.
+        if ($null -ne $r.install_window_start_local) {
+            Set-ItemProperty -Path $script:WuRegPath -Name 'ActiveHoursStart' `
+                -Value ([int]$r.install_window_start_local) -Type DWord -Force
+        }
+        if ($null -ne $r.install_window_end_local) {
+            Set-ItemProperty -Path $script:WuRegPath -Name 'ActiveHoursEnd' `
+                -Value ([int]$r.install_window_end_local) -Type DWord -Force
+        }
+
+        # Critical-only: pin to security-only and lock out feature updates.
+        if ($r.critical_only) {
+            Set-ItemProperty -Path $script:WuRegPath -Name 'DeferFeatureUpdatesPeriodInDays' -Value 365 -Type DWord -Force
+            # BranchReadinessLevel 20 = Semi-Annual Channel (Targeted) — slowest stable channel.
+            Set-ItemProperty -Path $script:WuRegPath -Name 'BranchReadinessLevel' -Value 20 -Type DWord -Force
+        } else {
+            # If ring is NOT critical-only, clear any prior pin so the
+            # machine doesn't get stuck on SAC-T after the ring changes.
+            try { Remove-ItemProperty -Path $script:WuRegPath -Name 'BranchReadinessLevel' -ErrorAction SilentlyContinue } catch {}
+        }
+
+        Write-PolicyLog "Update ring applied: defer Q=$($r.quality_update_defer_days)d F=$($r.feature_update_defer_days)d window=$($r.install_window_start_local)-$($r.install_window_end_local) critical_only=$($r.critical_only)"
+        return $true
+    } catch {
+        Write-PolicyLog "Update ring apply error: $_" 'Error'
+        return $false
+    }
+}
+
+# ---------------------------------------------------------------------------
 # FIREWALL (Windows Defender Firewall rules)
 # ---------------------------------------------------------------------------
 function Apply-FirewallPolicy {
@@ -782,9 +843,10 @@ function Invoke-PolicyEnforcementPass {
     $firewall = Invoke-PolicyApi -Path 'firewall-policy'
     $wu       = Invoke-PolicyApi -Path 'windows-update-policy'
     $gpo      = Invoke-PolicyApi -Path 'gpo-policy'
+    $ring     = Invoke-PolicyApi -Path 'update-ring'
 
     $result = @{
-        defender = $false; uac = $false; firewall = $false; wu = $false; gpo = $false
+        defender = $false; uac = $false; firewall = $false; wu = $false; gpo = $false; ring = $false
         firewall_rules = $null
     }
     if ($defender -and $defender.policy) { $result.defender = Apply-DefenderPolicy -Policy $defender.policy -Force:$Force }
@@ -794,6 +856,9 @@ function Invoke-PolicyEnforcementPass {
         if ($firewall.rules) { $result.firewall_rules = $firewall.rules }
     }
     if ($wu)                             { $result.wu       = Apply-WindowsUpdatePolicy -Policy $wu }
+    # Ring is applied AFTER the WU policy so the ring's defer-days +
+    # active-hours win for endpoints managed via the group flow.
+    if ($ring)                           { $result.ring     = Apply-UpdateRing -RingPayload $ring }
     if ($gpo)                            { $result.gpo      = Apply-GpoPolicy         -Policy $gpo }
     return $result
 }
@@ -811,5 +876,5 @@ Export-ModuleMember -Function `
     Invoke-PolicyEnforcementPass, `
     Get-EndpointPostureSummary, `
     Get-LegacyAgentToken, Set-CachedLegacyAgentToken, Clear-CachedLegacyAgentToken, `
-    Apply-DefenderPolicy, Apply-UacPolicy, Apply-WindowsUpdatePolicy, Apply-FirewallPolicy, Apply-GpoPolicy, `
+    Apply-DefenderPolicy, Apply-UacPolicy, Apply-WindowsUpdatePolicy, Apply-UpdateRing, Apply-FirewallPolicy, Apply-GpoPolicy, `
     Get-UacStatus, Get-WindowsUpdateStatus

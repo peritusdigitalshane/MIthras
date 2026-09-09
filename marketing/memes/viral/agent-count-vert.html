@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>How many agents — vertical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; background: #0b0b0d; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; padding: 100px 60px; }
+
+  /* === SCENE 1: 0-3s === */
+  .s1 { animation: s1 3s linear 0s both; justify-content: center; align-items: center; background: #000; gap: 50px; }
+  .s1 h1 { font-size: 130px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -4px; }
+  .s1 h1 .acc { color: #ff4040; }
+  .s1 p { font-size: 44px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: center; }
+
+  /* === SCENE 2: 3-13s — TASK MANAGER POPULATING === */
+  .s2 { animation: s2 10s linear 3s both; padding: 80px 50px; }
+  .tm { width: 100%; height: 100%; background: #1f1f1f; border-radius: 16px; border: 1px solid #333; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+  .tm-bar { background: #2b2b2b; border-bottom: 1px solid #404040; padding: 22px 28px; display: flex; align-items: center; gap: 14px; font-size: 28px; color: rgba(255,255,255,0.75); font-weight: 600; }
+  .tm-bar .dot { width: 22px; height: 22px; border-radius: 50%; background: #404040; }
+  .tm-bar .cpu-label { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 24px; }
+  .tm-bar .cpu-pct { color: #ff4040; font-weight: 800; }
+  .tm-head { display: grid; grid-template-columns: 1fr 140px 160px; padding: 18px 28px; background: #262626; border-bottom: 1px solid #333; font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 1px; }
+  .tm-rows { flex: 1; padding: 4px 0; }
+  .tm-row { display: grid; grid-template-columns: 1fr 140px 160px; padding: 16px 28px; font-family: 'JetBrains Mono', monospace; font-size: 24px; color: rgba(255,255,255,0.88); align-items: center; border-bottom: 1px solid rgba(255,255,255,0.04); opacity: 0; }
+  .tm-row.hot .cpu, .tm-row.hot .mem { color: #ff6464; font-weight: 700; }
+  .tm-row .name { display: flex; align-items: center; gap: 14px; }
+  .tm-row .vendor-tag { font-size: 16px; padding: 4px 10px; border-radius: 4px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.6px; font-family: 'Inter', sans-serif; font-weight: 700; }
+  .tm-row .cpu, .tm-row .mem { text-align: right; color: rgba(255,255,255,0.7); }
+  .tm-row.r1  { animation: rowIn 0.25s ease-out 3.3s both; }
+  .tm-row.r2  { animation: rowIn 0.25s ease-out 3.8s both; }
+  .tm-row.r3  { animation: rowIn 0.25s ease-out 4.3s both; }
+  .tm-row.r4  { animation: rowIn 0.25s ease-out 4.8s both; }
+  .tm-row.r5  { animation: rowIn 0.25s ease-out 5.3s both; }
+  .tm-row.r6  { animation: rowIn 0.25s ease-out 5.8s both; }
+  .tm-row.r7  { animation: rowIn 0.25s ease-out 6.3s both; }
+  .tm-row.r8  { animation: rowIn 0.25s ease-out 6.8s both; }
+  .tm-row.r9  { animation: rowIn 0.25s ease-out 7.3s both; }
+  .tm-row.r10 { animation: rowIn 0.25s ease-out 7.8s both; }
+  .tm-row.r11 { animation: rowIn 0.25s ease-out 8.3s both; }
+  .tm-row.r12 { animation: rowIn 0.25s ease-out 8.8s both; }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .tm-footer { padding: 28px 32px; background: #262626; border-top: 1px solid #333; font-size: 36px; font-weight: 700; color: #ff6464; display: flex; justify-content: space-between; align-items: center; opacity: 0; animation: rowIn 0.5s ease-out 9.0s both; }
+  .tm-footer .num { font-size: 90px; font-weight: 900; }
+
+  /* === SCENE 3: 13-17s — MITHRAS TASK MANAGER === */
+  .s3 { animation: s3 4s linear 13s both; padding: 80px 50px; }
+  .s3 .tm-bar .cpu-pct { color: #28d96b; }
+  .s3 .tm-footer { color: #28d96b; }
+  .s3 .tm-row { opacity: 1; }
+  .s3 .tm-row.dim { opacity: 0.22; }
+
+  /* === SCENE 4: 17-20s — CTA === */
+  .s4 { animation: s4 3s linear 17s both; justify-content: center; align-items: center; background: #000; gap: 50px; }
+  .s4::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.20), transparent 70%); }
+  .s4 .versus-row { display: flex; gap: 60px; align-items: center; animation: fadeUp 0.5s ease-out 0.0s both; }
+  .s4 .big-num { font-size: 380px; font-weight: 900; color: #28d96b; line-height: 1; letter-spacing: -14px; }
+  .s4 .versus { font-size: 140px; font-weight: 900; color: rgba(255,255,255,0.4); line-height: 1; letter-spacing: -3px; text-align: center; }
+  .s4 .versus .small { font-size: 36px; display: block; letter-spacing: 2px; color: rgba(255,255,255,0.5); }
+  .s4 .red { color: #ff4040; }
+  .s4 .brand { font-size: 130px; font-weight: 900; letter-spacing: -4px; margin-top: 30px; animation: fadeUp 0.5s ease-out 0.6s both; }
+  .s4 .tag { font-size: 52px; font-weight: 700; color: #28d96b; animation: fadeUp 0.5s ease-out 1.0s both; }
+  .s4 .url { font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #28d96b; margin-top: 30px; animation: fadeUp 0.5s ease-out 1.4s both; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s2 { 0% { opacity: 0; } 4% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s3 { 0% { opacity: 0; transform: scale(0.96); } 5% { opacity: 1; transform: scale(1); } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s4 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <h1>How many security<br/>agents are on your<br/><span class="acc">endpoint right now?</span></h1>
+    <p>Open Task Manager. Count them.<br/>Be honest.</p>
+  </div>
+
+  <div class="scene s2">
+    <div class="tm">
+      <div class="tm-bar"><div class="dot"></div><div class="dot"></div><div class="dot"></div>Task Manager<span class="cpu-label">CPU: <span class="cpu-pct">47%</span></span></div>
+      <div class="tm-head"><div>Process name</div><div class="cpu">CPU</div><div class="mem">RAM</div></div>
+      <div class="tm-rows">
+        <div class="tm-row r1 hot"><div class="name">CSFalconService.exe <span class="vendor-tag">CrowdStrike</span></div><div class="cpu">8.2%</div><div class="mem">412 MB</div></div>
+        <div class="tm-row r2 hot"><div class="name">HuntressAgent.exe <span class="vendor-tag">Huntress</span></div><div class="cpu">3.1%</div><div class="mem">186 MB</div></div>
+        <div class="tm-row r3"><div class="name">SentinelAgent.exe <span class="vendor-tag">S1</span></div><div class="cpu">5.7%</div><div class="mem">389 MB</div></div>
+        <div class="tm-row r4"><div class="name">MsMpEng.exe <span class="vendor-tag">Defender</span></div><div class="cpu">4.3%</div><div class="mem">274 MB</div></div>
+        <div class="tm-row r5"><div class="name">MDM_Agent.exe <span class="vendor-tag">Intune</span></div><div class="cpu">1.1%</div><div class="mem">98 MB</div></div>
+        <div class="tm-row r6"><div class="name">Sysmon64.exe <span class="vendor-tag">Sysmon</span></div><div class="cpu">2.4%</div><div class="mem">152 MB</div></div>
+        <div class="tm-row r7"><div class="name">RMMAgent.exe <span class="vendor-tag">CW</span></div><div class="cpu">1.8%</div><div class="mem">211 MB</div></div>
+        <div class="tm-row r8"><div class="name">BackupAgent.exe <span class="vendor-tag">Datto</span></div><div class="cpu">2.0%</div><div class="mem">178 MB</div></div>
+        <div class="tm-row r9"><div class="name">SophosFS.exe <span class="vendor-tag">Sophos</span></div><div class="cpu">3.6%</div><div class="mem">298 MB</div></div>
+        <div class="tm-row r10"><div class="name">WebrootSvc.exe <span class="vendor-tag">Webroot</span></div><div class="cpu">1.9%</div><div class="mem">142 MB</div></div>
+        <div class="tm-row r11"><div class="name">SplunkForwarder.exe <span class="vendor-tag">Splunk</span></div><div class="cpu">2.2%</div><div class="mem">204 MB</div></div>
+        <div class="tm-row r12"><div class="name">NinjaRMMAgent.exe <span class="vendor-tag">Ninja</span></div><div class="cpu">1.4%</div><div class="mem">132 MB</div></div>
+      </div>
+      <div class="tm-footer"><span>AGENTS RUNNING</span><span class="num">12</span></div>
+    </div>
+  </div>
+
+  <div class="scene s3">
+    <div class="tm">
+      <div class="tm-bar"><div class="dot"></div><div class="dot"></div><div class="dot"></div>Task Manager — Mithras<span class="cpu-label">CPU: <span class="cpu-pct">2%</span></span></div>
+      <div class="tm-head"><div>Process name</div><div class="cpu">CPU</div><div class="mem">RAM</div></div>
+      <div class="tm-rows">
+        <div class="tm-row"><div class="name">MithrasAgent.exe <span class="vendor-tag">Mithras</span></div><div class="cpu">0.4%</div><div class="mem">68 MB</div></div>
+        <div class="tm-row dim"><div class="name">— endpoint protection</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— microsegmentation</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— app whitelisting</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— vulnerability scan</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— firewall telemetry</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— event log shipping</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— defender management</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— tamper protection</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— remote desktop</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— patch device</div><div class="cpu">—</div><div class="mem">—</div></div>
+        <div class="tm-row dim"><div class="name">— SIEM forward</div><div class="cpu">—</div><div class="mem">—</div></div>
+      </div>
+      <div class="tm-footer"><span>AGENTS RUNNING</span><span class="num">1</span></div>
+    </div>
+  </div>
+
+  <div class="scene s4">
+    <div class="versus-row">
+      <div class="big-num">1</div>
+      <div class="versus">VS<span class="small">previously</span></div>
+      <div class="big-num red">12</div>
+    </div>
+    <div class="brand">MITHRAS</div>
+    <div class="tag">One agent. Every capability.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

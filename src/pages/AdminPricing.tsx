@@ -25,8 +25,8 @@ function fmtMoney(cents: number, currency = "AUD") {
 }
 
 const TIER_META = {
-  distributor: { label: "Distributors", icon: <Warehouse className="h-4 w-4" />, blurb: "What Peritus charges the distributor per endpoint per month." },
-  partner:     { label: "Resellers",    icon: <Briefcase className="h-4 w-4" />, blurb: "What a distributor (or Peritus, for direct resellers) charges the reseller per endpoint per month." },
+  distributor: { label: "Distributors", icon: <Warehouse className="h-4 w-4" />, blurb: "What Mithras charges the distributor per endpoint per month." },
+  partner:     { label: "Resellers",    icon: <Briefcase className="h-4 w-4" />, blurb: "What a distributor (or Mithras directly, for self-distributed resellers) charges the reseller per endpoint per month." },
   customer:    { label: "Customers",    icon: <Users className="h-4 w-4" />,     blurb: "Suggested retail rate resellers charge their end customers. Advisory only — resellers price independently." },
 } as const;
 
@@ -47,7 +47,7 @@ export default function AdminPricing() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Platform pricing is managed by Peritus operators.</AlertDescription>
+            <AlertDescription>Platform pricing is managed by Mithras platform operators.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>
@@ -307,7 +307,7 @@ function OrgPricingTable({
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2"><Warehouse className="h-4 w-4" /> Distributors</CardTitle>
-          <CardDescription>What Peritus charges each distributor per endpoint per month.</CardDescription>
+          <CardDescription>What Mithras charges each distributor per endpoint per month.</CardDescription>
         </CardHeader>
         <CardContent>{renderTable(grouped.distributor, "No distributors yet.")}</CardContent>
       </Card>

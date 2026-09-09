@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
  *   2. Stamps endpoints.uninstall_authorized_at / _by / _reason
  *   3. Queues an `uninstall_self` agent command
  *
- * The agent picks up the command on its next heartbeat (~60s), disables
+ * The agent picks up the command on its next heartbeat (~30s), disables
  * tamper protection on itself, registers a SYSTEM scheduled task that
  * fires Force-Remove.ps1 60 seconds later, and reports success before the
  * service is torn down.

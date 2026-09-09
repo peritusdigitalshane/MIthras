@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ransomware math</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; background: #0b0b0d; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; padding: 50px 50px; }
+
+  .title { animation: fadeUp 0.5s ease-out 0.1s both; margin-bottom: 22px; }
+  .title h1 { font-size: 56px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .title .accent { color: #ff6464; }
+  .title p { font-size: 22px; font-weight: 600; color: rgba(255,255,255,0.6); margin-top: 12px; }
+
+  .receipt {
+    background: #fff8e7;
+    color: #1a1a1a;
+    flex: 1;
+    padding: 36px 38px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+    animation: tapePrint 0.7s ease-out 0.4s both;
+    transform-origin: top center;
+  }
+  .receipt::before, .receipt::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 16px;
+    background: radial-gradient(circle at 8px 8px, #0b0b0d 5px, transparent 6px);
+    background-size: 16px 16px;
+  }
+  .receipt::before { top: -8px; }
+  .receipt::after  { bottom: -8px; transform: scaleY(-1); }
+
+  .r-head { text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px dashed #888; }
+  .r-head .org { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .r-head .sub { font-size: 13px; color: #555; margin-top: 4px; letter-spacing: 1px; }
+  .r-head .date { font-size: 12px; color: #777; margin-top: 8px; }
+
+  .lines { font-size: 17px; }
+  .line { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dotted rgba(0,0,0,0.15); }
+  .line .desc { font-weight: 500; }
+  .line .amt { font-weight: 700; }
+  .line.subtotal { border-top: 2px solid #444; border-bottom: none; padding-top: 12px; margin-top: 12px; font-size: 19px; }
+  .line.subtotal .amt { color: #d9220c; }
+  .line.alt {
+    margin-top: 24px;
+    padding: 18px;
+    background: rgba(40,217,107,0.18);
+    border: 2px solid #28a558;
+    border-radius: 8px;
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .line.alt .amt { color: #1a8744; }
+  .line.alt .desc { color: #1a8744; }
+
+  .saving { text-align: center; font-size: 18px; margin-top: 18px; font-weight: 700; color: #1a8744; }
+
+  .tagline { text-align: center; margin-top: 26px; animation: fadeUp 0.7s ease-out 1.4s both; }
+  .tagline .big { font-size: 60px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #fff; }
+  .tagline .url { font-size: 22px; font-weight: 700; letter-spacing: 6px; color: #28d96b; margin-top: 14px; }
+
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 50% 30%, rgba(255,80,80,0.10), transparent 50%); z-index: -1; }
+  @keyframes tapePrint { from { opacity: 0; transform: scaleY(0.6); } to { opacity: 1; transform: scaleY(1); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+  <div class="title">
+    <h1>RANSOMWARE <span class="accent">MATH</span></h1>
+    <p>The receipt nobody wants. The maths everyone should do.</p>
+  </div>
+
+  <div class="receipt">
+    <div class="r-head">
+      <div class="org">SMB BREACH ESTIMATE</div>
+      <div class="sub">25-seat Australian business</div>
+      <div class="date">— SOURCE: ASD ACSC ANNUAL CYBER THREAT REPORT —</div>
+    </div>
+
+    <div class="lines">
+      <div class="line"><span class="desc">Average AU SMB ransom demand</span><span class="amt">$850,000</span></div>
+      <div class="line"><span class="desc">Average downtime (24 days @ $2,500/day lost rev)</span><span class="amt">$60,000</span></div>
+      <div class="line"><span class="desc">Forensics + incident response</span><span class="amt">$80,000</span></div>
+      <div class="line"><span class="desc">Legal + notifiable data breach reporting</span><span class="amt">$25,000</span></div>
+      <div class="line"><span class="desc">Insurance excess + premium hike</span><span class="amt">$45,000</span></div>
+      <div class="line"><span class="desc">Lost customers (avg 18% post-breach churn)</span><span class="amt">$120,000</span></div>
+
+      <div class="line subtotal"><span class="desc">TOTAL PROBABLE COST</span><span class="amt">$1,180,000</span></div>
+
+      <div class="line alt">
+        <span class="desc">— OR —<br/>Mithras subscription (25 × $11 × 12)</span>
+        <span class="amt">$3,300</span>
+      </div>
+
+      <div class="saving">YOU SAVE: $1,176,700/year. THAT'S 357× ROI.</div>
+    </div>
+  </div>
+
+  <div class="tagline">
+    <div class="big">DO THE MATH.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+</body>
+</html>

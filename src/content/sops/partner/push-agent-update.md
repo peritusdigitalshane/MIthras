@@ -34,7 +34,7 @@ Reseller staff whose user record carries a `partner` role on the partner organis
 4. Review the confirmation dialog. The dialog displays the exact count, the first ten hostnames with current and target versions, and the expected brief offline window per endpoint during the service swap.
 5. If the scope or population is incorrect, select `Cancel` and adjust scope before retrying.
 6. Select `Push to N`. The console invokes `bulk_queue_agent_upgrade` and returns a toast naming the count queued and the count skipped as already in flight.
-7. Endpoints collect the upgrade command on the next heartbeat, typically within 60 seconds, and execute the signed update. Each endpoint is offline for 30 to 60 seconds during the service swap.
+7. Endpoints collect the upgrade command on the next heartbeat, typically within 30 seconds, and execute the signed update. Each endpoint is offline for 30 to 60 seconds during the service swap.
 
 ## Verification
 - The version status banner re-evaluates within 30 seconds and shows a reduced count or `All up to date (v<version>)`.
@@ -46,7 +46,7 @@ Reseller staff whose user record carries a `partner` role on the partner organis
 - **A subset of endpoints remains behind for more than one hour.** The endpoints are offline at command dispatch. The queued command fires on next connection. Filter `/endpoints` by `status = 'offline'` to identify the population and follow up with the customer.
 - **An endpoint records `upgrade_failed` in its activity panel.** The agent cannot reach the signed bundle storage. Verify the customer network is not intercepting `*.mithras.com.au` with a Transport Layer Security (TLS) inspecting proxy. Reissue the upgrade once connectivity is restored.
 - **The wrong scope was queued.** In-flight upgrades cannot be cancelled. Patch releases are non-breaking by contract; allow the upgrade to complete and document the deviation in the customer's change log.
-- **The version status banner shows `Checking versions` for more than two minutes.** The console version-check query has stalled. Refresh the page; if the state persists, escalate to the Peritus 24/7 SOC.
+- **The version status banner shows `Checking versions` for more than two minutes.** The console version-check query has stalled. Refresh the page; if the state persists, escalate to the Mithras SOC.
 
 ## Audit and compliance
 - The RPC `bulk_queue_agent_upgrade` writes a row to `public.activity_logs` for every endpoint queued, with `action_type = 'agent_upgrade_queued'`, `actor_id = auth.uid()`, and the target version.

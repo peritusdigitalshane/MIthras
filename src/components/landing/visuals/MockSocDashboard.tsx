@@ -170,7 +170,7 @@ export function MockSocDashboard() {
       </MockCard>
 
       <div className="text-[10px] text-muted-foreground">
-        Custom dashboard — replaces the Grafana view. Updates every 15s + on every event via Supabase Realtime.
+        Custom SOC console — updates every 15 seconds and the instant any event lands.
       </div>
     </div>
   );

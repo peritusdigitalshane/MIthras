@@ -355,6 +355,13 @@ function Invoke-EmergencyUnlock {
 #   target_version : '0.6.6'
 #   download_url   : 'https://api.mithras.com.au/storage/v1/object/public/agent-bundles/mithras-agent-0.6.6.zip'
 #   sha256         : '13f2af760e7c...'
+#   ed25519_sig    : base64 Ed25519 signature over the raw sha256 digest bytes
+#
+# v0.7.21: ed25519_sig is REQUIRED. Prior builds verified only sha256, which
+# the server also supplied -- so the hash proved nothing about who built the
+# bundle. An unsigned command is now refused here before anything is
+# downloaded, and reported to the console as a failed command so the reason
+# is visible rather than silent.
 #
 # On success: agent exits with code 0 inside Invoke-AgentSelfUpdate's swap
 # helper -- the NSSM service restart picks up the new binaries. The command
@@ -372,6 +379,20 @@ function Invoke-UpgradeAgent {
         return @{ status='failed'; error='target_version, download_url, sha256 required' }
     }
 
+    # Accept either key name: the edge function sends ed25519_sig, older
+    # console builds sent signature. Neither present means unsigned.
+    $sigB64 = ''
+    if ($Params.ed25519_sig) { $sigB64 = [string]$Params.ed25519_sig }
+    elseif ($Params.signature) { $sigB64 = [string]$Params.signature }
+
+    if ([string]::IsNullOrWhiteSpace($sigB64)) {
+        _CmdLog 'WARN' ("upgrade_agent: REFUSED unsigned release " + [string]$Params.target_version)
+        return @{
+            status = 'failed'
+            error  = "refusing unsigned agent bundle for version $([string]$Params.target_version) - no ed25519_sig in command params. Publish a signed release (scripts/phase2a/build-release.sh with SIGNING_KEY set)."
+        }
+    }
+
     try {
         # Lazy-import Updater so this command works even if the caller forgot
         # to pre-import the module.
@@ -381,10 +402,11 @@ function Invoke-UpgradeAgent {
         }
 
         Invoke-AgentSelfUpdate `
-            -DownloadUrl    ([string]$Params.download_url) `
-            -ExpectedSha256 ([string]$Params.sha256) `
-            -TargetVersion  ([string]$Params.target_version) `
-            -AgentRoot      'C:\ProgramData\Mithras'
+            -DownloadUrl      ([string]$Params.download_url) `
+            -ExpectedSha256   ([string]$Params.sha256) `
+            -Ed25519Signature ([string]$sigB64) `
+            -TargetVersion    ([string]$Params.target_version) `
+            -AgentRoot        'C:\ProgramData\Mithras'
 
         _CmdLog 'INFO' ("upgrade_agent: swap staged for " + [string]$Params.target_version)
         return @{
@@ -417,10 +439,98 @@ function Invoke-UpgradeAgent {
 # Params for uninstall_mesh_agent: none.
 # ============================================================================
 
+# Hosts we will download a MeshCentral agent from. Same reasoning as
+# Updater's AllowedBundleHosts: mesh_url arrives in a server-issued command,
+# and the code below adds Defender exclusions and then executes what it
+# downloads, so an unpinned host is a direct code-execution primitive.
+$script:AllowedMeshHosts = @(
+    'remote.mithras.com.au'
+)
+
+function Test-MeshUrlAllowed {
+    [OutputType([bool])]
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Url)
+    try { $u = [System.Uri]$Url } catch { return $false }
+    if ($u.Scheme -ne 'https') { return $false }
+    return ($script:AllowedMeshHosts -contains $u.Host)
+}
+
+$script:MeshApiBaseUrl = 'https://api.mithras.com.au/functions/v1/agent-api'
+
+function Get-MeshConfigFromServer {
+    <#
+        Fetch { mesh_url, mesh_id } from agent-api GET /mesh-config.
+
+        The mesh group id is a shared secret: holding it lets you enrol a
+        device into the Mithras remote-control group. It therefore lives in
+        platform_settings server-side and is handed out only over the agent's
+        own authenticated channel -- never baked into agent source (which is
+        in git and on every endpoint) and never into the web bundle (which is
+        served to anyone).
+
+        Returns $null when the token is unavailable or the call fails; the
+        caller then fails the command with an actionable message rather than
+        falling back to anything.
+    #>
+    $token = $null
+    if (Get-Command Get-LegacyAgentToken -ErrorAction SilentlyContinue) {
+        $token = Get-LegacyAgentToken
+    }
+    if (-not $token) {
+        _CmdLog 'WARN' 'mesh-config: no agent token available'
+        return $null
+    }
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $headers = @{ 'Content-Type' = 'application/json'; 'x-agent-token' = $token }
+        return Invoke-RestMethod -Uri "$script:MeshApiBaseUrl/mesh-config" -Method GET -Headers $headers -TimeoutSec 20 -ErrorAction Stop
+    } catch {
+        _CmdLog 'WARN' ("mesh-config: request failed - " + $_.Exception.Message)
+        return $null
+    }
+}
+
 function Invoke-InstallMeshAgent {
     param([hashtable]$Params)
-    $meshUrl = if ($Params -and $Params.mesh_url) { [string]$Params.mesh_url } else { 'https://remote.mithras.com.au' }
-    $meshId  = if ($Params -and $Params.mesh_id)  { [string]$Params.mesh_id }  else { 'LHDBcLRoKOPD$OltNZhPT5Urn89pHHeqjYJvR3h0ODKu3Sef5qpdTxPkgtraYP5h' }
+
+    # v0.7.21: the mesh group id is a shared remote-access enrolment secret.
+    # It used to be a hardcoded default in this file, which meant it was
+    # committed to git AND shipped in cleartext to every customer endpoint --
+    # anyone holding it could enrol a device into the Mithras remote-control
+    # group. It now comes from the server (agent-api GET /mesh-config, which
+    # reads platform_settings and is gated by the agent's own credentials), or
+    # from explicit command params. There is no baked-in fallback.
+    $meshUrl = ''
+    $meshId  = ''
+    if ($Params -and $Params.mesh_url) { $meshUrl = [string]$Params.mesh_url }
+    if ($Params -and $Params.mesh_id)  { $meshId  = [string]$Params.mesh_id }
+
+    if (-not $meshUrl -or -not $meshId) {
+        try {
+            $cfg = Get-MeshConfigFromServer
+            if ($cfg) {
+                if (-not $meshUrl -and $cfg.mesh_url) { $meshUrl = [string]$cfg.mesh_url }
+                if (-not $meshId  -and $cfg.mesh_id)  { $meshId  = [string]$cfg.mesh_id }
+            }
+        } catch {
+            _CmdLog 'WARN' ("install_mesh_agent: /mesh-config fetch failed: " + $_.Exception.Message)
+        }
+    }
+
+    if (-not $meshId) {
+        _CmdLog 'WARN' 'install_mesh_agent: no mesh_id available'
+        return @{
+            status = 'failed'
+            error  = 'no mesh_id available - set mesh_group_id in platform_settings (Admin > Settings) or pass mesh_id in the command params. This agent no longer ships a built-in mesh group id.'
+        }
+    }
+    if (-not (Test-MeshUrlAllowed -Url $meshUrl)) {
+        _CmdLog 'WARN' ("install_mesh_agent: refusing mesh_url '$meshUrl'")
+        return @{
+            status = 'failed'
+            error  = "refusing to download a MeshCentral agent from untrusted host '$meshUrl'"
+        }
+    }
 
     if (Get-Service -Name 'Mesh Agent' -ErrorAction SilentlyContinue) {
         return @{ status='succeeded'; result = @{ already_installed = $true; service_state = 'Running' } }
@@ -504,7 +614,41 @@ function Invoke-UninstallMeshAgent {
         if (Get-Service -Name 'Mesh Agent' -ErrorAction SilentlyContinue) {
             try { sc.exe delete 'Mesh Agent' | Out-Null } catch {}
         }
-        return @{ status='succeeded'; result = @{ uninstalled_at = (Get-Date).ToUniversalTime().ToString('o') } }
+
+        # v0.7.21: remove the Defender exclusions the install added. Before
+        # this, install_mesh_agent added ExclusionPath + ExclusionProcess for
+        # the vendor directory and for C:\Program Files\Mesh Agent and nothing
+        # ever took them away -- so uninstalling remote access left a
+        # permanent, unscanned drop location behind on the endpoint. Anything
+        # written to those paths afterwards was invisible to Defender.
+        $removedExclusions = @()
+        if (Get-Command Remove-MpPreference -ErrorAction SilentlyContinue) {
+            $meshPaths = @(
+                'C:\ProgramData\Mithras\install\vendor\MeshAgent.exe',
+                'C:\Program Files\Mesh Agent',
+                'C:\Program Files\Mesh Agent\MeshAgent.exe'
+            )
+            foreach ($p in $meshPaths) {
+                try { Remove-MpPreference -ExclusionPath    $p -ErrorAction SilentlyContinue; $removedExclusions += $p } catch {}
+                try { Remove-MpPreference -ExclusionProcess $p -ErrorAction SilentlyContinue } catch {}
+            }
+            _CmdLog 'INFO' ("uninstall_mesh_agent: removed Defender exclusions for " + ($removedExclusions -join ', '))
+        }
+
+        # Drop the downloaded installer too — no reason to leave a copy of a
+        # remote-control agent staged on disk after uninstall.
+        try {
+            $vendorExe = 'C:\ProgramData\Mithras\install\vendor\MeshAgent.exe'
+            if (Test-Path $vendorExe) { Remove-Item -LiteralPath $vendorExe -Force -ErrorAction SilentlyContinue }
+        } catch {}
+
+        return @{
+            status = 'succeeded'
+            result = @{
+                uninstalled_at      = (Get-Date).ToUniversalTime().ToString('o')
+                exclusions_removed  = $removedExclusions
+            }
+        }
     } catch {
         _CmdLog 'WARN' ("uninstall_mesh_agent failed: " + $_.Exception.Message)
         return @{ status='failed'; error = $_.Exception.Message }
@@ -1022,7 +1166,7 @@ Remove-Item 'C:\ProgramData\Mithras' -Recurse -Force -ErrorAction SilentlyContin
                 cleanup_script  = $cleanupScript
                 cleanup_in_secs = 60
                 armed_at        = (Get-Date).ToUniversalTime().ToString('o')
-                note            = 'Agent will be stopped + uninstalled by the scheduled task in ~60s. This is the last heartbeat from this endpoint.'
+                note            = 'Agent will be stopped + uninstalled by the scheduled task in ~60s (cleanup script delay). This is the last heartbeat from this endpoint.'
             }
         }
     } catch {

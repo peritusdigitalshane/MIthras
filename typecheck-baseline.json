@@ -1,0 +1,4 @@
+{
+  "maxErrors": 175,
+  "_comment": "Ceiling, not a target. These 175 errors are overwhelmingly caused by src/integrations/supabase/types.ts being ~15 migrations stale: 31 tables the app queries are absent from the generated Database type, so hooks fall back to `as unknown as` casts. Regenerate the types against the live database and most of this disappears. Lower this number whenever it drops: node scripts/typecheck-ratchet.mjs --update"
+}

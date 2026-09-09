@@ -1,10 +1,26 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildCorsHeaders, handlePreflight, ALLOWED_ORIGINS } from "./cors.ts";
 
-Deno.test("ALLOWED_ORIGINS includes appdev and apidev", () => {
+Deno.test("ALLOWED_ORIGINS includes appdev and apidev over HTTPS", () => {
     assertEquals(ALLOWED_ORIGINS.includes("https://appdev.peritusdigital.com.au"), true);
     assertEquals(ALLOWED_ORIGINS.includes("https://apidev.peritusdigital.com.au"), true);
-    assertEquals(ALLOWED_ORIGINS.includes("http://appdev.peritusdigital.com.au"), true);
+});
+
+Deno.test("ALLOWED_ORIGINS excludes plain-HTTP dev origins", () => {
+    // This assertion used to be inverted -- it required
+    // http://appdev.peritusdigital.com.au to be allowed. The plain-HTTP
+    // entries were deliberately dropped from cors.ts when credentialled CORS
+    // shipped, because a session cookie sent over HTTP is interceptable. The
+    // test was never updated because nothing in the repo ran the Deno suite
+    // (vitest's include glob is "src/**" only). It now asserts the secure
+    // behaviour rather than the old insecure one.
+    assertEquals(ALLOWED_ORIGINS.includes("http://appdev.peritusdigital.com.au"), false);
+    assertEquals(ALLOWED_ORIGINS.includes("http://apidev.peritusdigital.com.au"), false);
+});
+
+Deno.test("localhost dev origins remain allowed (secure-context exception)", () => {
+    assertEquals(ALLOWED_ORIGINS.includes("http://localhost:5173"), true);
+    assertEquals(ALLOWED_ORIGINS.includes("http://localhost:8080"), true);
 });
 
 Deno.test("buildCorsHeaders returns origin when allowed", () => {

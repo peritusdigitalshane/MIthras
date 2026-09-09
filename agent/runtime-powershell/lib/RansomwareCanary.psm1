@@ -19,8 +19,9 @@
 #   * State: canary-state.json maps each canary path to its expected
 #     sha256, size, and mtime. Any drift on Test-MithrasCanaries returns
 #     a tripped record.
-#   * Polling cadence: every heartbeat (60s default). Good enough to catch
-#     ransomware that takes seconds-to-minutes to walk a fleet.
+#   * Polling cadence: every heartbeat (30s default as of v0.7.6). Catches
+#     ransomware that takes seconds-to-minutes to walk a fleet, and faster
+#     cadence means less time between encryption start and tripped alert.
 #   * Idempotent re-creation: Initialize-MithrasCanaries replaces canaries
 #     that were deleted or modified (after they were already shipped as
 #     tripped), so the trap re-arms automatically.

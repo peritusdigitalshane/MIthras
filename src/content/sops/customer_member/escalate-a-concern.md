@@ -12,10 +12,10 @@ review_cadence: Quarterly
 ---
 
 ## Purpose
-This procedure defines the channel, evidence, and conduct required when a non-administrative member of a customer organisation observes or is informed of a suspected security event. Correct escalation preserves volatile evidence, enables the reseller and the Peritus 24/7 SOC to triage at speed, and protects the affected device from inadvertent disturbance.
+This procedure defines the channel, evidence, and conduct required when a non-administrative member of a customer organisation observes or is informed of a suspected security event. Correct escalation preserves volatile evidence, enables the reseller and the Mithras SOC to triage at speed, and protects the affected device from inadvertent disturbance.
 
 ## Audience and authority
-Members of a customer organisation whose `organization_memberships.role` is `member`. The procedure is read-only with respect to the platform: it does not authorise the reader to execute any RPC, dispatch any edge function, or change any policy. All mutating response actions are performed by the reseller or by the Peritus 24/7 SOC on the reader's behalf.
+Members of a customer organisation whose `organization_memberships.role` is `member`. The procedure is read-only with respect to the platform: it does not authorise the reader to execute any RPC, dispatch any edge function, or change any policy. All mutating response actions are performed by the reseller or by the Mithras SOC on the reader's behalf.
 
 ## Prerequisites
 - You hold an active membership in the customer organisation.
@@ -25,7 +25,7 @@ Members of a customer organisation whose `organization_memberships.role` is `mem
 
 ## Procedure
 
-1. Leave the affected device powered on and connected to the network. Do not shut it down, restart it, hibernate it, or disconnect any cables. Volatile memory contains evidence that the Peritus 24/7 SOC may require.
+1. Leave the affected device powered on and connected to the network. Do not shut it down, restart it, hibernate it, or disconnect any cables. Volatile memory contains evidence that the Mithras SOC may require.
 2. Instruct the user of the affected device to step away from the keyboard. Do not click links, do not close windows, and do not dismiss popup messages on the affected device.
 3. From an unaffected device, open the Mithras console and navigate to `/customer/contact`. The page renders the primary security contact details for your reseller: `Contact name`, `Email`, `Telephone`, and `Operating hours`.
 4. Use the telephone number for any concern that is in progress or that involves user data, credentials, or financial systems. Use the email address only for retrospective reports of an event that has concluded.
@@ -45,7 +45,7 @@ Members of a customer organisation whose `organization_memberships.role` is `mem
 - An entry appears in `public.activity_logs` against the affected endpoint with `action_type` in the `customer_concern_*` family, written by the reseller on your behalf.
 
 ## Troubleshooting
-- **The reseller telephone number is unanswered and the concern is time-critical.** Use the secondary number published on `/customer/contact` under `After-hours escalation`. That number reaches the Peritus 24/7 SOC. Reserve this channel for events involving active encryption, mass account lockout, or suspected financial fraud.
+- **The reseller telephone number is unanswered and the concern is time-critical.** Email the address published on `/customer/contact` and copy your customer administrator. Mark the subject line with `URGENT` and a one-line description of the event. A second escalation channel staffed by Mithras directly is not available at this time; resellers may publish their own after-hours number on `/customer/contact`.
 - **The page `/customer/contact` does not display contact details.** Your reseller has not yet populated the record. Notify your customer administrator immediately; they hold the authority to request a backfill.
 - **You cannot reach the Mithras console.** Telephone your customer administrator and report verbally. The administrator holds the contact details independently.
 - **A second event begins while you are on the call.** Inform the representative on the call of the second device before ending the call. Do not place the first call on hold to start a second call.

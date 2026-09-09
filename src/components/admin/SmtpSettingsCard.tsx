@@ -90,7 +90,7 @@ export function SmtpSettingsCard() {
     setSaving(true);
     try {
       await call("save", { settings: s });
-      toast({ title: "SMTP settings saved", description: "Run a test send to confirm. GoTrue (the email sender) needs an auth-container restart to start using these for password-reset emails." });
+      toast({ title: "SMTP settings saved", description: "Run a test send to confirm. Password-reset emails use a separate auth service that needs a restart to pick up the new SMTP settings." });
       if (s.smtp_password) setHasStoredPw(true);
     } catch (e) {
       toast({ title: "Save failed", description: e instanceof Error ? e.message : "Unknown", variant: "destructive" });
@@ -248,7 +248,7 @@ export function SmtpSettingsCard() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle className="text-sm">One extra step to start sending password-reset emails</AlertTitle>
             <AlertDescription className="text-xs">
-              GoTrue (the auth server that mints recovery emails) reads its SMTP settings at startup. After saving here, an operator with VM access needs to write the same values into <code>/opt/peritus-supabase/.env</code> and restart the <code>supabase-auth</code> container. The "Send test" button above proves the credentials themselves work end-to-end.
+              The auth service that mints password-recovery emails reads its SMTP settings at startup. After saving here, an operator with host access needs to mirror the same values into the auth service's environment and restart it. The &quot;Send test&quot; button above proves the credentials themselves work end-to-end.
             </AlertDescription>
           </Alert>
         )}

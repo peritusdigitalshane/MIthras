@@ -11,7 +11,14 @@ interface Organization {
   network_module_enabled: boolean;
   router_module_enabled: boolean;
   legacy_hardening_enabled: boolean;
+  timezone: string;
 }
+
+// localStorage key for the currently-impersonated org id. Keyed by user id so
+// switching accounts in the same browser doesn't accidentally restore the
+// previous operator's pivot. Survives OAuth redirects (e.g. Connect M365).
+const IMPERSONATION_KEY_PREFIX = "mithras.impersonated-org:";
+const impersonationKey = (userId: string) => `${IMPERSONATION_KEY_PREFIX}${userId}`;
 
 interface TenantContextType {
   // The user's own organization
@@ -79,6 +86,8 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         setAllOrganizations([]);
         setPartnerCustomers([]);
         setImpersonatedOrgState(null);
+        // Don't sweep every persisted pivot — only clear keys for the user
+        // we knew about. (No-op when no prior session existed.)
         setIsLoading(false);
         return;
       }
@@ -123,7 +132,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           setUserOrgRole((membershipData as any).role ?? null);
           const { data: orgData } = await supabase
             .from("organizations")
-            .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled")
+            .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled, timezone")
             .eq("id", membershipData.organization_id)
             .single();
 
@@ -133,18 +142,21 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // If super admin, fetch all organizations
+        let loadedAllOrgs: Organization[] = [];
         if (isAdmin) {
           const { data: allOrgs, error: orgsError } = await supabase
             .from("organizations")
-            .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled")
+            .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled, timezone")
             .order("name");
 
           if (orgsError) throw orgsError;
 
-          setAllOrganizations((allOrgs || []) as Organization[]);
+          loadedAllOrgs = (allOrgs || []) as Organization[];
+          setAllOrganizations(loadedAllOrgs);
         }
 
         // If partner admin, fetch their customer organizations
+        let loadedPartnerCustomers: Organization[] = [];
         if (isPartner && !isAdmin) {
           const { data: customerOrgs, error: customerError } = await supabase
             .rpc("get_partner_customer_org_ids", { _user_id: user.id });
@@ -154,13 +166,33 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
           if (customerOrgs && customerOrgs.length > 0) {
             const { data: customers } = await supabase
               .from("organizations")
-              .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled")
+              .select("id, name, slug, organization_type, parent_partner_id, network_module_enabled, router_module_enabled, legacy_hardening_enabled, timezone")
               .in("id", customerOrgs)
               .order("name");
 
-            setPartnerCustomers((customers || []) as Organization[]);
+            loadedPartnerCustomers = (customers || []) as Organization[];
+            setPartnerCustomers(loadedPartnerCustomers);
           }
         }
+
+        // Restore the impersonated org if one was pinned before a page reload
+        // (e.g. the partner was pivoted into a customer, clicked Connect M365,
+        // and OAuth redirected the SPA away and back). Only restore if the
+        // user still has access to that org — otherwise drop the key.
+        try {
+          const persistedId = localStorage.getItem(impersonationKey(user.id));
+          if (persistedId) {
+            const candidate =
+              loadedAllOrgs.find(o => o.id === persistedId) ??
+              loadedPartnerCustomers.find(o => o.id === persistedId) ??
+              null;
+            if (candidate && (isAdmin || isPartner)) {
+              setImpersonatedOrgState(candidate);
+            } else {
+              localStorage.removeItem(impersonationKey(user.id));
+            }
+          }
+        } catch { /* localStorage unavailable — silent fallback */ }
       } catch (error) {
         console.error("Error loading tenant data:", error);
       } finally {
@@ -180,6 +212,13 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
     const previous = impersonatedOrg;
     setImpersonatedOrgState(org);
+    // Persist for survive-a-reload (OAuth round-trips, hard refresh).
+    try {
+      if (user?.id) {
+        if (org) localStorage.setItem(impersonationKey(user.id), org.id);
+        else localStorage.removeItem(impersonationKey(user.id));
+      }
+    } catch { /* localStorage unavailable */ }
     // Audit trail: super-admin / partner pivots into / out of a customer tenant
     // are recorded on BOTH the source and target orgs so each side has visibility
     // of operator activity. Best-effort — never blocks the UI state change.

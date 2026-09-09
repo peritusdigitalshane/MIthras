@@ -6,7 +6,13 @@ import { toast } from "sonner";
 export interface RouterEnrollmentToken {
   id: string;
   organization_id: string;
-  token: string;
+  /**
+   * SHA-256 of the enrolment token. The plaintext is returned exactly once,
+   * by useCreateRouterEnrollmentToken, and is never persisted — so it cannot
+   * be listed, re-displayed, or recovered after the creation dialog closes.
+   * Rendering code must treat a token as write-once.
+   */
+  token_hash: string;
   label: string;
   is_active: boolean;
   max_uses: number | null;
@@ -38,24 +44,25 @@ export function useCreateRouterEnrollmentToken() {
   const { currentOrganization } = useTenant();
   return useMutation({
     mutationFn: async (params: { label: string; max_uses?: number; expires_at?: string }) => {
-      const { data: userData } = await supabase.auth.getUser();
-      const { data, error } = await supabase
-        .from("router_enrollment_tokens")
-        .insert({
-          organization_id: currentOrganization!.id,
-          label: params.label,
-          max_uses: params.max_uses || null,
-          expires_at: params.expires_at || null,
-          created_by: userData.user?.id || null,
-        } as any)
-        .select()
-        .single();
+      // Minting moved server-side (mint_router_enrollment_token). The table no
+      // longer carries a plaintext `token` column or a default that generates
+      // one, so a direct insert cannot produce a usable token. The RPC returns
+      // the plaintext exactly once — this is the only moment it exists outside
+      // the router that will use it.
+      const { data, error } = await supabase.rpc("mint_router_enrollment_token", {
+        p_organization_id: currentOrganization!.id,
+        p_label: params.label,
+        p_max_uses: params.max_uses ?? null,
+        p_expires_at: params.expires_at ?? null,
+      });
       if (error) throw error;
-      return data as RouterEnrollmentToken;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row?.plaintext_token) throw new Error("Token minting returned no token");
+      return { id: row.token_id as string, plaintext_token: row.plaintext_token as string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["router-enrollment-tokens"] });
-      toast.success("Enrollment token created");
+      toast.success("Enrollment token created — copy it now, it can't be shown again");
     },
     onError: (e: any) => toast.error(e.message),
   });

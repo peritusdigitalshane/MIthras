@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface HomeUsersTotals {
@@ -35,5 +35,22 @@ export function useAdminHomeUsers() {
       return data as unknown as HomeUsersOverview;
     },
     staleTime: 60_000,
+  });
+}
+
+// Re-send the 3-step home-user welcome email. The edge function pulls a
+// fresh magic link, finds the active enrolment token, and dispatches the
+// welcome via SMTP. Surfaces the dispatched address in the toast.
+export function useResendHomeWelcome() {
+  return useMutation({
+    mutationFn: async (orgId: string) => {
+      const { data, error } = await supabase.functions.invoke<{ ok?: boolean; dispatched_to?: string; error?: string; details?: string }>(
+        "admin-resend-home-welcome",
+        { body: { org_id: orgId } },
+      );
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error ? `${data.error}${data.details ? `: ${data.details}` : ""}` : "Welcome dispatch failed");
+      return data;
+    },
   });
 }

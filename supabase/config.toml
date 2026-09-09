@@ -56,6 +56,9 @@ verify_jwt = false
 [functions.admin-reset-password]
 verify_jwt = false
 
+[functions.admin-resend-home-welcome]
+verify_jwt = false
+
 [functions.smtp-settings]
 verify_jwt = false
 
@@ -119,4 +122,14 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.m365-poll-tenants]
+verify_jwt = false
+
+# Radar — public threat-intelligence dashboard at /radar. radar-public is
+# anonymous-readable (no JWT required). radar-refresh is authorised inside
+# the function by cron-secret or super-admin JWT; it must accept anonymous
+# requests at the gateway so pg_cron can call it without a JWT.
+[functions.radar-public]
+verify_jwt = false
+
+[functions.radar-refresh]
 verify_jwt = false

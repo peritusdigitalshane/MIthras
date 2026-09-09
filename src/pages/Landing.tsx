@@ -27,9 +27,10 @@ const Landing = () => {
   return (
     <>
       <Seo
-        title="Mithras Threat Defence — 24/7 AI SOC for MSPs, built in Australia"
-        description="An AI-first SOC for MSPs. Five specialised AI agents triage every alert, cross-check each other, and respond in seconds — 24/7/365. Centrally harden Microsoft Defender, microsegment Windows endpoints, and protect end-of-life Windows boxes — no E5 required."
+        title="Mithras Threat Defence | AI SOC + M365 email security for Australian MSPs"
+        description="Five purpose-built AI agents run your SOC round the clock and triage every Microsoft 365 inbox for phishing, BEC and malware. We harden Microsoft Defender across your fleet, microsegment Windows endpoints, and cover the end-of-life machines other EDRs refuse to install on. $11 a seat. Sold through partners."
         canonical="/"
+        keywords="AI SOC, endpoint security Australia, Microsoft Defender management, MSP security platform, M365 email security, phishing protection, BEC protection, AI phishing detection, microsegmentation Windows, EDR for SMB, end of life Windows hardening, Mithras Threat Defence"
         structuredData={[
           organizationSchema(),
           websiteSchema(),

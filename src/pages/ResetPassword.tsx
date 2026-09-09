@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Lock, CheckCircle, ShieldAlert } from "lucide-react";
+import { Seo } from "@/components/seo/Seo";
 
 const passwordPolicyOk = (pw: string) =>
   pw.length >= 12 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
@@ -65,6 +66,13 @@ const ResetPassword = () => {
   };
 
   return (
+    <>
+    <Seo
+      title="Reset password — Mithras Threat Defence"
+      description="Reset your Mithras Threat Defence account password."
+      canonical="/reset-password"
+      noindex
+    />
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
@@ -117,6 +125,7 @@ const ResetPassword = () => {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 };
 

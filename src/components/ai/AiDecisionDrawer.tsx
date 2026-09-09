@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
-import { Brain, AlertTriangle, ShieldCheck, HelpCircle, Loader2, ExternalLink, ThumbsUp, ThumbsDown, FileText, Cog, Target, Clock } from "lucide-react";
+import { Brain, AlertTriangle, ShieldCheck, HelpCircle, Loader2, ExternalLink, ThumbsUp, ThumbsDown, FileText, Cog, Target, Clock, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -226,8 +226,9 @@ function TriageSummary({ decision, onReview, reviewing }: {
             <Separator />
 
             <div className="flex items-center justify-between gap-3">
-                <div className="text-[10px] text-muted-foreground">
-                    {decision.model} · {decision.latency_ms}ms · ${(decision.cost_cents / 100).toFixed(4)}
+                <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Mithras SOC Agent</span>
                 </div>
                 <div className="flex gap-1.5">
                     <Button size="sm" variant="outline" onClick={() => onReview("approved")} disabled={reviewing}>
@@ -404,8 +405,9 @@ function Investigation({ investigation, loading, onRun, running }: {
                         Copy markdown
                     </Button>
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-4 text-right">
-                    {investigation.model} · {investigation.latency_ms}ms · ${(investigation.cost_cents / 100).toFixed(4)}
+                <div className="text-[10px] text-muted-foreground mt-4 text-right flex items-center justify-end gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Mithras SOC Agent</span>
                 </div>
             </TabsContent>
         </Tabs>

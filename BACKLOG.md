@@ -389,12 +389,11 @@ bigger scope, or a manual deploy.
   container and bump `timeoutMs` in `ai-triage-alert/index.ts` to 90s.
   Stuck-row reaper is already in place — see migration
   `20260607030000_expire_stuck_ai_triages.sql`.
-- [ ] **Agent upgrade nudge → bulk action**. 7 of 10 active endpoints are
-  on 0.4.5–0.7.9 even though current is 0.7.10, because v0.6.6
-  deliberately removed self-upgrade and there's no UI/cron to push
-  `upgrade_agent` to "everyone < latest". Either auto-issue from a
-  daily cron (security trade-off — surprise rollouts) or add a "Push
-  upgrade to all out-of-date" bulk button to `/admin/endpoints`.
+- [x] ~~**Agent upgrade nudge → bulk action**~~. Done — `BulkUpgradeButton`
+  lives on `/endpoints`, calls `bulk_queue_agent_upgrade()` RPC, shows the
+  out-of-date count + first-10 preview, queues one `upgrade_agent` command
+  per behind-version endpoint. Permission-gated to super-admin and org
+  admins via the RPC + a UI check.
 - [ ] **WDAC policy XML schema fix needs new agent bundle**. Fixed in
   `agent/runtime-powershell/lib/WdacEnforcer.psm1` lines 122 & 129
   (added `<CertRoot Type="Wellknown" Value="06" />` before
@@ -500,37 +499,33 @@ positive that needs more nuanced handling.
   threading `organizationId`, and verifying the response-shape is compatible
   with `callLlmStructured`'s strict JSON-schema path (some use `json_object`,
   not `json_schema`). Pure scope, no risk in the gap.
-- [ ] **CORS shared lib for cve-* + vulnerability-scan**. Currently use
-  wildcard `Access-Control-Allow-Origin: *`. Works fine because they're
-  only called via `supabase.functions.invoke` which mediates CORS — but
-  switching to `_shared/cors.ts` would match the project's documented
-  credentialled-CORS policy. Mechanical change; not urgent.
-- [ ] **`ai-triage-incident` + `generate-customer-report` exec-summary
-  paths missing AbortSignal.timeout**. Hung OpenAI connections will burn
-  the edge-function wall-clock budget. Add `signal: AbortSignal.timeout(45_000)`.
-- [ ] **`ai-security-advisor` service-key misuse**. Function creates a
-  service-role client for both `auth.getUser(token)` and downstream data
-  reads. Should create a second user-scoped client for the reads so RLS
-  applies. Privilege-escalation risk if the org-membership check is ever
-  removed.
-- [ ] **`ai-triage-incident` and `generate-customer-report` accept
-  `token === SUPABASE_SERVICE_KEY` as a service-call check**. Service key
-  becomes a second bearer token; a leaked key from another context can
-  call these as a "service" call. Use a dedicated `x-mithras-cron-secret`
-  header per the `m365-poll-tenants` pattern.
-- [ ] **`notify-alert` recipient filter bug**. Lines 148–151 have two
-  consecutive `if (emails.length === 0) return` checks with different
-  skip messages. The second is unreachable. The intent (filter by
-  severity first, validate emails second) is inverted.
-- [ ] **`agent-heartbeat` queued-commands filter skips null-expiry**.
-  `.gt("expires_at", now)` silently skips commands where `expires_at IS
-  NULL`. Legacy `agent-api/index.ts` uses
-  `.or("expires_at.is.null,expires_at.gt....")` — copy that.
-- [ ] **`agent-api` + `agent-heartbeat` fire-and-forget DB writes**.
-  Three `supabase.from(...).update(...)` calls aren't awaited. Errors
-  vanish.
-- [ ] **`vulnerability-scan` SELECT-then-INSERT race**. Concurrent scans
-  can duplicate findings. Switch to `.upsert(..., { onConflict: ... })`.
+- [x] ~~**CORS shared lib for cve-* + vulnerability-scan**~~. Shipped in
+  Wave 13 — all three switched to `_shared/cors.ts` with origin allow-list.
+- [x] ~~**`ai-triage-incident` + `generate-customer-report` exec-summary
+  paths missing AbortSignal.timeout**~~. Wave 13 verified both already
+  carried 45s / 30s timeouts.
+- [x] ~~**`ai-security-advisor` service-key misuse**~~. Shipped Wave 12 —
+  split into service-role client for `auth.getUser()` + admin reads, and
+  a user-scoped client for the RLS-protected data reads.
+- [x] ~~**`ai-triage-incident` and `generate-customer-report` accept
+  `token === SUPABASE_SERVICE_KEY` as a service-call check**~~. Shipped
+  Wave 14 — `ai-triage-incident` dead service-key-as-bearer path removed
+  (user JWT only); `generate-customer-report` swapped to
+  `x-mithras-cron-secret` header with the service-key fallback kept
+  transitionally.
+- [x] ~~**`notify-alert` recipient filter bug**~~. Done — the two `if`
+  checks were merged into a single guard with a `skipReason` ternary
+  that distinguishes `no_recipients_for_severity` from `no_valid_emails`.
+- [x] ~~**`agent-heartbeat` queued-commands filter skips null-expiry**~~.
+  Done — now uses `.or("expires_at.is.null,expires_at.gt.${nowIso}")`.
+- [x] ~~**`agent-api` + `agent-heartbeat` fire-and-forget DB writes**~~.
+  In `agent-heartbeat` the 4 mesh-agent state updates are now awaited
+  *and* their errors are logged with a `logUpdateErr` helper. (`agent-api`
+  is the legacy path — leaving for now; the modern HMAC path is the
+  one to harden first.)
+- [x] ~~**`vulnerability-scan` SELECT-then-INSERT race**~~. Shipped in
+  Wave 12 — `.upsert(..., { onConflict: "endpoint_id,cve_id,affected_software",
+  ignoreDuplicates: true })` with a fall-through re-open path.
 - [ ] **`enrollment_codes.expires_at` nullable + no retention job**.
   Codes with no expiry accumulate as valid signup entry points.
 - [ ] **`next_invoice_number()` count-based**. Concurrent invoice
@@ -538,12 +533,8 @@ positive that needs more nuanced handling.
   Switch to `nextval()` with per-issuer sequence.
 - [ ] **`return_licence` not called on endpoint delete**. Reseller's
   licence pool is never credited back when an endpoint is removed.
-- [ ] **Date formats scattered across admin tables**. `Users`,
-  `PartnersSection`, `EnrollmentCodesSection`, `DirectCustomersSection`,
-  `PartnerDeals`, `MyCustomers`, `DistributorResellers`, `DistributorDashboard`,
-  `BootstrapResultDialog` all use `.toLocaleDateString()` with no locale
-  — browser-dependent output. Standardise on `format(d, "d MMM yyyy")`
-  from `date-fns`.
+- [x] ~~**Date formats scattered across admin tables**~~. Shipped Wave 17 —
+  18 files switched to `format(d, "d MMM yyyy")` from date-fns.
 - [ ] ~~**Glossary entries reveal RLS / HMAC implementation
   details**~~. Shipped in Wave 18 — rewrote 5 entries in plain
   English. Tab-gating to super-admin not done; can revisit if

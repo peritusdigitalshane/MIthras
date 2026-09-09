@@ -51,6 +51,12 @@ VITE_SUPABASE_ANON_KEY="$ANON_KEY" \
 echo "  copying dist to VM"
 ssh "$VM" "sudo mkdir -p /opt/peritus-frontend"
 rsync -az --delete dist/ "$VM:/tmp/peritus-frontend-dist/"
-ssh "$VM" "sudo rsync -az --delete /tmp/peritus-frontend-dist/ /opt/peritus-frontend/"
+# Exclude config files so rsync --delete doesn't wipe them. See incident
+# 2026-06-19 (peritus-frontend container crash-looped because nginx.conf
+# was turned into an empty directory by the rsync delete logic).
+ssh "$VM" "sudo rsync -az --delete \
+    --exclude='nginx.conf' \
+    --exclude='docker-compose.yml' \
+    /tmp/peritus-frontend-dist/ /opt/peritus-frontend/"
 
 echo "=== deploy complete ==="

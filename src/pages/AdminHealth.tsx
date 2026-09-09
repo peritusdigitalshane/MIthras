@@ -26,8 +26,8 @@ import {
 } from "@/hooks/usePlatformHealth";
 
 const CATEGORY_LABEL: Record<HealthCategory, string> = {
-  cron:           "Cron",
-  edge_function:  "Edge function",
+  cron:           "Scheduled jobs",
+  edge_function:  "Background services",
   database:       "Database",
   agent_fleet:    "Agent fleet",
   ai_pipeline:    "AI pipeline",
@@ -144,7 +144,7 @@ export default function AdminHealth() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Platform health is a Peritus operator concern.</AlertDescription>
+            <AlertDescription>Platform health is a Mithras platform operator concern.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>

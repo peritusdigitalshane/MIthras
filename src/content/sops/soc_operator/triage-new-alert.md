@@ -15,7 +15,7 @@ review_cadence: Quarterly
 This procedure governs the first analyst touch on any alert raised in the Mithras platform. The AI Triage chain (Triage, Verification, Adversarial, Investigation, Commander, Comms) has already produced a verdict and may have armed or executed an autonomous response. The operator's role is to validate the verdict trail, confirm that cited evidence resolves to real telemetry, and decide whether the alert is closed at consensus, overridden, or escalated for cross-tenant investigation. Until the operator dispositions the alert, the auto-rollback window remains the only safety net.
 
 ## Audience and authority
-The operator. Authorisation requires a record in `public.super_admins` or an `organization_memberships.role` of `admin` or `owner` for the customer organisation that owns the alert. Override actions on the AI verdict trail are restricted to `super_admins` and members of the Peritus 24/7 SOC roster.
+The operator. Authorisation requires a record in `public.super_admins` or an `organization_memberships.role` of `admin` or `owner` for the customer organisation that owns the alert. Override actions on the AI verdict trail are restricted to `super_admins` and members of the Mithras SOC roster.
 
 ## Prerequisites
 - The operator is signed in to the SOC console at `https://www.mithras.com.au/soc`.
@@ -61,7 +61,7 @@ The operator. Authorisation requires a record in `public.super_admins` or an `or
 ## Audit and compliance
 - Every operator disposition writes a row to `public.ai_triage_decisions` with `review_action`, `review_reason`, `reviewed_by`, and `reviewed_at` populated.
 - A correlated row is written to `public.activity_logs` with `action_type` set to `triage_confirmed`, `triage_overridden`, or `incident_resolved` and `actor_id = auth.uid()`.
-- The verdict trail, citations, and operator notes are retained in `ai_triage_decisions` for 24 months in accordance with the customer's data retention configuration and the Peritus SOC evidentiary standard.
+- The verdict trail, citations, and operator notes are retained in `ai_triage_decisions` for 24 months in accordance with the customer's data retention configuration and the Mithras SOC evidentiary standard.
 - Force overrides and refute notes are surfaced in the customer's monthly report and are visible to the channel partner and the customer administrator.
 
 ## Related procedures

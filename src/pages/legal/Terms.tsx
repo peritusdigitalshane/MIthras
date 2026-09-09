@@ -7,17 +7,23 @@ const Terms = () => (
   <MarketingShell>
     <Seo
       title="Terms of Service — Mithras Threat Defence"
-      description="Terms of service for Mithras Threat Defence operated by Peritus Digital Pty Ltd."
+      description="Terms of service for Mithras Threat Defence."
       canonical="/terms"
     />
     <article className="container mx-auto max-w-3xl px-6 py-16 prose prose-invert">
       <h1>Terms of Service</h1>
       <p className="text-sm text-muted-foreground">Effective {EFFECTIVE_DATE}</p>
 
+      {/*
+        Legal entity placeholder. Replace "Mithras" below with the registered
+        operator's full Pty Ltd / ABN name once the trading entity is
+        finalised, e.g. "Mithras Pty Ltd (ABN xx xxx xxx xxx)". A signed
+        legal review should sign off this text before launch.
+      */}
       <p>
-        These Terms govern your access to and use of Mithras Threat Defence, operated by
-        Peritus Digital Pty Ltd ("Peritus", "we"). By creating an account you agree to
-        these Terms.
+        These Terms govern your access to and use of Mithras Threat Defence
+        (the &quot;Service&quot;, &quot;we&quot;, &quot;our&quot;). By creating an account you agree to these
+        Terms.
       </p>
 
       <h2>1. Your account</h2>
@@ -29,18 +35,20 @@ const Terms = () => (
 
       <h2>2. Onboarding</h2>
       <p>
-        Mithras is sold through authorised channel partners. Each customer account is
-        provisioned by a distributor or reseller, who issues an enrolment code at the
-        start of the engagement. There is no public self-service trial; speak to a
-        reseller in your region to evaluate the platform.
+        Business plans are sold through authorised channel partners. Each business
+        account is provisioned by a distributor or reseller, who issues an enrolment
+        code at the start of the engagement. There is no public self-service trial of
+        the business plan; speak to a reseller in your region to evaluate it. Home
+        users can subscribe directly to the personal plan at <a href="/personal">/personal</a>.
       </p>
 
       <h2>3. Billing</h2>
       <p>
-        Paid plans are billed annually in advance, in Australian dollars, and are GST-
-        inclusive for Australian customers. Endpoint counts are checked at the end of
-        each calendar month; if you exceed your committed count we will invoice the
-        overage at your plan rate.
+        Business plans are billed monthly or annually in advance via the channel partner
+        invoice, in Australian dollars, and are GST-inclusive for Australian customers.
+        Endpoint counts are checked at the end of each calendar month; if you exceed
+        your committed count we will invoice the overage at your plan rate. The personal
+        plan is billed monthly via Stripe direct.
       </p>
 
       <h2>4. Acceptable use</h2>
@@ -60,9 +68,9 @@ const Terms = () => (
 
       <h2>6. Service availability</h2>
       <p>
-        We strive for high availability. Enterprise plans include a 99.9% uptime SLA;
-        other plans are provided on a commercially reasonable best-effort basis. Planned
-        maintenance is announced on the <a href="/status">status page</a>.
+        We strive for high availability. All plans are currently provided on a
+        commercially reasonable best-effort basis; we do not yet offer a contractual
+        uptime SLA. Planned maintenance is announced on the <a href="/status">status page</a>.
       </p>
 
       <h2>7. Warranties and liability</h2>
@@ -94,7 +102,7 @@ const Terms = () => (
 
       <h2>11. Contact</h2>
       <p>
-        Questions: <a href="mailto:legal@peritusdigital.com.au">legal@peritusdigital.com.au</a>.
+        Questions: <a href="mailto:legal@mithras.com.au">legal@mithras.com.au</a>.
       </p>
     </article>
   </MarketingShell>

@@ -35,8 +35,31 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const apiBase = url.searchParams.get("api") ?? PUBLIC_API_BASE_URL;
-  const enrollmentToken = url.searchParams.get("enrollment_token") ?? "";
+
+  // B6 fix: the api param previously let any caller redirect the installed
+  // agent to an attacker-controlled API host. Lock it down to known-good
+  // hosts; ignore anything else and fall back to the public default.
+  const ALLOWED_API_HOSTS = new Set([
+    "api.mithras.com.au",
+    "apidev.peritusdigital.com.au",
+  ]);
+  const requestedApi = url.searchParams.get("api") ?? "";
+  let apiBase = PUBLIC_API_BASE_URL;
+  if (requestedApi) {
+    try {
+      const u = new URL(requestedApi);
+      if (u.protocol === "https:" && ALLOWED_API_HOSTS.has(u.host)) {
+        apiBase = `${u.protocol}//${u.host}`;
+      }
+    } catch { /* keep default */ }
+  }
+
+  // B6 fix: enrollment_token must look like a Mithras enrolment code
+  // (MTHX-XXXX-XXXX-XXXX) — strip anything else to prevent PowerShell
+  // injection through the token query param. The old `replace(/['"\\]/g,"")`
+  // sanitiser missed $() backtick newlines and other expansion vectors.
+  const rawToken = url.searchParams.get("enrollment_token") ?? "";
+  const enrollmentToken = /^[A-Z0-9-]{8,64}$/i.test(rawToken) ? rawToken : "";
 
   // Fetch latest.json from storage to learn current version + sha256
   let manifest: { version: string; filename: string; size: number; sha256: string } | null = null;

@@ -154,7 +154,7 @@ export const GUIDES: Guide[] = [
     Thumbnail: ThumbSysmon,
     animationKey: "sysmon-process-tree",
     captions: [
-      { startSec: 0, endSec: 8, text: "Mithras installs Sysmon on every endpoint with a tuned configuration. You get process creates, network connects, and file creates streaming into the platform every five minutes." },
+      { startSec: 0, endSec: 8, text: "Mithras installs Sysmon on every endpoint with a tuned configuration. You get process creates, network connects, and file creates streaming into the platform on every agent heartbeat — every 30 seconds." },
       { startSec: 8, endSec: 18, text: "The Process Telemetry view shows the entire fleet's activity. Filter by event type, search by command line, hash, image, or destination IP." },
       { startSec: 18, endSec: 30, text: "Each row tells you the parent process, the user, the integrity level, the destination of any network connection, and the SHA256 hash of the binary." },
       { startSec: 30, endSec: 42, text: "When something stands out — say a powershell child of Word — click into it. You'll see the full command line, the encoded payload, and any outbound connections from the same process." },

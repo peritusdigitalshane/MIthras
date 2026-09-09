@@ -81,11 +81,12 @@ function Get-DefenderThreatsPayload {
     #
     # Get-MpThreatDetection + Get-MpThreat go through the Defender Protection-
     # Management WMI provider (hosted by WmiPrvSE). On an endpoint with N
-    # historical detections both calls enumerate every record, and the agent's
-    # 60-second heartbeat cadence puts that work on WmiPrvSE every minute even
-    # though the detection set rarely changes minute-to-minute. We've measured
-    # this as the dominant WmiPrvSE CPU consumer on endpoints with EICAR test
-    # fixtures or normal day-to-day threat history.
+    # historical detections both calls enumerate every record, and the agent
+    # heartbeat (30s as of v0.7.6) puts that work on WmiPrvSE twice a minute
+    # even though the detection set rarely changes minute-to-minute. We've
+    # measured this as the dominant WmiPrvSE CPU consumer on endpoints with
+    # EICAR test fixtures or normal day-to-day threat history — making the
+    # fingerprint cache below load-bearing now that we tick every 30s.
     #
     # Cache the parsed payload at script scope. While the cache is fresh we
     # ship the same payload (server is the source of truth + dedupes by

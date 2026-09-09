@@ -91,7 +91,7 @@ export default function MacInstallTab({ organizationId }: MacInstallTabProps) {
                         </Badge>
                     </div>
                     <CardDescription>
-                        Bash + launchd daemon. Heartbeats every 60s with FileVault, SIP, Gatekeeper,
+                        Bash + launchd daemon. Heartbeats every 30s with FileVault, SIP, Gatekeeper,
                         Firewall, MDM enrolment, XProtect version + installed-apps inventory.
                         Tested on macOS 13 Ventura / 14 Sonoma / 15 Sequoia, Apple Silicon + Intel.
                     </CardDescription>

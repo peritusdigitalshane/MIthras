@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Calling vendor support</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1080px; background: #0b0b0d; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; padding: 50px 50px; }
+  .title { animation: fadeUp 0.5s ease-out 0.1s both; margin-bottom: 22px; }
+  .title h1 { font-size: 56px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .title p { font-size: 22px; font-weight: 600; color: rgba(255,255,255,0.6); margin-top: 10px; }
+
+  .rows { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .row { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 22px 28px; display: grid; grid-template-columns: 80px 1fr 130px; gap: 22px; align-items: center; }
+  .row.hero { background: linear-gradient(90deg, rgba(40,217,107,0.18), rgba(40,217,107,0.04)); border-color: rgba(40,217,107,0.4); }
+  .row .vendor { font-size: 26px; font-weight: 800; letter-spacing: -1px; }
+  .row .vendor .label { display: block; font-size: 14px; font-weight: 600; letter-spacing: 1px; color: rgba(255,255,255,0.45); margin-top: 4px; text-transform: uppercase; }
+  .quote { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-style: italic; color: rgba(255,255,255,0.75); line-height: 1.4; }
+  .time {
+    font-size: 30px; font-weight: 900; letter-spacing: -1px; text-align: right;
+    color: #ff6464;
+  }
+  .row.hero .time { color: #28d96b; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+  .badge.pain { background: rgba(255,80,80,0.15); color: #ff8080; }
+  .badge.win { background: rgba(40,217,107,0.18); color: #28d96b; }
+
+  .row.r1 { animation: fadeInLeft 0.45s ease-out 0.25s both; }
+  .row.r2 { animation: fadeInLeft 0.45s ease-out 0.40s both; }
+  .row.r3 { animation: fadeInLeft 0.45s ease-out 0.55s both; }
+  .row.r4 { animation: fadeInLeft 0.45s ease-out 0.70s both; }
+  .row.hero { animation: heroPop 0.55s ease-out 1.0s both; }
+
+  .tagline { text-align: center; margin-top: 22px; animation: fadeUp 0.7s ease-out 1.3s both; }
+  .tagline .big { font-size: 52px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .tagline .url { font-size: 22px; font-weight: 700; letter-spacing: 6px; color: #28d96b; margin-top: 14px; }
+
+  body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 50% 100%, rgba(40,217,107,0.12), transparent 50%); z-index: -1; }
+  @keyframes fadeInLeft { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes fadeUp     { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes heroPop    { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+</style>
+</head>
+<body>
+  <div class="title">
+    <h1>HOW LONG TO GET A HUMAN ON SUPPORT?</h1>
+    <p>It's 2am. The ransomware note just landed. You call your security vendor.</p>
+  </div>
+
+  <div class="rows">
+    <div class="row r1">
+      <div class="vendor">CrowdStrike<span class="label">Sev-1 portal ticket</span></div>
+      <div>
+        <span class="badge pain">⏱ Hours</span>
+        <div class="quote" style="margin-top:8px">"A case manager has been assigned. They will contact you within 4 business hours."</div>
+      </div>
+      <div class="time">4–6h</div>
+    </div>
+
+    <div class="row r2">
+      <div class="vendor">Huntress<span class="label">Your MSP only</span></div>
+      <div>
+        <span class="badge pain">⏱ Call your MSP first</span>
+        <div class="quote" style="margin-top:8px">"Direct support is provided to partners. Please contact your IT provider."</div>
+      </div>
+      <div class="time">??</div>
+    </div>
+
+    <div class="row r3">
+      <div class="vendor">Microsoft<span class="label">M365 Business Premium</span></div>
+      <div>
+        <span class="badge pain">⏱ Ticket queue</span>
+        <div class="quote" style="margin-top:8px">"We've escalated to a Microsoft case manager who will assign an engineer to your case…"</div>
+      </div>
+      <div class="time">24h+</div>
+    </div>
+
+    <div class="row r4">
+      <div class="vendor">Sophos<span class="label">Standard support</span></div>
+      <div>
+        <span class="badge pain">⏱ Region-restricted</span>
+        <div class="quote" style="margin-top:8px">"AU support hours are 9am–5pm. After hours requires Premium Support."</div>
+      </div>
+      <div class="time">9am</div>
+    </div>
+
+    <div class="row hero">
+      <div class="vendor">Mithras<span class="label">In-console chat, any time</span></div>
+      <div>
+        <span class="badge win">✓ Human on the line</span>
+        <div class="quote" style="margin-top:8px">"G'day — I can see the incident. I'm pulling the SOC into the chat now."</div>
+      </div>
+      <div class="time">30s</div>
+    </div>
+  </div>
+
+  <div class="tagline">
+    <div class="big">CALL HUMANS, NOT TICKET QUEUES.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+</body>
+</html>

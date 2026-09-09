@@ -41,9 +41,9 @@ Distribution operations staff whose home organisation has `organizations.org_typ
 - A row exists in `public.licence_transactions` with `kind = 'disty_to_reseller'`, `status = 'posted'`, your distributor organisation as `from_organization_id`, and the reseller as `to_organization_id`.
 
 ## Troubleshooting
-- **The cut fails with `insufficient_balance`.** Your distributor pool is below the requested amount. Open `/distributor/credits`, select `Request top-up from Peritus`, and submit the required quantity. Resume the reseller cut once the Peritus credit posts.
+- **The cut fails with `insufficient_balance`.** Your distributor pool is below the requested amount. Open `/distributor/credits`, select `Request top-up from Mithras`, and submit the required quantity. Resume the reseller cut once the Platform credit posts.
 - **The reseller does not see the new balance within sixty seconds.** The reseller portal refreshes the credit panel on a thirty-second interval. Instruct the reseller to reload `/partner/credits` or to sign out and back in. The ledger row on your side is the source of truth.
-- **The top-up was posted to the wrong reseller.** The ledger is append-only. Open `/distributor/credits`, select the incorrect transaction, and use `Reverse with contra entry` to record a compensating `licence_transactions` row of equal magnitude in the opposite direction with a reference to the original transaction identifier. Then post a fresh cut to the intended reseller. Contact Peritus channel operations if the incorrect reseller has already consumed the credits against customer endpoints.
+- **The top-up was posted to the wrong reseller.** The ledger is append-only. Open `/distributor/credits`, select the incorrect transaction, and use `Reverse with contra entry` to record a compensating `licence_transactions` row of equal magnitude in the opposite direction with a reference to the original transaction identifier. Then post a fresh cut to the intended reseller. Contact Mithras channel operations if the incorrect reseller has already consumed the credits against customer endpoints.
 - **The reseller is suspended.** A commercial or compliance hold is present. Resolve the hold in `/distributor/resellers` under the reseller's detail panel before retrying the cut.
 
 ## Audit and compliance

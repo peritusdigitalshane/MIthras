@@ -16,11 +16,14 @@ import {
     useM365ForwardingRules,
     useM365HighRiskOAuthGrants,
     useStartM365Connect,
+    useM365AzureConfigured,
     usePollM365Tenant,
     useDisconnectM365Tenant,
     useDeleteM365Tenant,
     type M365Tenant,
 } from "@/hooks/useM365";
+import { Link } from "react-router-dom";
+import { useTenant } from "@/contexts/TenantContext";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -35,6 +38,7 @@ import { parsePollError } from "@/lib/m365-error";
 
 export default function M365() {
     const { toast } = useToast();
+    const { isSuperAdmin } = useTenant();
     const [searchParams, setSearchParams] = useSearchParams();
     const tenants = useM365Tenants();
     const alerts = useM365Alerts();
@@ -42,6 +46,8 @@ export default function M365() {
     const fwdRules = useM365ForwardingRules();
     const oauthGrants = useM365HighRiskOAuthGrants();
     const startConnect = useStartM365Connect();
+    const azureConfig = useM365AzureConfigured();
+    const azureMissing = azureConfig.data && !azureConfig.data.configured;
 
     // Surface the OAuth callback result that the redirect carries.
     useEffect(() => {
@@ -83,8 +89,9 @@ export default function M365() {
                         </p>
                     </div>
                     <Button
-                        onClick={() => startConnect.mutate("read_only")}
-                        disabled={startConnect.isPending}
+                        onClick={() => startConnect.mutate({ mode: "read_only" })}
+                        disabled={startConnect.isPending || !!azureMissing}
+                        title={azureMissing ? "Configure the Azure app at Admin → Platform settings before connecting tenants." : undefined}
                     >
                         {startConnect.isPending
                             ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -92,6 +99,25 @@ export default function M365() {
                         Connect a Microsoft 365 tenant
                     </Button>
                 </div>
+
+                {azureMissing && (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Microsoft 365 integration isn't configured</AlertTitle>
+                        <AlertDescription className="space-y-2 text-sm">
+                            <p>
+                                Before any customer tenant can be connected, the platform-wide Azure AD app credentials (client id, client secret, redirect URI) need to be entered. Until they are, the Connect button silently fails because there's nothing to redirect customers to for consent.
+                            </p>
+                            {isSuperAdmin ? (
+                                <Link to="/admin/settings" className="inline-flex items-center gap-1 text-sm font-medium underline">
+                                    Open Admin → Platform settings
+                                </Link>
+                            ) : (
+                                <p>Ask a Mithras super-admin to complete the Azure app registration. Once it's saved, the Connect button works for every tenant immediately.</p>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <StatCard icon={<Cloud className="h-5 w-5" />} label="Connected tenants" value={activeTenants.length} />
@@ -106,7 +132,11 @@ export default function M365() {
                     <EmptyState onConnect={() => startConnect.mutate({ mode: "read_only" })} />
                 ) : (
                     <>
-                        <TenantList tenants={tenants.data ?? []} onConnectRemediation={(m365TenantId) => startConnect.mutate({ mode: "remediation", m365TenantId })} />
+                        <TenantList
+                            tenants={tenants.data ?? []}
+                            onConnectRemediation={(m365TenantId) => startConnect.mutate({ mode: "remediation", m365TenantId })}
+                            onRefreshScopes={(m365TenantId) => startConnect.mutate({ mode: "read_only", m365TenantId })}
+                        />
 
                         <Tabs defaultValue="alerts" className="w-full">
                             <TabsList>
@@ -167,7 +197,7 @@ function EmptyState({ onConnect }: { onConnect: () => void }) {
     );
 }
 
-function TenantList({ tenants, onConnectRemediation }: { tenants: M365Tenant[]; onConnectRemediation: (m365TenantId: string) => void }) {
+function TenantList({ tenants, onConnectRemediation, onRefreshScopes }: { tenants: M365Tenant[]; onConnectRemediation: (m365TenantId: string) => void; onRefreshScopes: (m365TenantId: string) => void }) {
     const pollMut = usePollM365Tenant();
     const disconnectMut = useDisconnectM365Tenant();
     const deleteMut = useDeleteM365Tenant();
@@ -231,6 +261,16 @@ function TenantList({ tenants, onConnectRemediation }: { tenants: M365Tenant[]; 
                                 {pollMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
                                 Poll now
                             </Button>
+                            {t.consent_state === "active" && (
+                                <Button
+                                    variant="outline" size="sm"
+                                    onClick={() => onRefreshScopes(t.id)}
+                                    title="Re-run consent for this tenant with the current baseline scope set. Use this after Mithras adds a new scope (e.g. Mail.Read for email security) or if a tenant admin previously denied a scope."
+                                >
+                                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                                    Refresh permissions
+                                </Button>
+                            )}
                             {!t.remediation_enabled && t.consent_state === "active" && (
                                 <Button variant="outline" size="sm" onClick={() => onConnectRemediation(t.id)}>
                                     <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />

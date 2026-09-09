@@ -90,7 +90,7 @@ export function BulkUpgradeButton() {
         title: `Queued ${res.queued} upgrade${res.queued === 1 ? "" : "s"} to v${res.target_version}`,
         description: res.already_queued > 0
           ? `${res.already_queued} endpoint(s) already had an upgrade in flight — skipped.`
-          : "Agents will pick up the command on their next heartbeat (~60s) and report back.",
+          : "Agents will pick up the command on their next heartbeat (~30s) and report back.",
       });
       queryClient.invalidateQueries({ queryKey: ["bulk-upgrade-eligible"] });
       queryClient.invalidateQueries({ queryKey: ["endpoints"] });
@@ -143,7 +143,7 @@ export function BulkUpgradeButton() {
           <AlertDialogDescription className="space-y-3">
             <span className="block">
               The agent on each endpoint picks up its command on the next
-              heartbeat (within ~60 seconds) and self-updates. Endpoints with
+              heartbeat (within ~30 seconds) and self-updates. Endpoints with
               an upgrade already in flight are skipped automatically.
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">

@@ -73,7 +73,7 @@ export default function AdminCredits() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Credit issuance is a Peritus operation.</AlertDescription>
+            <AlertDescription>Credit issuance is a Mithras platform operation.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>

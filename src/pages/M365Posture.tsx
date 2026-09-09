@@ -129,7 +129,7 @@ export default function M365Posture() {
                 scan it daily. Read-only access via Microsoft consent.
               </p>
             }
-            primaryAction={{ label: "Connect M365 →", href: "/settings" }}
+            primaryAction={{ label: "Connect M365 →", href: "/m365" }}
             secondaryAction={{ label: "Read the security overview", href: "/glossary#m365-posture" }}
           />
         </div>

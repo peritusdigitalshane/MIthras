@@ -17,7 +17,7 @@ import {
 } from "@/lib/sops";
 
 const AUDIENCE_ORDER: SopAudience[] = [
-  "peritus_super_admin",
+  "platform_super_admin",
   "soc_operator",
   "distributor",
   "partner",
@@ -27,7 +27,7 @@ const AUDIENCE_ORDER: SopAudience[] = [
 ];
 
 const AUDIENCE_ICONS: Record<SopAudience, React.ComponentType<{ className?: string }>> = {
-  peritus_super_admin: ShieldCheck,
+  platform_super_admin: ShieldCheck,
   soc_operator:        Bot,
   distributor:         Building2,
   partner:             Briefcase,

@@ -30,7 +30,7 @@ Mithras turns the Windows Defender already installed on every endpoint into a **
 
 ### Why distributors love selling Mithras
 
-- **Real margins**: 30–40% to the distributor, 20–35% to the reseller. Built in, no jumping through MDF hoops.
+- **Real margins**: distributor pays $6 / reseller pays $8 / list $11 — that's $2/seat to the distributor (25%) and $3/seat to the reseller (27%). Built in, no jumping through MDF hoops.
 - **Defender = no-install** for the EDR layer. Pitch lands in 5 minutes, not 50.
 - **EOL hardening** opens doors at every SMB still running ancient hardware — and there are tens of thousands of them.
 - **Channel-first**: Mithras has no direct-sales arm competing with you.
@@ -58,4 +58,4 @@ Reseller margin: $3/seat (27%). Distributor margin: $2/seat (25%). Volume tiers 
 - **Live platform**: www.mithras.com.au
 - **Knowledge base**: docs.cmwcollective.com.au
 
-*Built by Peritus Digital in Australia. Defender-native. Channel-first.*
+*Built by Mithras in Australia. Defender-native. Channel-first.*

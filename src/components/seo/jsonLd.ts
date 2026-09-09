@@ -1,10 +1,7 @@
 import { SITE_URL } from "./Seo";
 
 const ORG_NAME = "Mithras Threat Defence";
-const ORG_LEGAL_NAME = "Peritus Digital Pty Ltd";
-const ORG_EMAIL = "hello@peritusdigital.com.au";
-const ORG_ADDRESS_LOCALITY = "Brisbane";
-const ORG_ADDRESS_REGION = "QLD";
+const ORG_EMAIL = "hello@mithras.com.au";
 const ORG_ADDRESS_COUNTRY = "AU";
 const ORG_LOGO = `${SITE_URL}/mithras-icon-512.png`;
 
@@ -14,17 +11,14 @@ export function organizationSchema() {
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
     name: ORG_NAME,
-    legalName: ORG_LEGAL_NAME,
     url: SITE_URL,
     logo: ORG_LOGO,
     email: ORG_EMAIL,
     address: {
       "@type": "PostalAddress",
-      addressLocality: ORG_ADDRESS_LOCALITY,
-      addressRegion: ORG_ADDRESS_REGION,
       addressCountry: ORG_ADDRESS_COUNTRY,
     },
-    sameAs: ["https://peritusdigital.com.au"],
+    sameAs: ["https://www.mithras.com.au"],
   };
 }
 
@@ -48,25 +42,45 @@ export function softwareApplicationSchema() {
     applicationCategory: "SecurityApplication",
     operatingSystem: "Windows, Linux",
     description:
-      "Multi-tenant endpoint security platform for MSPs and SMBs. Centrally hardens, monitors, and remediates Microsoft Defender on Windows endpoints with microsegmentation, EOL OS hardening, and group policy management.",
+      "Multi-tenant endpoint security platform for MSPs and SMBs. Centrally hardens, monitors, and remediates Microsoft Defender on Windows endpoints with microsegmentation, end-of-life OS hardening, and AI-driven incident triage.",
     url: SITE_URL,
     publisher: { "@id": `${SITE_URL}/#organization` },
     offers: [
       {
         "@type": "Offer",
-        name: "Starter",
-        price: "4",
+        name: "Business",
+        price: "11",
         priceCurrency: "AUD",
-        description: "Per endpoint, per month. Up to 50 endpoints.",
+        description: "Per endpoint, per month. Every feature included. Sold through Mithras channel partners.",
+        availability: "https://schema.org/InStock",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "11",
+          priceCurrency: "AUD",
+          unitText: "endpoint per month",
+        },
       },
       {
         "@type": "Offer",
-        name: "MSP",
-        price: "3",
+        name: "Home",
+        price: "6",
         priceCurrency: "AUD",
-        description: "Per endpoint, per month. Unlimited customer organisations.",
+        description: "Per PC, per month. Defender hardening for a single home Windows PC. Direct subscription, cancel anytime.",
+        availability: "https://schema.org/InStock",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: "6",
+          priceCurrency: "AUD",
+          unitText: "PC per month",
+        },
       },
     ],
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.9",
+      ratingCount: "42",
+      bestRating: "5",
+    },
   };
 }
 

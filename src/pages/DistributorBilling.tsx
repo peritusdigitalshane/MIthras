@@ -60,7 +60,7 @@ export default function DistributorBilling() {
           eyebrow="Distributor portal"
           eyebrowIcon={<Warehouse className="h-3.5 w-3.5" />}
           title="Endpoint roll-up"
-          subtitle={`What your reseller network is running, by the numbers. ${isLoading ? "" : `${totalEndpoints} active endpoints across ${totalCustomers} customers.`} Actual Mithras invoices are driven by your credit purchases — see /distributor/credits.`}
+          subtitle={`What your reseller network is running across ${isLoading ? "your customers" : `${totalEndpoints} active endpoints across ${totalCustomers} customers`}. The MRR figure below is an indicative roll-up at wholesale prices — your actual Mithras bill is settled through credit purchases on /distributor/credits.`}
           status={(org as any)?.is_active === false ? { label: "Suspended", tone: "bad" } : { label: "Active", tone: "ok" }}
           actions={
             <div className="text-right">

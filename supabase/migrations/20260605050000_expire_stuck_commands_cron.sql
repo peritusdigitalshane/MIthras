@@ -1,7 +1,7 @@
 -- 20260605050000_expire_stuck_commands_cron.sql
 --
 -- pg_cron job that auto-expires agent commands stuck in 'dispatched' state
--- longer than 15 minutes. The agent SLA is one heartbeat (≤60s on a
+-- longer than 15 minutes. The agent SLA is one heartbeat (≤30s on a
 -- properly-running endpoint), so anything still dispatched after 15
 -- minutes indicates either:
 --   - the agent received it, ran it, then crashed or restarted before

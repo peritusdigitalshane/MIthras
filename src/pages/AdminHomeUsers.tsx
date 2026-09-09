@@ -10,10 +10,13 @@ import { PortalHero } from "@/components/portal/PortalHero";
 import { PortalStatCard } from "@/components/portal/PortalStatCard";
 import { PortalEmptyState } from "@/components/portal/PortalEmptyState";
 import { useTenant } from "@/contexts/TenantContext";
-import { useAdminHomeUsers } from "@/hooks/useAdminHomeUsers";
+import { useAdminHomeUsers, useResendHomeWelcome } from "@/hooks/useAdminHomeUsers";
 import {
-  Home, ShieldAlert, Users, Monitor, Wifi, Receipt, AlertCircle, Mail,
+  Home, ShieldAlert, Users, Monitor, Wifi, Receipt, AlertCircle, Mail, Send, Loader2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 
 function fmtMoney(cents: number, currency = "AUD") {
@@ -23,6 +26,10 @@ function fmtMoney(cents: number, currency = "AUD") {
 export default function AdminHomeUsers() {
   const { isSuperAdmin, isLoading: tenantLoading } = useTenant();
   const { data, isLoading, error } = useAdminHomeUsers();
+  const resend = useResendHomeWelcome();
+  // Track which row is currently dispatching so other rows stay enabled
+  // and we can show a per-row spinner instead of locking the whole table.
+  const [pendingOrgId, setPendingOrgId] = useState<string | null>(null);
 
   if (tenantLoading) return <MainLayout><div className="p-6"><Skeleton className="h-32 w-full" /></div></MainLayout>;
   if (!isSuperAdmin) {
@@ -32,7 +39,7 @@ export default function AdminHomeUsers() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Home-user accounts are managed by Peritus operators.</AlertDescription>
+            <AlertDescription>Home-user accounts are managed by Mithras platform operators.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>
@@ -96,6 +103,7 @@ export default function AdminHomeUsers() {
                     <TableHead className="text-right">Endpoints</TableHead>
                     <TableHead>Last seen</TableHead>
                     <TableHead>Period ends</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -115,6 +123,30 @@ export default function AdminHomeUsers() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground tabular-nums">
                         {r.stripe_current_period_end ? new Date(r.stripe_current_period_end).toLocaleDateString() : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={pendingOrgId === r.org_id}
+                          onClick={async () => {
+                            setPendingOrgId(r.org_id);
+                            try {
+                              const res = await resend.mutateAsync(r.org_id);
+                              toast.success(`Welcome email sent to ${res.dispatched_to ?? r.contact_email ?? "customer"}`);
+                            } catch (e) {
+                              toast.error(e instanceof Error ? e.message : "Failed to resend welcome");
+                            } finally {
+                              setPendingOrgId(null);
+                            }
+                          }}
+                          title="Re-send the 3-step welcome email with a fresh magic link"
+                        >
+                          {pendingOrgId === r.org_id
+                            ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Sending</>
+                            : <><Send className="h-3 w-3 mr-1" /> Resend welcome</>}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

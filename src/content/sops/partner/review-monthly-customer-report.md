@@ -52,7 +52,7 @@ Reseller staff whose user record carries a `partner` role on the partner organis
 
 ## Troubleshooting
 - **PDF preview fails to render.** Markdown formatting in the commentary blocks contains a syntax error, commonly an unbalanced table row. Remove commentary blocks until preview succeeds, then reintroduce them individually to isolate the failing block.
-- **The customer reports the release email was not received.** Inspect `public.activity_logs` filtered by the customer organisation and `action_type = 'report_email_sent'`. A `failed` outcome captures the underlying Simple Mail Transfer Protocol (SMTP) error. Escalate persistent SMTP failures to the Peritus 24/7 SOC.
+- **The customer reports the release email was not received.** Inspect `public.activity_logs` filtered by the customer organisation and `action_type = 'report_email_sent'`. A `failed` outcome captures the underlying Simple Mail Transfer Protocol (SMTP) error. Escalate persistent SMTP failures to the Mithras SOC.
 - **Report figures appear lower than current live counts.** The report locks to a snapshot taken at draft creation. Live views at `/endpoints` and `/incidents` evolve after the snapshot; the report intentionally reflects the close of the reporting month.
 - **The report was auto-released before review completed.** Add reseller commentary as an addendum through `Append addendum` in the report editor. Addenda are dispatched to the same recipients and recorded as a distinct `activity_logs` row.
 

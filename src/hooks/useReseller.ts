@@ -152,7 +152,7 @@ export function useResellerBillingSnapshot() {
   });
 }
 
-// Reseller's own pricing record (what they pay Peritus per endpoint by default).
+// Reseller's own pricing record (what they pay the platform per endpoint by default).
 export function useResellerOrg() {
   const resellerOrgId = useResellerOrgId();
 

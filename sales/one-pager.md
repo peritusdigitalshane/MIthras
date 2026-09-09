@@ -56,6 +56,6 @@ Reseller margin: $3/seat (27%). Distributor margin: $2/seat (25%). Volume tiers 
 
 - **Distributor sign-up**: contact channel@mithras.com.au
 - **Live platform**: www.mithras.com.au
-- **Knowledge base**: docs.cmwcollective.com.au
+- **Knowledge base**: docs.mithras.com.au
 
 *Built by Peritus Digital in Australia. Defender-native. Channel-first.*

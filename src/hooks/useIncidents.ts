@@ -198,10 +198,74 @@ export function useResolveIncident() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["incidents"] });
+      qc.invalidateQueries({ queryKey: ["open-incidents-feed"] });
       // SOC counter strip displays active_threats / openAlerts which derive
       // from incident state. Without this the strip shows stale counts
       // until the 15s poll.
       qc.invalidateQueries({ queryKey: ["soc-counters"] });
     },
   });
+}
+
+// SOC operator queue — pre-joined (org + endpoint), pre-filtered to non-
+// terminal status, pre-sorted by severity then opened_at. Lighter than
+// useIncidents() because the RPC does the work server-side and only
+// returns the columns this view needs.
+//
+// Shape returned by public.get_open_incidents_feed (defined in
+// 20260612100000_soc_team_replacement.sql).
+export interface OpenIncidentRow {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  endpoint_id: string | null;
+  endpoint_hostname: string | null;
+  alert_id: string | null;
+  investigation_id: string | null;
+  kind: string;
+  severity: string;     // mixed-case: trigger paths emit "Severe"/"High"/"Moderate"/"Low";
+                        // commander paths emit "critical"/"high"/"medium"/"low".
+                        // Use normaliseSeverity() before rendering.
+  status: string;       // open | triaging | in_progress | investigating | contained | triaged
+  title: string;
+  commander_summary: string | null;
+  playbook_step: string | null;
+  opened_at: string;
+  sla_due_at: string | null;
+  commander_last_action_at: string | null;
+}
+
+export function useOpenIncidentsFeed() {
+  const { currentOrganization, isSuperAdmin } = useTenant();
+  const orgId = currentOrganization?.id ?? null;
+  return useQuery({
+    queryKey: ["open-incidents-feed", orgId, isSuperAdmin],
+    // Belt-and-braces: don't even ask the RPC for the unscoped feed unless
+    // the caller is a super-admin. The RPC's own filter would still reject
+    // a non-super-admin (is_member_of_org returns false), but avoiding the
+    // round-trip means we never accidentally surface cross-org rows if
+    // someone later loosens that RPC.
+    enabled: isSuperAdmin || !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_open_incidents_feed", {
+        // Super-admin with no org context → null = unscoped (all orgs).
+        // Non-super-admin always pins to the active org.
+        p_org_id: isSuperAdmin && !orgId ? null : orgId,
+      });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as OpenIncidentRow[];
+    },
+    refetchInterval: 15_000,
+  });
+}
+
+// Severity normalisation. Trigger-based incidents (Defender threats) use
+// Severe/High/Moderate/Low; the commander writes critical/high/medium/low.
+// Map both to one bucket so the UI can colour and sort consistently.
+export function normaliseSeverity(s: string | null | undefined): "critical" | "high" | "medium" | "low" {
+  const v = (s ?? "").toLowerCase();
+  if (v === "severe" || v === "critical") return "critical";
+  if (v === "high")     return "high";
+  if (v === "moderate" || v === "medium") return "medium";
+  return "low";
 }

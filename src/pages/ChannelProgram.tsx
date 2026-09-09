@@ -14,9 +14,10 @@ export default function ChannelProgram() {
   return (
     <>
       <Seo
-        title="Channel program — Mithras Threat Defence"
-        description="Become a Mithras distributor or reseller. Channel-first SMB security with real margins, real sales support, and no direct-sales competition from us."
+        title="Channel program | Become a Mithras reseller or distributor"
+        description="Channel-first SMB security with real margins, deal protection, and no direct-sales competition. Distributors handle billing and inventory. Resellers own the customer relationship and the recurring revenue. Applications are open across Australia and New Zealand."
         canonical="/channel-program"
+        keywords="MSP channel program Australia, become a security reseller, distributor program endpoint security, channel partner Mithras"
       />
       <div className="min-h-screen bg-background">
         <LandingNav />
@@ -85,7 +86,7 @@ export default function ChannelProgram() {
               <Reason
                 icon={<MapPin className="h-5 w-5" />}
                 title="Australian-built, AUD-billed"
-                body="No FX exposure, no offshore support hours. Built in Brisbane, supported during your working day."
+                body="No FX exposure. Built in Australia. Support requests responded to by email during Australian business hours."
               />
             </div>
           </div>

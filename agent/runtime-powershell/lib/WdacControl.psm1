@@ -15,7 +15,19 @@ function ConvertFrom-CodeIntegrityEvent {
     }
 
     $filePath = $data['File Name']
-    $fileName = if ($filePath) { [System.IO.Path]::GetFileName($filePath.TrimEnd('\','/')) } else { $null }
+    # Split on both separators explicitly rather than using
+    # [System.IO.Path]::GetFileName. That API is platform-sensitive: on Windows
+    # it treats '\' as a separator, but on macOS/Linux it does not, so a
+    # CodeIntegrity path like \Device\HarddiskVolume3\...\app.exe came back
+    # whole when the Pester suite ran anywhere but Windows. Behaviour on
+    # Windows is unchanged; this just makes the parser (and its tests)
+    # host-independent.
+    $fileName = $null
+    if ($filePath) {
+        $trimmed = $filePath.TrimEnd('\', '/')
+        $parts   = $trimmed -split '[\\/]'
+        $fileName = $parts[$parts.Length - 1]
+    }
 
     [hashtable]@{
         event_id       = [int]$sys.EventID

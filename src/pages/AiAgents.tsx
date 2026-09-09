@@ -109,7 +109,7 @@ export default function AiAgents() {
                         icon={<ShieldCheck className="h-4 w-4 text-emerald-500" />}
                         title="Verification"
                         kind="classifier"
-                        description="Independent re-classification with a different model (default gpt-4o). Catches Triage hallucinations."
+                        description="Independent re-classification by a separately-trained classifier. Catches Triage hallucinations."
                         stats={dashboard.data ? [
                             { label: "Agreement", value: pct(dashboard.data.verification_agreement_rate) },
                             { label: "Disagreement", value: pct(dashboard.data.disagreement_rate) },

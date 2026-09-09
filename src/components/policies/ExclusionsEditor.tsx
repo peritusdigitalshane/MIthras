@@ -65,7 +65,7 @@ export function ExclusionsEditor({
       <div className="rounded-lg border border-border/40 bg-card p-4 mb-4">
         <p className="text-sm text-muted-foreground">
           Exclusions prevent Windows Defender from scanning or blocking specific paths, processes, or file types.
-          Use these to whitelist trusted applications like the Peritus Secure agent.
+          Use these to whitelist trusted applications like the Mithras agent.
         </p>
       </div>
 
@@ -76,13 +76,13 @@ export function ExclusionsEditor({
           <h4 className="text-sm font-medium">Path Exclusions</h4>
         </div>
         <p className="text-xs text-muted-foreground">
-          Folders or files to exclude from scanning (e.g., C:\ProgramData\PeritusSecure\)
+          Folders or files to exclude from scanning (e.g., C:\ProgramData\Mithras\)
         </p>
         <div className="flex gap-2">
           <Input
             value={newPath}
             onChange={(e) => setNewPath(e.target.value)}
-            placeholder="C:\ProgramData\PeritusSecure\"
+            placeholder="C:\ProgramData\Mithras\"
             className="flex-1"
             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addPath())}
           />

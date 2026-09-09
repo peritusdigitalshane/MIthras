@@ -265,7 +265,7 @@ const EndpointDetail = () => {
                 faq={[
                   {
                     q: "What is the status badge (Online/Idle/Offline)?",
-                    a: <p>Online = heartbeat in last 10 min. Idle = 10-60 min. Offline = &gt;60 min. Heartbeats fire every ~60s.</p>,
+                    a: <p>Online = heartbeat in last 10 min. Idle = 10-60 min. Offline = &gt;60 min. Heartbeats fire every ~30s.</p>,
                   },
                   {
                     q: "Why is the agent showing 'Outdated'?",

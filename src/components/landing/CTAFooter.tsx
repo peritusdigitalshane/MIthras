@@ -63,53 +63,53 @@ export function Footer() {
             </p>
             <div className="mt-6 space-y-2 text-sm">
               <a
-                href="mailto:hello@peritusdigital.com.au"
+                href="mailto:hello@mithras.com.au"
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Mail className="h-4 w-4" />
-                hello@peritusdigital.com.au
+                hello@mithras.com.au
               </a>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4" />
-                Brisbane, Australia
+                Australia
               </div>
             </div>
           </div>
 
           {/* Link columns */}
           <FooterColumn
-            title="Product"
+            title="Platform"
             links={[
-              { label: "Microsegmentation", href: "#features" },
-              { label: "Defender posture", href: "#protection" },
-              { label: "Group policy", href: "#platform" },
-              { label: "Cross-platform agents", href: "#platform" },
-              { label: "Monthly PDF reports", href: "#features" },
-              { label: "WordPress site protection", href: "#features" },
+              { label: "AI SOC", href: "/ai-soc" },
+              { label: "End-of-life Windows", href: "/eol-windows" },
+              { label: "Microsegmentation", href: "/platform#microseg" },
+              { label: "Defender management", href: "/platform#defender" },
+              { label: "Application control", href: "/platform#app-control" },
+              { label: "Threat Intel", href: "/intel" },
             ]}
           />
           <FooterColumn
             title="For MSPs"
             links={[
-              { label: "Multi-tenant console", href: "#msp" },
+              { label: "MSP overview", href: "/for-msps" },
               { label: "Channel program", href: "/channel-program" },
-              { label: "Pricing", href: "#pricing" },
+              { label: "Pricing", href: "/pricing" },
               { label: "Sign in", href: "/login" },
             ]}
           />
           <FooterColumn
             title="For home users"
             links={[
-              { label: "Mithras Personal — $6/mo", href: "/personal" },
-              { label: "Manage subscription", href: "/account" },
+              { label: "Mithras Personal", href: "/personal" },
+              { label: "Sign in", href: "/login?role=customer" },
             ]}
           />
           <FooterColumn
             title="Company"
             links={[
               { label: "Blog", href: "/blog" },
-              { label: "Peritus Digital", href: "https://peritusdigital.com.au" },
-              { label: "Contact", href: "mailto:hello@peritusdigital.com.au" },
+              { label: "Guides", href: "/guides" },
+              { label: "Contact sales", href: "/contact-sales" },
               { label: "Status", href: "/status" },
               { label: "Security", href: "/security" },
             ]}
@@ -118,8 +118,7 @@ export function Footer() {
 
         <div className="pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>
-            &copy; {new Date().getFullYear()} Peritus Digital Pty Ltd. All rights reserved.
-            &middot; Mithras Threat Defence&trade;
+            &copy; {new Date().getFullYear()} Mithras Threat Defence&trade;. All rights reserved.
           </div>
           <div className="flex items-center gap-5">
             <Link to="/privacy" className="hover:text-foreground transition-colors">

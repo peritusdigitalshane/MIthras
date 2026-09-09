@@ -12,7 +12,7 @@ review_cadence: Quarterly
 ---
 
 ## Purpose
-This procedure closes an incident in the Mithras platform once the threat is contained, the customer has been notified, and the autonomous response lifecycle is terminal. Resolution writes the operator's narrative to the audit trail, releases the incident from the active queue, and emits the record into the customer's monthly security report. An incident resolved without sufficient notes is a quality defect under the Peritus SOC quality programme.
+This procedure closes an incident in the Mithras platform once the threat is contained, the customer has been notified, and the autonomous response lifecycle is terminal. Resolution writes the operator's narrative to the audit trail, releases the incident from the active queue, and emits the record into the customer's monthly security report. An incident resolved without sufficient notes is a quality defect under the Mithras SOC quality programme.
 
 ## Audience and authority
 The operator. Authorisation requires a record in `public.super_admins` or an `organization_memberships.role` of `admin` or `owner` for the customer organisation that owns the incident. The `Resolve` and `Mark false positive` actions on `HeaderActions` are hidden when the caller does not satisfy the authorisation check.
@@ -40,7 +40,7 @@ The operator. Authorisation requires a record in `public.super_admins` or an `or
 
 ## Reference resolution notes
 
-The following examples meet the Peritus SOC quality bar.
+The following examples meet the Mithras SOC quality bar.
 
 Real threat:
 
@@ -67,7 +67,7 @@ False positive:
 - The resolution is persisted to `public.incidents` with `resolved_at`, `resolved_by`, and `resolution_notes` populated.
 - A row is written to `public.activity_logs` with `action_type = 'incident_resolved'` or `action_type = 'incident_marked_false_positive'` and `actor_id = auth.uid()`.
 - A `Mark false positive` resolution writes a correlated update to `public.ai_triage_decisions` with `review_action = 'override_to_benign'` and the operator's refute note.
-- The incident record and resolution notes are retained for seven years in accordance with the Peritus SOC evidentiary standard. The customer's monthly report includes the resolved incident in the security summary delivered to the addresses configured in `org_report_recipients` for category `incident`.
+- The incident record and resolution notes are retained for seven years in accordance with the Mithras SOC evidentiary standard. The customer's monthly report includes the resolved incident in the security summary delivered to the addresses configured in `org_report_recipients` for category `incident`.
 
 ## Related procedures
 - [Triage a new alert in the SOC console](/help/sops/soc_operator/triage-new-alert)

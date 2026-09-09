@@ -12,6 +12,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Globe, Plus, Copy, Trash2, ExternalLink, Download, Loader2, Info, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +37,9 @@ const Sites = () => {
   const [expiresInDays, setExpiresInDays] = useState(14);
   const [note, setNote] = useState("");
   const [mintedToken, setMintedToken] = useState<string | null>(null);
+  // MAJOR fix: replace browser window.confirm() with a styled AlertDialog —
+  // confirm() looks like a phishing prompt and gets dismissed reflexively.
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleCreateToken = async () => {
     if (!currentOrganization?.id) {
@@ -56,13 +63,19 @@ const Sites = () => {
     navigator.clipboard.writeText(s).then(() => toast({ title: "Copied to clipboard" }));
   };
 
-  const handleDelete = async (siteId: string, name: string) => {
-    if (!confirm(`Delete site "${name}" and all its event history? This can't be undone.`)) return;
+  const handleDelete = (siteId: string, name: string) => {
+    setDeleteTarget({ id: siteId, name });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteSite.mutateAsync(siteId);
+      await deleteSite.mutateAsync(deleteTarget.id);
       toast({ title: "Site removed" });
     } catch (e) {
       toast({ title: "Failed to delete", description: e instanceof Error ? e.message : "Unknown", variant: "destructive" });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -249,6 +262,31 @@ const Sites = () => {
             )}
           </CardContent>
         </Card>
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this site?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deleteTarget && (
+                  <>
+                    This removes <span className="font-medium text-foreground">{deleteTarget.name}</span> and every event recorded against it. Endpoints stop reporting site activity until you re-enrol. This cannot be undone.
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={deleteSite.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteSite.isPending ? "Deleting…" : "Delete site"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

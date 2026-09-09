@@ -99,10 +99,22 @@ interface OrgSettings {
 }
 
 async function loadOrgGate(orgId: string): Promise<OrgSettings> {
-    const { data } = await supabase.from("organizations").select("settings").eq("id", orgId).maybeSingle();
+    // v0.7.6: ai_endpoint_remediation_enabled (typed column, default false)
+    // is now the authoritative per-customer master switch. The legacy
+    // `settings.ai_response_enabled` JSONB key is intentionally ignored —
+    // the new UI in AiSocOrgDialog is the only path to enable, and the
+    // typed column is the single source of truth. Tuning knobs
+    // (confidence, rollback minutes, allowed actions) still live in JSONB
+    // because they're not yet exposed in the UI; only the master toggle
+    // moved to a typed column.
+    const { data } = await supabase
+        .from("organizations")
+        .select("settings, ai_endpoint_remediation_enabled")
+        .eq("id", orgId)
+        .maybeSingle();
     const settings = (data?.settings as Record<string, unknown>) ?? {};
     return {
-        ai_response_enabled:        settings.ai_response_enabled !== false,  // default ON
+        ai_response_enabled:        (data as { ai_endpoint_remediation_enabled?: boolean } | null)?.ai_endpoint_remediation_enabled === true,
         ai_response_min_confidence: typeof settings.ai_response_min_confidence === "number" ? settings.ai_response_min_confidence as number : DEFAULT_MIN_CONFIDENCE,
         ai_response_rollback_minutes: typeof settings.ai_response_rollback_minutes === "number" ? settings.ai_response_rollback_minutes as number : DEFAULT_ROLLBACK_MINUTES,
         ai_response_allowed_actions: Array.isArray(settings.ai_response_allowed_actions) ? settings.ai_response_allowed_actions as string[] : null,
@@ -194,14 +206,18 @@ Deno.serve(async (req) => {
         .from("ai_triage_decisions")
         .select("id, alert_id, organization_id, verdict, confidence, recommended_command, final_verdict, final_confidence, orchestration_state, disagreement_detected, adversarial_refuted")
         .eq("id", triageDecisionId).maybeSingle();
-    if (!td) return jsonResponse({ error: "triage_decision_not_found" }, 404, origin);
+
+    // B5 fix: return identical 403 for "not found" and "not authorized" so
+    // a low-privilege auth user can't enumerate valid triage-decision UUIDs
+    // by walking the 404→403 boundary.
+    if (!td) return jsonResponse({ error: "forbidden" }, 403, origin);
 
     // Tenancy gate — MUST run before dispatching anything. A service-key
     // holder otherwise dispatches isolate / kill / quarantine on ANY tenant's
     // endpoint by guessing the triage_decision UUID. Cross-tenant IDOR
     // review finding #2.
     const orgAuthz = await authoriseForTriage(authz, { organization_id: td.organization_id as string });
-    if (!orgAuthz.ok) return jsonResponse(orgAuthz.body, orgAuthz.status, origin);
+    if (!orgAuthz.ok) return jsonResponse({ error: "forbidden" }, 403, origin);
 
     // Gate 1 — consensus must be complete and TP.
     if (!forceFire) {

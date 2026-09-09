@@ -1,8 +1,15 @@
 import { useState, useEffect } from "react";
+import { useTenant } from "@/contexts/TenantContext";
 
-const TIMEZONE_KEY = "user-timezone";
+// Per-user override key. Lives in localStorage so a road-warrior individual
+// can pin their own zone independent of the org default. When unset, the
+// hook falls through to the org's timezone, then to the platform default.
+const USER_OVERRIDE_KEY = "user-timezone-override";
 
-// Common timezones grouped by region
+const DEFAULT_TIMEZONE = "Australia/Sydney";
+
+// Common timezones grouped by region. Used by the partner-portal Settings
+// select and by any per-user override picker.
 export const TIMEZONE_OPTIONS = [
   { label: "UTC", value: "UTC" },
   // Australia
@@ -33,33 +40,51 @@ export const TIMEZONE_OPTIONS = [
   { label: "Pacific/Fiji (FJT)", value: "Pacific/Fiji" },
 ];
 
+function readUserOverride(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(USER_OVERRIDE_KEY);
+}
+
 export function useTimezone() {
-  const [timezone, setTimezoneState] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(TIMEZONE_KEY);
-      if (saved) return saved;
-      // Default to browser's timezone
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    }
-    return "UTC";
-  });
+  const { currentOrganization } = useTenant();
+  const orgTimezone = currentOrganization?.timezone ?? null;
 
+  // Resolution order: per-user override → org timezone → Australia/Sydney.
+  // We pick on render so a user switching tenants picks up the new org zone
+  // without a refresh.
+  const [override, setOverrideState] = useState<string | null>(readUserOverride);
+
+  // Re-sync if another tab changed the localStorage key.
   useEffect(() => {
-    localStorage.setItem(TIMEZONE_KEY, timezone);
-  }, [timezone]);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === USER_OVERRIDE_KEY) setOverrideState(e.newValue);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
-  const setTimezone = (tz: string) => {
-    setTimezoneState(tz);
+  const timezone = override ?? orgTimezone ?? DEFAULT_TIMEZONE;
+
+  // setTimezone sets the per-user override. To clear and fall back to the
+  // org default, pass null.
+  const setTimezone = (tz: string | null) => {
+    if (tz === null || tz === "") {
+      localStorage.removeItem(USER_OVERRIDE_KEY);
+      setOverrideState(null);
+    } else {
+      localStorage.setItem(USER_OVERRIDE_KEY, tz);
+      setOverrideState(tz);
+    }
   };
 
   const formatInTimezone = (date: Date | string, formatStr: string) => {
     const d = typeof date === "string" ? new Date(date) : date;
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("en-AU", {
       timeZone: timezone,
-      year: formatStr.includes("yyyy") ? "numeric" : undefined,
-      month: formatStr.includes("MMM") ? "short" : formatStr.includes("MM") ? "2-digit" : undefined,
-      day: formatStr.includes("d") ? "numeric" : undefined,
-      hour: formatStr.includes("HH") ? "2-digit" : undefined,
+      year:   formatStr.includes("yyyy") ? "numeric" : undefined,
+      month:  formatStr.includes("MMM") ? "short" : formatStr.includes("MM") ? "2-digit" : undefined,
+      day:    formatStr.includes("d") ? "numeric" : undefined,
+      hour:   formatStr.includes("HH") ? "2-digit" : undefined,
       minute: formatStr.includes("mm") ? "2-digit" : undefined,
       second: formatStr.includes("ss") ? "2-digit" : undefined,
       hour12: false,
@@ -68,7 +93,7 @@ export function useTimezone() {
 
   const formatDatetime = (date: Date | string) => {
     const d = typeof date === "string" ? new Date(date) : date;
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("en-AU", {
       timeZone: timezone,
       month: "short",
       day: "numeric",
@@ -81,7 +106,7 @@ export function useTimezone() {
 
   const formatFullDatetime = (date: Date | string) => {
     const d = typeof date === "string" ? new Date(date) : date;
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("en-AU", {
       timeZone: timezone,
       year: "numeric",
       month: "short",
@@ -95,6 +120,9 @@ export function useTimezone() {
 
   return {
     timezone,
+    orgTimezone,
+    userOverride: override,
+    isUsingOrgDefault: !override,
     setTimezone,
     formatInTimezone,
     formatDatetime,

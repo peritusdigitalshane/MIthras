@@ -8,12 +8,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { PlayCircle, Clock, ArrowRight } from "lucide-react";
+import { Seo } from "@/components/seo/Seo";
+import { breadcrumbSchema } from "@/components/seo/jsonLd";
 
 const Guides = () => {
   const [active, setActive] = useState<Guide | null>(null);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <Seo
+        title="Guides — Mithras Threat Defence (90-second walkthroughs)"
+        description="Short narrated walkthroughs of four core Mithras workflows: microsegmentation, EDR telemetry, monthly customer reports, and DNS filtering — under two minutes each."
+        canonical="/guides"
+        keywords="mithras guides, endpoint security tutorials, defender management walkthrough, microsegmentation tutorial"
+        structuredData={[
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Guides", path: "/guides" },
+          ]),
+        ]}
+      />
+      <div className="min-h-screen bg-background">
       <LandingNav />
 
       <section className="pt-32 pb-12 px-6">
@@ -64,6 +79,7 @@ const Guides = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 };
 

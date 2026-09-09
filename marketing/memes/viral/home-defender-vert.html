@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Your Windows Defender is half-off — vertical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; background: #0b0b0d; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; padding: 90px 60px; }
+
+  /* SCENE 1: 0-3s — Hook */
+  .s1 { animation: s1 3s linear 0s both; justify-content: center; align-items: center; gap: 40px; background: #000; }
+  .s1 h1 { font-size: 130px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -4px; }
+  .s1 h1 .acc { color: #ff4040; }
+  .s1 p { font-size: 42px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: center; }
+
+  /* SCENE 2: 3-10s — Defender DEFAULT (a lot of OFFs) */
+  .s2 { animation: s2 7s linear 3s both; padding-top: 100px; }
+  .panel-head { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+  .panel-head .badge { padding: 12px 24px; background: rgba(255,64,64,0.12); border: 2px solid rgba(255,64,64,0.4); color: #ff8080; font-size: 22px; font-weight: 800; letter-spacing: 3px; border-radius: 8px; text-transform: uppercase; }
+  .panel-head h2 { font-size: 64px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .panel-sub { font-size: 28px; color: rgba(255,255,255,0.55); margin-bottom: 30px; }
+  .defender-box {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+    padding: 30px 36px; flex: 1; display: flex; flex-direction: column; gap: 16px;
+  }
+  .ctrl { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.06); opacity: 0; }
+  .ctrl .name { font-size: 28px; font-weight: 600; }
+  .ctrl .state { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; padding: 6px 14px; border-radius: 6px; letter-spacing: 2px; }
+  .ctrl .state.off { background: rgba(255,64,64,0.15); color: #ff6464; }
+  .ctrl .state.on  { background: rgba(40,217,107,0.15); color: #28d96b; }
+  .s2 .c1  { animation: rowIn 0.25s ease-out 0.3s both; }
+  .s2 .c2  { animation: rowIn 0.25s ease-out 0.6s both; }
+  .s2 .c3  { animation: rowIn 0.25s ease-out 0.9s both; }
+  .s2 .c4  { animation: rowIn 0.25s ease-out 1.2s both; }
+  .s2 .c5  { animation: rowIn 0.25s ease-out 1.5s both; }
+  .s2 .c6  { animation: rowIn 0.25s ease-out 1.8s both; }
+  .s2 .c7  { animation: rowIn 0.25s ease-out 2.1s both; }
+  .s2 .c8  { animation: rowIn 0.25s ease-out 2.4s both; }
+  .s2 .c9  { animation: rowIn 0.25s ease-out 2.7s both; }
+  .s2 .punchline { font-size: 36px; font-weight: 800; color: #ff8080; text-align: center; margin-top: 26px; opacity: 0; animation: fadeUp 0.4s ease-out 3.4s both; line-height: 1.2; }
+
+  /* SCENE 3: 10-15s — same controls, all ON (Mithras-managed) */
+  .s3 { animation: s3 5s linear 10s both; padding-top: 100px; }
+  .s3 .badge { background: rgba(40,217,107,0.12) !important; border-color: rgba(40,217,107,0.4) !important; color: #28d96b !important; }
+  .s3 .punchline { font-size: 36px; font-weight: 800; color: #28d96b; text-align: center; margin-top: 26px; opacity: 0; animation: fadeUp 0.4s ease-out 3.4s both; line-height: 1.2; }
+  .s3 .ctrl { animation: flipOn 0.3s ease-out var(--d, 0s) both; }
+  .s3 .c1 { --d: 0.2s; } .s3 .c2 { --d: 0.35s; } .s3 .c3 { --d: 0.5s; }
+  .s3 .c4 { --d: 0.65s; } .s3 .c5 { --d: 0.8s; } .s3 .c6 { --d: 0.95s; }
+  .s3 .c7 { --d: 1.1s; } .s3 .c8 { --d: 1.25s; } .s3 .c9 { --d: 1.4s; }
+  @keyframes flipOn {
+    0%   { opacity: 0; transform: translateX(-15px); }
+    60%  { opacity: 1; background: rgba(40,217,107,0.10); transform: translateX(0); }
+    100% { opacity: 1; background: transparent; }
+  }
+
+  /* SCENE 4: 15-20s — CTA */
+  .s4 { animation: s4 5s linear 15s both; justify-content: center; align-items: center; gap: 40px; }
+  .s4::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.18), transparent 70%); }
+  .s4 .tag { font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #28d96b; text-transform: uppercase; animation: fadeUp 0.5s ease-out 0.0s both; }
+  .s4 h1 { font-size: 115px; font-weight: 900; line-height: 1.0; text-align: center; letter-spacing: -4px; animation: fadeUp 0.5s ease-out 0.3s both; }
+  .s4 h1 .acc { color: #28d96b; }
+  .s4 .brand { font-size: 200px; font-weight: 900; letter-spacing: -7px; margin-top: 30px; animation: fadeUp 0.5s ease-out 0.9s both; }
+  .s4 .cta { padding: 28px 70px; background: #28d96b; color: #000; font-size: 50px; font-weight: 900; border-radius: 18px; animation: fadeUp 0.5s ease-out 1.4s both; }
+  .s4 .price { font-size: 32px; font-weight: 700; color: rgba(255,255,255,0.7); animation: fadeUp 0.5s ease-out 1.7s both; }
+  .s4 .url { font-size: 38px; font-weight: 700; letter-spacing: 12px; color: #28d96b; margin-top: 30px; animation: fadeUp 0.5s ease-out 2.0s both; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s2 { 0% { opacity: 0; } 3% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s3 { 0% { opacity: 0; } 5% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s4 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes rowIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <h1>Your Windows<br/>Defender is<br/><span class="acc">half-off.</span></h1>
+    <p>Microsoft shipped the protections.<br/>They didn't switch them on.</p>
+  </div>
+
+  <div class="scene s2">
+    <div class="panel-head"><div class="badge">DEFAULT</div></div>
+    <h2 style="font-size:50px; font-weight:900; margin-bottom:10px;">Windows Defender on a normal home PC</h2>
+    <div class="panel-sub">Right now, on your machine:</div>
+    <div class="defender-box">
+      <div class="ctrl c1"><span class="name">Attack Surface Reduction rules</span><span class="state off">OFF</span></div>
+      <div class="ctrl c2"><span class="name">Controlled Folder Access</span><span class="state off">OFF</span></div>
+      <div class="ctrl c3"><span class="name">Block credential theft from LSASS</span><span class="state off">OFF</span></div>
+      <div class="ctrl c4"><span class="name">Block Office macros from running .exe</span><span class="state off">OFF</span></div>
+      <div class="ctrl c5"><span class="name">Block executables from email</span><span class="state off">OFF</span></div>
+      <div class="ctrl c6"><span class="name">Block untrusted USB processes</span><span class="state off">OFF</span></div>
+      <div class="ctrl c7"><span class="name">Network protection</span><span class="state off">OFF</span></div>
+      <div class="ctrl c8"><span class="name">SmartScreen for Office</span><span class="state off">OFF</span></div>
+      <div class="ctrl c9"><span class="name">PUA (unwanted program) blocking</span><span class="state off">OFF</span></div>
+    </div>
+    <div class="punchline">Defender is running.<br/>Nine of its strongest protections aren't.</div>
+  </div>
+
+  <div class="scene s3">
+    <div class="panel-head"><div class="badge">WITH MITHRAS</div></div>
+    <h2 style="font-size:50px; font-weight:900; margin-bottom:10px;">Same Defender. Properly configured.</h2>
+    <div class="panel-sub">Every protection Microsoft shipped:</div>
+    <div class="defender-box">
+      <div class="ctrl c1"><span class="name">Attack Surface Reduction rules</span><span class="state on">ON</span></div>
+      <div class="ctrl c2"><span class="name">Controlled Folder Access</span><span class="state on">ON</span></div>
+      <div class="ctrl c3"><span class="name">Block credential theft from LSASS</span><span class="state on">ON</span></div>
+      <div class="ctrl c4"><span class="name">Block Office macros from running .exe</span><span class="state on">ON</span></div>
+      <div class="ctrl c5"><span class="name">Block executables from email</span><span class="state on">ON</span></div>
+      <div class="ctrl c6"><span class="name">Block untrusted USB processes</span><span class="state on">ON</span></div>
+      <div class="ctrl c7"><span class="name">Network protection</span><span class="state on">ON</span></div>
+      <div class="ctrl c8"><span class="name">SmartScreen for Office</span><span class="state on">ON</span></div>
+      <div class="ctrl c9"><span class="name">PUA (unwanted program) blocking</span><span class="state on">ON</span></div>
+    </div>
+    <div class="punchline">Mithras turns on what<br/>Microsoft shipped but didn't enable.</div>
+  </div>
+
+  <div class="scene s4">
+    <div class="tag">Defender. Done right.</div>
+    <h1>Same antivirus.<br/><span class="acc">Real protection.</span></h1>
+    <div class="brand">MITHRAS</div>
+    <div class="cta">$6/month per device</div>
+    <div class="price">Family pack covers 5 devices</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

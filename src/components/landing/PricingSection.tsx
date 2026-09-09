@@ -17,7 +17,7 @@ const INCLUDED_FEATURES = [
   "Application whitelisting (WDAC)",
   "End-of-life Windows hardening (Win7 / Server 2008 / 2012)",
   "AI SOC triage + investigation",
-  "M365 ITDR (sign-ins, mailbox rules, OAuth grants)",
+  "M365 email security (AI phishing/BEC/malware quarantine)",
   "Embedded remote desktop (MeshCentral)",
   "Monthly customer reports (PDF)",
   "Multi-tenant operator console",

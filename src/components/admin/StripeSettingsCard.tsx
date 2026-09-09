@@ -154,7 +154,7 @@ export function StripeSettingsCard() {
           <AlertDescription className="text-xs space-y-1 mt-1">
             <div>1. In Stripe, create a recurring <strong>$6 AUD / month</strong> price and copy its <code>price_…</code> ID.</div>
             <div>2. Grab your <code>sk_live_…</code> (or <code>sk_test_…</code>) secret key.</div>
-            <div>3. In Stripe → <strong>Developers → Webhooks</strong>, add endpoint <code className="break-all">{(import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, "")}/functions/v1/stripe-webhook</code> with events <code>checkout.session.completed</code>, <code>customer.subscription.updated</code>, <code>customer.subscription.deleted</code> — copy the signing secret (<code>whsec_…</code>).</div>
+            <div>3. In Stripe → <strong>Developers → Webhooks</strong>, add endpoint <code className="break-all">https://api.mithras.com.au/functions/v1/stripe-webhook</code> with events <code>checkout.session.completed</code>, <code>customer.subscription.updated</code>, <code>customer.subscription.deleted</code> — copy the signing secret (<code>whsec_…</code>).</div>
             <div>4. In Stripe → <strong>Settings → Billing → Customer portal</strong>, enable "Allow customers to cancel subscriptions" and "Allow customers to update payment methods".</div>
             <div>5. Paste everything below and save. Hit "Check status" to confirm.</div>
           </AlertDescription>
@@ -257,8 +257,8 @@ export function StripeSettingsCard() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle className="text-sm">How values are resolved</AlertTitle>
           <AlertDescription className="text-xs">
-            Values saved here are read by the Stripe edge functions at request time. If the same key is set
-            as an environment variable in <code>/opt/peritus-supabase/.env</code>, the env var wins. This lets ops
+            Values saved here are read by the Stripe handlers at request time. If the same key is set
+            as a host environment variable, the env var wins. This lets ops
             override per-host without touching the database.
           </AlertDescription>
         </Alert>

@@ -2,7 +2,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useTenant } from "@/contexts/TenantContext";
 import { PortalHero } from "@/components/portal/PortalHero";
 import { PortalStatCard } from "@/components/portal/PortalStatCard";
 import { PortalEmptyState } from "@/components/portal/PortalEmptyState";
@@ -23,7 +24,23 @@ function fmtMoney(cents: number, currency = "AUD") {
 }
 
 export default function PartnerDashboard() {
+  const navigate = useNavigate();
+  const { setImpersonatedOrg } = useTenant();
   const { data: customers, isLoading: customersLoading } = useResellerCustomers();
+
+  // G2 fix: drill into a customer by impersonating their org and landing on
+  // the operator dashboard — same flow MyCustomers uses for "View as".
+  // Without this, every row in the "Top customers" list just took the partner
+  // back to the customers index, which is dead-end UX.
+  const handleDrillInto = (c: { id: string; name: string; slug: string; organization_type: string; parent_partner_id: string | null }) => {
+    setImpersonatedOrg({
+      id: c.id, name: c.name, slug: c.slug,
+      organization_type: c.organization_type,
+      parent_partner_id: c.parent_partner_id,
+      network_module_enabled: false, router_module_enabled: false, legacy_hardening_enabled: false,
+    });
+    navigate("/dashboard");
+  };
   const { data: billing, isLoading: billingLoading } = useResellerBillingSnapshot();
   const { data: org } = useResellerOrg();
   const orgId = useResellerOrgId();
@@ -182,10 +199,11 @@ export default function PartnerDashboard() {
                       .sort((a, b) => b.active_endpoint_count - a.active_endpoint_count)
                       .slice(0, 5)
                       .map(c => (
-                        <Link
+                        <button
                           key={c.id}
-                          to="/my-customers"
-                          className="flex items-center justify-between px-3 py-3 hover:bg-muted/50 rounded transition-colors"
+                          type="button"
+                          onClick={() => handleDrillInto(c as any)}
+                          className="w-full flex items-center justify-between px-3 py-3 hover:bg-muted/50 rounded transition-colors text-left"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -203,7 +221,7 @@ export default function PartnerDashboard() {
                             <div className="font-semibold tabular-nums">{c.active_endpoint_count}</div>
                             <div className="text-[11px] text-muted-foreground uppercase tracking-wider">endpoints</div>
                           </div>
-                        </Link>
+                        </button>
                       ))}
                   </div>
                 )}

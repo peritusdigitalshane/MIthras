@@ -16,7 +16,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const CRON_SECRET          = Deno.env.get("MITHRAS_CRON_SECRET") ?? Deno.env.get("CRON_SECRET") ?? "";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+function authorised(req: Request): boolean {
+    // Auth options (any one passes):
+    //   - cron secret header (pg_cron / scan-all orchestrator)
+    //   - service-role bearer token (internal callers)
+    const cronSec = req.headers.get("x-cron-secret") ?? "";
+    if (CRON_SECRET && cronSec === CRON_SECRET) return true;
+    const auth = req.headers.get("Authorization") ?? "";
+    const jwt = auth.replace(/^Bearer\s+/i, "").trim();
+    if (jwt && jwt === SUPABASE_SERVICE_KEY) return true;
+    return false;
+}
 
 function jsonResp(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), {
@@ -44,10 +57,16 @@ function thisMonth(): string {
 
 Deno.serve(async (req) => {
     // POST only — GET would let any unauthenticated browser navigation
-    // trigger a full budget eval loop. The function uses the service-role
-    // key for all DB ops; budget rows are admin-managed.
+    // trigger a full budget eval loop.
     if (req.method !== "POST") {
         return jsonResp({ error: "method_not_allowed" }, 405);
+    }
+
+    // Auth: this function reads budget telemetry (spend, caps, scopes).
+    // Without a gate, any caller could DoS the function and probe internal
+    // economics. Restrict to cron or service-role callers.
+    if (!authorised(req)) {
+        return jsonResp({ error: "unauthorized" }, 401);
     }
 
     const currentMonth = thisMonth();

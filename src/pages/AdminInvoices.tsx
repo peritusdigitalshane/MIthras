@@ -79,7 +79,7 @@ export default function AdminInvoices() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>Invoice management is for Peritus operators.</AlertDescription>
+            <AlertDescription>Invoice management is for Mithras platform operators.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>
@@ -115,7 +115,7 @@ export default function AdminInvoices() {
                 <DialogHeader>
                   <DialogTitle>Generate draft invoice</DialogTitle>
                   <DialogDescription>
-                    Creates a draft invoice from Peritus to the selected distributor or reseller for the period below.
+                    Creates a draft invoice from the platform to the selected distributor or reseller for the period below.
                     Re-running for the same org + period replaces the existing draft.
                   </DialogDescription>
                 </DialogHeader>

@@ -29,6 +29,7 @@ import EventLogs from "./pages/EventLogs";
 import Activity from "./pages/Activity";
 import Admin from "./pages/Admin";
 import AdminOverview from "./pages/AdminOverview";
+import AdminSettings from "./pages/AdminSettings";
 import SystemHealth from "./pages/SystemHealth";
 import AdminHealth from "./pages/AdminHealth";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
@@ -65,9 +66,17 @@ import M365 from "./pages/M365";
 import M365Posture from "./pages/M365Posture";
 import M365ItdrSetup from "./pages/setup/M365ItdrSetup";
 import SocConsole from "./pages/SocConsole";
+import SocIncidents from "./pages/SocIncidents";
+import ConditionalAccess from "./pages/ConditionalAccess";
+import IdentityDefence from "./pages/IdentityDefence";
 import AiActivity from "./pages/AiActivity";
 import PartnerDashboard from "./pages/PartnerDashboard";
 import PartnerBilling from "./pages/PartnerBilling";
+import PartnerTemplates from "./pages/PartnerTemplates";
+import UpdateRings from "./pages/UpdateRings";
+import SiemIntegrations from "./pages/SiemIntegrations";
+import EmailSecurity from "./pages/EmailSecurity";
+import EmailRelease from "./pages/EmailRelease";
 import DistributorDashboard from "./pages/DistributorDashboard";
 import DistributorResellers from "./pages/DistributorResellers";
 import DistributorBilling from "./pages/DistributorBilling";
@@ -86,10 +95,19 @@ import Landed from "./pages/Landed";
 import ChannelProgram from "./pages/ChannelProgram";
 import ContactSales from "./pages/ContactSales";
 import Personal from "./pages/Personal";
+import PersonalSuccess from "./pages/PersonalSuccess";
+import { Navigate } from "react-router-dom";
 import AISoc from "./pages/AISoc";
+import PhishingProtection from "./pages/PhishingProtection";
+import IdentityDefenceMarketing from "./pages/IdentityDefenceMarketing";
+import M365Shield from "./pages/M365Shield";
+import M365ShieldMarketing from "./pages/M365ShieldMarketing";
 import PlatformPage from "./pages/PlatformPage";
 import ForMsps from "./pages/ForMsps";
 import EolWindows from "./pages/EolWindows";
+import ThreatIntel from "./pages/ThreatIntel";
+import Pricing from "./pages/Pricing";
+import ScrollToHash from "./components/layout/ScrollToHash";
 import HomeUserAccount from "./pages/HomeUserAccount";
 import HomeUserProtectedRoute from "./components/auth/HomeUserProtectedRoute";
 import { RouteAnalytics } from "@/components/analytics/RouteAnalytics";
@@ -102,6 +120,7 @@ function AnalyticsBridge() {
 import AdminHomeUsers from "./pages/AdminHomeUsers";
 import DistributorCredits from "./pages/DistributorCredits";
 import PartnerCredits from "./pages/PartnerCredits";
+import PartnerSettings from "./pages/PartnerSettings";
 import AdminCredits from "./pages/AdminCredits";
 import PartnerDeals from "./pages/PartnerDeals";
 import DistributorDeals from "./pages/DistributorDeals";
@@ -124,18 +143,34 @@ const App = () => (
           <AuthProvider>
             <TenantProvider>
               <AnalyticsBridge />
+              <ScrollToHash />
               <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Login />} />
+              {/* /forgot-password is just where users type by habit. The
+                  actual "send me a reset link" button lives on /login —
+                  redirect there so we don't 404 on muscle-memory URLs. */}
+              <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/channel-program" element={<ChannelProgram />} />
               <Route path="/contact-sales" element={<ContactSales />} />
               <Route path="/personal" element={<Personal />} />
+              <Route path="/personal/success" element={<PersonalSuccess />} />
+              {/* G1 fix: SOPs + ChannelProgram references "/partner/licences";
+                  the actual page is /partner/credits. Redirect so nobody
+                  hits a dead link. */}
+              <Route path="/partner/licences" element={<Navigate to="/partner/credits" replace />} />
+              <Route path="/partner/licenses" element={<Navigate to="/partner/credits" replace />} />
               <Route path="/ai-soc" element={<AISoc />} />
               <Route path="/platform" element={<PlatformPage />} />
+              <Route path="/phishing-protection" element={<PhishingProtection />} />
+              <Route path="/identity-defence" element={<IdentityDefenceMarketing />} />
+              <Route path="/m365-shield" element={<M365ShieldMarketing />} />
               <Route path="/for-msps" element={<ForMsps />} />
               <Route path="/eol-windows" element={<EolWindows />} />
+              <Route path="/intel" element={<ThreatIntel />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route
                 path="/account"
                 element={
@@ -244,6 +279,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <AdminOverview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute>
+                    <AdminSettings />
                   </ProtectedRoute>
                 }
               />
@@ -364,6 +407,14 @@ const App = () => (
                 element={
                   <ResellerProtectedRoute>
                     <PartnerCredits />
+                  </ResellerProtectedRoute>
+                }
+              />
+              <Route
+                path="/partner/settings"
+                element={
+                  <ResellerProtectedRoute>
+                    <PartnerSettings />
                   </ResellerProtectedRoute>
                 }
               />
@@ -616,6 +667,13 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              {/* E6 fix: home_user SOPs are linked from PersonalSuccess.tsx
+                  (post-Stripe-checkout, pre-login) and from the welcome
+                  email — they need to render without auth. Listed BEFORE
+                  the protected /help/sops/:audience route so the public
+                  home_user variant wins the match. */}
+              <Route path="/help/sops/home_user" element={<HelpSops />} />
+              <Route path="/help/sops/home_user/:slug" element={<HelpSops />} />
               <Route
                 path="/help/sops"
                 element={
@@ -681,10 +739,42 @@ const App = () => (
                 }
               />
               <Route
+                path="/m365/conditional-access"
+                element={
+                  <ProtectedRoute>
+                    <ConditionalAccess />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/m365/identity-defence"
+                element={
+                  <ProtectedRoute>
+                    <IdentityDefence />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/m365/shield"
+                element={
+                  <ProtectedRoute>
+                    <M365Shield />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/soc"
                 element={
                   <ProtectedRoute>
                     <SocConsole />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/soc/incidents"
+                element={
+                  <ProtectedRoute>
+                    <SocIncidents />
                   </ProtectedRoute>
                 }
               />
@@ -728,6 +818,42 @@ const App = () => (
                   </ResellerProtectedRoute>
                 }
               />
+              <Route
+                path="/partner/templates"
+                element={
+                  <ResellerProtectedRoute>
+                    <PartnerTemplates />
+                  </ResellerProtectedRoute>
+                }
+              />
+              <Route
+                path="/update-rings"
+                element={
+                  <ProtectedRoute>
+                    <UpdateRings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/integrations/siem"
+                element={
+                  <ProtectedRoute>
+                    <SiemIntegrations />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/email-security"
+                element={
+                  <ProtectedRoute>
+                    <EmailSecurity />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Public self-service release link — recipient clicks the magic
+                  link in the Mithras warning email. No auth required (the
+                  release_token in the URL is the credential). */}
+              <Route path="/email-release" element={<EmailRelease />} />
               <Route
                 path="/distributor"
                 element={

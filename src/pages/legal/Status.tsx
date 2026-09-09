@@ -20,8 +20,8 @@ const Status = () => (
     <article className="container mx-auto max-w-3xl px-6 py-16">
       <h1 className="text-3xl font-bold mb-2">System status</h1>
       <p className="text-muted-foreground mb-10">
-        Live status of the Mithras Threat Defence platform. Major incidents and planned
-        maintenance windows are posted here.
+        Current status of the Mithras Threat Defence platform. Major incidents and planned
+        maintenance windows are posted here. Automated uptime probes are on our roadmap.
       </p>
 
       <div className="rounded-xl border border-border/40 bg-card divide-y divide-border/40">
@@ -39,8 +39,8 @@ const Status = () => (
       <h2 className="text-xl font-bold mt-10 mb-3">Reporting an issue</h2>
       <p className="text-muted-foreground">
         Seeing something we're not? Email{" "}
-        <a className="underline" href="mailto:support@peritusdigital.com.au">
-          support@peritusdigital.com.au
+        <a className="underline" href="mailto:support@mithras.com.au">
+          support@mithras.com.au
         </a>{" "}
         with the time, endpoint, and console URL you were on. We'll respond inside one
         business hour during AU business days.

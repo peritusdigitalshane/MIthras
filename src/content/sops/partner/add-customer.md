@@ -38,13 +38,13 @@ Reseller staff whose user record carries a `partner` role on the partner organis
 ## Verification
 - The customer is listed at `/my-customers` with status `Active` and your reseller name on the row.
 - The corresponding `licence_transactions` entry is visible in your transaction history at `/partner/credits` with the expected debit amount.
-- After the customer administrator activates their account and enrols an endpoint, the endpoint surfaces at `/endpoints` filtered by the customer organisation within the agent heartbeat window of 60 seconds.
+- After the customer administrator activates their account and enrols an endpoint, the endpoint surfaces at `/endpoints` filtered by the customer organisation within the agent heartbeat window of 30 seconds.
 - The customer organisation is selectable in your global organisation switcher in the console header.
 
 ## Troubleshooting
 - **`Add customer` is disabled.** Your credit pool balance is at or below zero. Top up at `/partner/credits` or escalate to your distributor before retrying.
 - **The form rejects the organisation name with `deal_conflict`.** A `deal_registrations` row exists for this entity under another reseller or under a different stage. Resolve the conflict with your distributor before reattempting provisioning.
-- **The activation email is not received within 15 minutes.** Direct the customer administrator to the password reset flow at `/login` using the registered email address. Persistent failure indicates an SMTP issue; escalate to the Peritus 24/7 SOC.
+- **The activation email is not received within 15 minutes.** Direct the customer administrator to the password reset flow at `/login` using the registered email address. Persistent failure indicates an SMTP issue; escalate to the Mithras SOC.
 - **The first endpoint fails to enrol.** Confirm the customer administrator generated a fresh installer command at `/deploy` after activation. Enrolment tokens are single-use and expire within 24 hours.
 
 ## Audit and compliance

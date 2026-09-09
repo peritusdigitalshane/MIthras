@@ -45,7 +45,7 @@ Reseller staff whose user record carries a `partner` role on the partner organis
 - **The lifecycle chip remains `Decommissioning` after 30 minutes.** The agent has not reported back. Confirm the device is powered on and has network connectivity. Where the device is reachable, run the break-glass cleanup script from the customer's `/deploy` page under an elevated PowerShell session.
 - **The wrong endpoint was decommissioned.** The command is not reversible once queued. Re-enrol the device using a fresh installer command from the customer's `/deploy` page. The new enrolment creates a distinct `endpoints` row; the original row remains in the audit trail.
 - **`authorize_endpoint_uninstall` returns `permission_denied`.** Your scope is not on the customer that owns the endpoint. Switch scope in the console organisation switcher and retry.
-- **The customer cannot see the lifecycle chip change.** The customer console refreshes the endpoint state every 30 seconds. Direct the customer to refresh the page; persistent failure indicates a stale session and requires sign-out and sign-in.
+- **The customer cannot see the lifecycle chip change.** The customer console refreshes endpoint state on a short interval; the state should update within a minute. Direct the customer to refresh the page; persistent failure indicates a stale session and requires sign-out and sign-in.
 
 ## Audit and compliance
 - The RPC `authorize_endpoint_uninstall` writes a row to `public.activity_logs` with `action_type = 'endpoint_decommission_authorized'`, `actor_id = auth.uid()`, the target endpoint identifier, and the supplied justification.

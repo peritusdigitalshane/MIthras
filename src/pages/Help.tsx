@@ -465,7 +465,7 @@ const helpSections: HelpSection[] = [
       {
         title: "Auto Update Mode",
         content: "Controls automatic update behavior. Options: Disabled (1), Notify before download (2), Auto download, notify install (3), Auto download and install (4), Allow local admin to configure (5).",
-        bestPractice: "Use mode 3 or 4 for most endpoints. Mode 3 gives admins visibility before installs. Mode 4 ensures updates are never missed.",
+        bestPractice: "Use mode 3 or 4 for most endpoints. Mode 3 gives admins visibility before installs. Mode 4 installs updates as soon as they're released.",
         recommendedValue: "3 or 4",
         severity: "high",
       },
@@ -626,7 +626,7 @@ const helpSections: HelpSection[] = [
       },
       {
         title: "Agent Deployment",
-        content: "Download the agent installer from Deploy Agent page. The agent requires an enrollment code and runs as a Windows service. It checks in every 60 seconds.",
+        content: "Download the agent installer from Deploy Agent page. The agent requires an enrollment code and runs as a Windows service. It checks in every 30 seconds.",
         bestPractice: "Deploy via Group Policy, SCCM, or Intune for mass deployment. Test on a single machine first. Ensure port 443 outbound is allowed.",
         severity: "high",
       },

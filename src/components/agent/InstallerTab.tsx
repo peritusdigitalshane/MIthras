@@ -227,8 +227,8 @@ export default function InstallerTab({ organizationId }: InstallerTabProps) {
                     <ul className="text-xs space-y-1 list-disc pl-5">
                         <li>Agent files → <code>C:\ProgramData\Mithras</code></li>
                         <li>Windows service <code>MithrasAgent</code> (auto-start, runs as LocalSystem)</li>
-                        <li>Add/Remove Programs entry under <strong>Mithras Threat Defence</strong> (Publisher: Peritus Digital Pty Ltd)</li>
-                        <li>First check-in within 60 seconds of install</li>
+                        <li>Add/Remove Programs entry under <strong>Mithras Threat Defence</strong></li>
+                        <li>First check-in within 30 seconds of install</li>
                         <li>Auto-updates over the same channel; no admin action needed for version bumps</li>
                         <li>Clean uninstall via Settings → Apps → Mithras Threat Defence → Uninstall</li>
                     </ul>

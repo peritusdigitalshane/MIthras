@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Loader2, Info, ShieldCheck, FileText, Wand2 } from "lucide-react";
+import { Brain, Loader2, Info, ShieldCheck, FileText, Mail, ServerCog } from "lucide-react";
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,6 +20,8 @@ export interface AiSocOrgDialogTarget {
     ai_triage_enabled: boolean;
     ai_investigation_enabled: boolean;
     ai_soc_daily_cap_cents: number;
+    ai_email_remediation_enabled: boolean;
+    ai_endpoint_remediation_enabled: boolean;
 }
 
 interface Props {
@@ -28,12 +30,17 @@ interface Props {
 }
 
 /**
- * Per-customer AI SOC settings dialog. Independent toggles per agent
- * (Triage / Investigation / Auto-response-coming-soon) so the MSP can
- * tier customers:
+ * Per-customer AI SOC settings dialog. Independent toggles per agent so
+ * the MSP can tier customers:
  *   - triage only → human reviews + decides escalation
  *   - triage + investigation → AI builds full incident reports
- *   - triage + investigation + auto-response (future) → full autonomy
+ *   - + email remediation → AI auto-quarantines flagged mail
+ *   - + endpoint remediation → AI auto-isolates / kills / quarantines on
+ *                              the box, with rollback timer
+ *
+ * Email and endpoint remediation are independent — a customer can have
+ * one without the other. Both gate ONLY autonomous actions; operator
+ * clicks are always allowed.
  *
  * Daily cost cap pools across all agents.
  */
@@ -41,6 +48,8 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
     const update = useUpdateOrganizationAiSoc();
     const [triageEnabled, setTriageEnabled] = useState(false);
     const [investigationEnabled, setInvestigationEnabled] = useState(false);
+    const [emailRemediationEnabled, setEmailRemediationEnabled] = useState(false);
+    const [endpointRemediationEnabled, setEndpointRemediationEnabled] = useState(false);
     const [capDollars, setCapDollars] = useState<string>("5");
     const [acknowledgeNotified, setAcknowledgeNotified] = useState(false);
 
@@ -73,18 +82,27 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
         if (target) {
             setTriageEnabled(target.ai_triage_enabled);
             setInvestigationEnabled(target.ai_investigation_enabled);
+            setEmailRemediationEnabled(target.ai_email_remediation_enabled);
+            setEndpointRemediationEnabled(target.ai_endpoint_remediation_enabled);
             setCapDollars(((target.ai_soc_daily_cap_cents ?? 500) / 100).toFixed(2));
             setAcknowledgeNotified(false);
         }
     }, [target?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Constraint: investigation depends on triage (can't escalate without
-    // a triage verdict). Flipping triage off auto-disables investigation.
+    // Constraint cascade: each agent depends on the one above. Flipping a
+    // dependency off auto-disables everything downstream so the UI never
+    // shows an impossible state.
+    //   triage off          → investigation off, email-remediation off
+    //   investigation off   → endpoint-remediation off
     useEffect(() => {
-        if (!triageEnabled && investigationEnabled) {
-            setInvestigationEnabled(false);
+        if (!triageEnabled) {
+            if (investigationEnabled)  setInvestigationEnabled(false);
+            if (emailRemediationEnabled) setEmailRemediationEnabled(false);
         }
-    }, [triageEnabled, investigationEnabled]);
+        if (!investigationEnabled && endpointRemediationEnabled) {
+            setEndpointRemediationEnabled(false);
+        }
+    }, [triageEnabled, investigationEnabled, emailRemediationEnabled, endpointRemediationEnabled]);
 
     const capCents = useMemo(() => {
         const parsed = Number.parseFloat(capDollars);
@@ -92,12 +110,21 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
         return Math.round(parsed * 100);
     }, [capDollars]);
 
-    const wasOff = target && !target.ai_triage_enabled && !target.ai_investigation_enabled;
-    const willBeOn = triageEnabled || investigationEnabled;
+    const wasOff = target
+        && !target.ai_triage_enabled
+        && !target.ai_investigation_enabled
+        && !target.ai_email_remediation_enabled
+        && !target.ai_endpoint_remediation_enabled;
+    const willBeOn = triageEnabled
+        || investigationEnabled
+        || emailRemediationEnabled
+        || endpointRemediationEnabled;
     const isTurningOn = wasOff && willBeOn;
     const hasChanges = target && (
         triageEnabled !== target.ai_triage_enabled ||
         investigationEnabled !== target.ai_investigation_enabled ||
+        emailRemediationEnabled !== target.ai_email_remediation_enabled ||
+        endpointRemediationEnabled !== target.ai_endpoint_remediation_enabled ||
         capCents !== target.ai_soc_daily_cap_cents
     );
     const canSave = target != null
@@ -113,6 +140,8 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
                 aiTriageEnabled: triageEnabled,
                 aiInvestigationEnabled: investigationEnabled,
                 aiSocDailyCapCents: capCents,
+                aiEmailRemediationEnabled: emailRemediationEnabled,
+                aiEndpointRemediationEnabled: endpointRemediationEnabled,
             });
             toast.success(
                 willBeOn
@@ -168,16 +197,26 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
                         disabledReason="Triage must be enabled to escalate to Investigation."
                     />
 
-                    {/* AGENT 3 — AUTO-RESPONSE (PLACEHOLDER) */}
+                    {/* AGENT 3a — EMAIL REMEDIATION */}
                     <AgentToggle
-                        icon={<Wand2 className="h-4 w-4" />}
-                        title="AI Auto-Response Agent"
-                        description="Executes recommended response actions (isolate host, kill process, quarantine file, revoke OAuth grant) automatically when investigation confidence is high. Full autonomy mode."
-                        checked={false}
-                        onChange={() => {}}
-                        disabled
-                        disabledReason="Not yet shipped — Phase 2 of AI SOC. On the backlog."
-                        comingSoon
+                        icon={<Mail className="h-4 w-4" />}
+                        title="AI Email Remediation"
+                        description="When a flagged message is high-confidence phishing or malware, auto-quarantines it without an operator click. Block rules with kind=quarantine also fire automatically on matching mail."
+                        checked={emailRemediationEnabled}
+                        onChange={setEmailRemediationEnabled}
+                        disabled={!triageEnabled}
+                        disabledReason="Triage must be enabled — remediation acts on its verdicts."
+                    />
+
+                    {/* AGENT 3b — ENDPOINT REMEDIATION */}
+                    <AgentToggle
+                        icon={<ServerCog className="h-4 w-4" />}
+                        title="AI Endpoint Remediation"
+                        description="When the Response Agent's consensus is high (default ≥0.85), auto-executes recommended actions (isolate host, kill process, quarantine file, run scan). Auto-rollback timer arms in parallel so a misfire reverses itself."
+                        checked={endpointRemediationEnabled}
+                        onChange={setEndpointRemediationEnabled}
+                        disabled={!investigationEnabled}
+                        disabledReason="Investigation must be enabled — endpoint actions need the full incident context."
                     />
 
                     {/* COST CAP */}
@@ -224,7 +263,12 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
                         </Alert>
                     )}
 
-                    {target && (target.ai_triage_enabled || target.ai_investigation_enabled) && (
+                    {target && (
+                        target.ai_triage_enabled
+                        || target.ai_investigation_enabled
+                        || target.ai_email_remediation_enabled
+                        || target.ai_endpoint_remediation_enabled
+                    ) && (
                         <div className="flex flex-wrap gap-1">
                             {target.ai_triage_enabled && (
                                 <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">
@@ -234,6 +278,16 @@ export function AiSocOrgDialog({ target, onClose }: Props) {
                             {target.ai_investigation_enabled && (
                                 <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">
                                     Investigation on
+                                </Badge>
+                            )}
+                            {target.ai_email_remediation_enabled && (
+                                <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-500">
+                                    Email auto-remediate
+                                </Badge>
+                            )}
+                            {target.ai_endpoint_remediation_enabled && (
+                                <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-500">
+                                    Endpoint auto-remediate
                                 </Badge>
                             )}
                             <Badge variant="outline" className="text-[10px]">

@@ -81,7 +81,22 @@ if [ -n "$SIGNING_KEY" ]; then
         fi
     fi
 else
-    echo "  (no signing key provided — skipping Ed25519 signature)"
+    # v0.7.21: an unsigned bundle is no longer a usable release. Agents refuse
+    # it, agent-api refuses to auto-queue it, and the console renders it as
+    # "unsigned" rather than offering the upgrade. Producing one silently just
+    # strands the fleet, so fail here instead.
+    #
+    # Deliberate escape hatch for local smoke builds that are never published:
+    #   ALLOW_UNSIGNED=1 bash scripts/phase2a/build-release.sh
+    if [ "${ALLOW_UNSIGNED:-0}" = "1" ]; then
+        echo "  WARNING: building UNSIGNED (ALLOW_UNSIGNED=1). Do not publish this to agent_versions."
+    else
+        echo "FATAL: no signing key provided."
+        echo "  A release without an Ed25519 signature cannot be installed by any agent >= 0.7.21."
+        echo "  Pass the key:  bash scripts/phase2a/build-release.sh /etc/peritus-supabase/agent-signing.pem"
+        echo "  Local-only build that will never be published:  ALLOW_UNSIGNED=1 bash scripts/phase2a/build-release.sh"
+        exit 1
+    fi
 fi
 
 echo "Done. Artifacts in $DIST/"

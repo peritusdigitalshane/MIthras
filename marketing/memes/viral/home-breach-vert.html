@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>You're already in the breach — vertical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; background: #000; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; padding: 100px 70px; justify-content: center; align-items: center; }
+
+  /* SCENE 1: 0-3s — Hook */
+  .s1 { animation: s1 3s linear 0s both; gap: 40px; }
+  .s1 h1 { font-size: 130px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -4px; }
+  .s1 h1 .acc { color: #ff4040; }
+  .s1 p { font-size: 44px; font-weight: 600; color: rgba(255,255,255,0.55); text-align: center; }
+
+  /* SCENE 2: 3-8s — Email type-in */
+  .s2 { animation: s2 5s linear 3s both; gap: 50px; }
+  .s2 .label { font-size: 32px; font-weight: 700; letter-spacing: 6px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+  .s2 .input-row {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 18px;
+    padding: 36px 40px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .s2 .input-row .email { overflow: hidden; white-space: nowrap; animation: typing 2.5s steps(20, end) 0.4s both; }
+  .s2 .input-row .caret { color: #28d96b; animation: blink 0.6s steps(1) infinite; }
+  .s2 .search-btn { background: #28d96b; color: #000; padding: 28px 50px; font-size: 38px; font-weight: 900; border-radius: 14px; animation: pop 0.4s ease-out 3.2s both; }
+  .s2 .checking { font-family: 'JetBrains Mono', monospace; font-size: 32px; color: rgba(255,255,255,0.7); margin-top: 30px; animation: fadeUp 0.4s ease-out 3.8s both; }
+
+  @keyframes typing { from { max-width: 0; } to { max-width: 100%; } }
+
+  /* SCENE 3: 8-15s — RESULTS */
+  .s3 { animation: s3 7s linear 8s both; gap: 0; justify-content: flex-start; padding-top: 100px; }
+  .s3 .heading { font-size: 36px; font-weight: 700; letter-spacing: 4px; color: #ff4040; text-transform: uppercase; margin-bottom: 30px; }
+  .s3 .count { font-size: 280px; font-weight: 900; color: #ff4040; line-height: 1; letter-spacing: -10px; text-shadow: 0 0 80px rgba(255,64,64,0.6); animation: pop 0.6s ease-out 0.3s both; }
+  .s3 .count-label { font-size: 36px; font-weight: 700; color: rgba(255,255,255,0.85); margin-top: 14px; animation: fadeUp 0.4s ease-out 0.7s both; }
+  .s3 .breaches { margin-top: 50px; display: flex; flex-direction: column; gap: 16px; width: 100%; }
+  .s3 .b {
+    background: rgba(255,64,64,0.08);
+    border-left: 5px solid #ff4040;
+    border-radius: 8px;
+    padding: 20px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    opacity: 0;
+  }
+  .s3 .b .name { font-size: 38px; font-weight: 800; }
+  .s3 .b .stat { font-family: 'JetBrains Mono', monospace; font-size: 24px; color: rgba(255,255,255,0.6); }
+  .s3 .b:nth-child(1) { animation: rowIn 0.3s ease-out 1.3s both; }
+  .s3 .b:nth-child(2) { animation: rowIn 0.3s ease-out 1.6s both; }
+  .s3 .b:nth-child(3) { animation: rowIn 0.3s ease-out 1.9s both; }
+  .s3 .b:nth-child(4) { animation: rowIn 0.3s ease-out 2.2s both; }
+  .s3 .b:nth-child(5) { animation: rowIn 0.3s ease-out 2.5s both; }
+  .s3 .more { font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.55); text-align: center; margin-top: 24px; animation: fadeUp 0.4s ease-out 3.0s both; }
+
+  /* SCENE 4: 15-20s — CTA */
+  .s4 { animation: s4 5s linear 15s both; gap: 40px; }
+  .s4::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.18), transparent 70%); }
+  .s4 .tag { font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #28d96b; text-transform: uppercase; animation: fadeUp 0.5s ease-out 0.0s both; }
+  .s4 h1 { font-size: 120px; font-weight: 900; line-height: 1.05; text-align: center; letter-spacing: -4px; animation: fadeUp 0.5s ease-out 0.3s both; }
+  .s4 h1 .acc { color: #28d96b; }
+  .s4 .brand { font-size: 200px; font-weight: 900; letter-spacing: -7px; margin-top: 30px; animation: fadeUp 0.5s ease-out 0.9s both; }
+  .s4 .cta { padding: 30px 70px; background: #28d96b; color: #000; font-size: 52px; font-weight: 900; border-radius: 18px; animation: fadeUp 0.5s ease-out 1.4s both; }
+  .s4 .price { font-size: 36px; font-weight: 700; color: rgba(255,255,255,0.7); margin-top: 12px; animation: fadeUp 0.5s ease-out 1.7s both; }
+  .s4 .url { font-size: 36px; font-weight: 700; letter-spacing: 12px; color: #28d96b; margin-top: 40px; animation: fadeUp 0.5s ease-out 2.0s both; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s2 { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s3 { 0% { opacity: 0; } 3% { opacity: 1; } 95% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s4 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes rowIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <h1>You think you're<br/><span class="acc">protected.</span></h1>
+    <p>Let's check what your<br/>antivirus already missed.</p>
+  </div>
+
+  <div class="scene s2">
+    <div class="label">Check your email for breaches</div>
+    <div class="input-row">
+      <span class="email">your.name@gmail.com</span>
+      <span class="caret">|</span>
+    </div>
+    <div class="search-btn">CHECK NOW</div>
+    <div class="checking">▸ searching 14,247 known breaches...</div>
+  </div>
+
+  <div class="scene s3">
+    <div class="heading">⚠ YOU APPEAR IN</div>
+    <div class="count">14</div>
+    <div class="count-label">data breaches.</div>
+    <div class="breaches">
+      <div class="b"><span class="name">Optus</span><span class="stat">SEP 2022 · 9.8M AUS</span></div>
+      <div class="b"><span class="name">Medibank</span><span class="stat">OCT 2022 · 9.7M AUS</span></div>
+      <div class="b"><span class="name">Latitude</span><span class="stat">MAR 2023 · 14M AUS</span></div>
+      <div class="b"><span class="name">LinkedIn</span><span class="stat">2021 · 700M</span></div>
+      <div class="b"><span class="name">Adobe</span><span class="stat">2013 · 153M</span></div>
+    </div>
+    <div class="more">+ 9 more.<br/>Your antivirus didn't catch any of them.</div>
+  </div>
+
+  <div class="scene s4">
+    <div class="tag">Your antivirus can't help</div>
+    <h1>Mithras<br/><span class="acc">tells you the moment<br/>your data leaks.</span></h1>
+    <div class="brand">MITHRAS</div>
+    <div class="cta">$6/month per device</div>
+    <div class="price">Family pack covers 5 devices</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

@@ -169,9 +169,12 @@ export function AlertRecipientsCard() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmDel && del.mutate(confirmDel.id, { onSuccess: () => setConfirmDel(null) })}>
-              Remove
+            <AlertDialogCancel disabled={del.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={del.isPending}
+              onClick={() => confirmDel && del.mutate(confirmDel.id, { onSuccess: () => setConfirmDel(null) })}
+            >
+              {del.isPending ? "Removing…" : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

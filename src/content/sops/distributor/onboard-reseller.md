@@ -29,9 +29,9 @@ Distribution operations staff whose home organisation has `organizations.org_typ
 1. Navigate to `/distributor/resellers` and select `Add reseller` in the page header.
 2. Complete the `New reseller` dialog with the following fields.
    - `Organisation name` as it will appear on the reseller's portal and on invoices.
-   - `Primary admin email` for the activation invitation.
-   - `Billing contact email` for monthly invoices and credit notifications.
-   - `Account manager` from the dropdown, if your distributorship operates named accounts.
+   - `Wholesale price per endpoint` — the per-seat rate the reseller pays you. Defaults to the program standard; override only with a documented commercial reason. The reseller's resale margin is calculated downstream from this figure.
+
+   The activation email and a separate billing contact field are not collected in this dialog; capture the reseller's admin and billing addresses in your CRM and add them through `/distributor/resellers` once the reseller has activated.
 3. Select `Create reseller`. The console writes a new row to `organizations` with `org_type = 'reseller'`, links your distributor organisation as `parent_organization_id`, and dispatches the activation email through the platform mail transport.
 4. Confirm the new reseller row is visible in `/distributor/resellers` with status `Active` and the `Last activity` column showing `Awaiting first sign-in`.
 5. Open `/distributor/credits` in a new tab.
@@ -47,9 +47,9 @@ Distribution operations staff whose home organisation has `organizations.org_typ
 
 ## Troubleshooting
 - **The activation email is not received within ten minutes.** Inspect `/distributor/resellers`, open the reseller row, and select `Resend invitation`. If the second attempt also fails to land, direct the reseller's primary administrator to `https://www.mithras.com.au/login` and select `Forgot password` to set their own credential. The mailbox owner must hold the address recorded on the `organizations` row.
-- **The credit cut fails with `insufficient_balance`.** Your distributor pool is below the requested amount. Open `/distributor/credits`, select `Request top-up from Peritus`, and submit the required quantity with a commercial justification. Resume the cut once the Peritus credit posts to your pool.
+- **The credit cut fails with `insufficient_balance`.** Your distributor pool is below the requested amount. Open `/distributor/credits`, select `Request top-up from Mithras`, and submit the required quantity with a commercial justification. Resume the cut once the Platform credit posts to your pool.
 - **The new reseller signs in but lands on a blank dashboard.** The reseller administrator opened the console at the distributor subdomain. Direct them to sign out and sign back in at `https://www.mithras.com.au/login`; reseller members are routed to `/partner` automatically based on `organizations.org_type`.
-- **The reseller already exists in the directory.** A row with the supplied organisation name is present in `organizations`. Confirm the reseller is not already onboarded under another distributorship before contacting Peritus channel operations to resolve the conflict.
+- **The reseller already exists in the directory.** A row with the supplied organisation name is present in `organizations`. Confirm the reseller is not already onboarded under another distributorship before contacting Mithras channel operations to resolve the conflict.
 
 ## Audit and compliance
 - A row is written to `public.organizations` with `org_type = 'reseller'` and `parent_organization_id` set to your distributor organisation.

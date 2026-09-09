@@ -42,7 +42,7 @@ The operator. Confirm and roll back are available to any user whose `organizatio
 
 ### Force-fire an action the consensus declined
 
-1. Confirm that the operator-driven judgement is supportable. Acceptable grounds are cross-tenant intelligence that the AI did not have, a credential-stuffing pattern composed of low-signal events that individually fell below threshold, or an active campaign briefed by Peritus threat intelligence.
+1. Confirm that the operator-driven judgement is supportable. Acceptable grounds are cross-tenant intelligence that the AI did not have, a credential-stuffing pattern composed of low-signal events that individually fell below threshold, or an active campaign briefed by Mithras threat intelligence.
 2. From the `AI decision drawer` on `/soc` or `/alerts`, click `Force-fire response`. The drawer presents a confirmation form.
 3. Select the action kind explicitly. The AI did not pick one, and the kind drives both the executor path and the customer-visible label. Use `isolate_network` rather than `kill_process` whenever a system process on a tier-0 host is in scope.
 4. Enter a `force_reason` of at least eight characters that names the intelligence source, the cross-tenant pattern, or the operational rationale. The text is persisted to `ai_agent_actions.override_reason`.
@@ -59,16 +59,16 @@ The operator. Confirm and roll back are available to any user whose `organizatio
 - **`Force-fire response` returns `force_reason_too_short`.** The `ai-response-execute` edge function rejects any reason shorter than eight characters. Re-enter a reason that names the intelligence source and the technique under suspicion.
 - **`Force-fire response` returns `caller_not_user`.** A service-role token is being presented. Sign in to the console with a real operator account; force-fire is never permitted from automation.
 - **`Rollback now` reports `action_already_terminal`.** The action has already completed and cannot be reversed by the standard rollback path. Use the super-admin `Force rollback` variant on `/incidents/:id` and follow the force-rollback procedure.
-- **The customer reports the rollback did not restore connectivity.** Open `/endpoints/:id`, inspect the `Defender posture` card and the `Network isolation` chip. If isolation is still active, run `Force rollback` and escalate to the Peritus on-call.
+- **The customer reports the rollback did not restore connectivity.** Open `/endpoints/:id`, inspect the `Defender posture` card and the `Network isolation` chip. If isolation is still active, run `Force rollback` and escalate to the Mithras on-call.
 - **The `forceFire override` badge does not appear after a force-fire.** The action was executed but the badge component reads `ai_agent_actions.force_fired`. Refresh `/incidents/:id`; if the badge is still absent after thirty seconds, the column did not update and the operator must open an internal ticket against the response engine.
 
 ## Audit and compliance
 - Every confirm, rollback, and force-fire writes a row to `public.activity_logs` with `action_type` set to `response_confirmed`, `response_rolled_back`, or `response_force_fired`, with `actor_id = auth.uid()` and the `incident_id` linked.
 - The `ai_agent_actions` row carries the full lifecycle: `status`, `customer_confirmed_at`, `rolled_back_at`, `customer_overrode_at`, `force_fired`, `override_caller_id`, and `override_reason`. The row is retained for 24 months.
 - Force-fire actions are flagged in the customer's monthly report and surfaced to the channel partner. The `forceFire override` badge is rendered on every reporting surface.
-- Recurring force-fire patterns against the same classification are tracked by the Peritus SOC quality programme and feed the prompt-tuning backlog.
+- Recurring force-fire patterns against the same classification are tracked by the Mithras SOC quality programme and feed the prompt-tuning backlog.
 
 ## Related procedures
 - [Triage a new alert in the SOC console](/help/sops/soc_operator/triage-new-alert)
 - [Resolve an incident](/help/sops/soc_operator/resolve-incident)
-- [Force-rollback an AI response](/help/sops/peritus_super_admin/force-rollback-ai-response)
+- [Force-rollback an AI response](/help/sops/platform_super_admin/force-rollback-ai-response)

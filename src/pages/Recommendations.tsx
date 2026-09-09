@@ -29,7 +29,7 @@ const Recommendations = () => {
   const [aiData, setAiData] = useState<AIResponse | null>(null);
   const [modelUsed, setModelUsed] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { currentOrganization } = useTenant();
+  const { currentOrganization, isSuperAdmin } = useTenant();
   const { toast } = useToast();
 
   const generateRecommendations = async () => {
@@ -71,7 +71,9 @@ const Recommendations = () => {
       
       toast({
         title: "Recommendations Generated",
-        description: `Analysis complete using ${result.model_used}`,
+        description: isSuperAdmin
+          ? `Analysis complete using ${result.model_used}`
+          : `Analysis complete`,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to generate recommendations";
@@ -192,7 +194,7 @@ const Recommendations = () => {
                     {aiData.risk_level.toUpperCase()} RISK
                   </Badge>
                 </div>
-                {modelUsed && (
+                {modelUsed && isSuperAdmin && (
                   <CardDescription>Analyzed using {modelUsed}</CardDescription>
                 )}
               </CardHeader>

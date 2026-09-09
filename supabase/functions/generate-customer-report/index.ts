@@ -173,6 +173,26 @@ ${topIncidents.length === 0
       }</tbody></table>`
 }
 
+${(() => {
+    const m = (summary.m365_shield ?? {}) as Record<string, unknown>;
+    if (!m.enabled) return "";
+    const mfaPct        = m.mfa_coverage_pct == null ? "n/a" : `${m.mfa_coverage_pct}%`;
+    const breachUnack   = Number(m.breach_findings_unack ?? 0);
+    const breachNew     = Number(m.breach_findings_new ?? 0);
+    const adminsAtRisk  = Number(m.admins_at_risk ?? 0);
+    const oauthHighRisk = Number(m.oauth_high_risk ?? 0);
+    const anonShares    = Number(m.anonymous_share_links ?? 0);
+    return `<h3>Microsoft 365 Shield</h3>
+<div class="grid">
+ <div class="card"><div class="label">MFA coverage</div><div class="value">${htmlEscape(mfaPct)}</div></div>
+ <div class="card ${adminsAtRisk > 0 ? "alert" : "good"}"><div class="label">Admins without MFA</div><div class="value">${fmt(adminsAtRisk)}</div></div>
+ <div class="card ${breachNew > 0 ? "alert" : "good"}"><div class="label">Breach findings this period</div><div class="value">${fmt(breachNew)}</div></div>
+ <div class="card ${breachUnack > 0 ? "alert" : ""}"><div class="label">Breach findings unread</div><div class="value">${fmt(breachUnack)}</div></div>
+ <div class="card ${oauthHighRisk > 0 ? "alert" : "good"}"><div class="label">High-risk OAuth apps</div><div class="value">${fmt(oauthHighRisk)}</div></div>
+ <div class="card ${anonShares > 0 ? "alert" : "good"}"><div class="label">Anonymous share links</div><div class="value">${fmt(anonShares)}</div></div>
+</div>`;
+})()}
+
 <h3>Top software in fleet</h3>
 ${topSoftware.length === 0
     ? "<p style=\"color:#64748b\">No software inventory yet.</p>"

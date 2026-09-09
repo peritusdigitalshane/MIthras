@@ -73,7 +73,7 @@ export default function AdminAiCosts() {
           <Alert variant="destructive">
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Super-admin only</AlertTitle>
-            <AlertDescription>AI cost management is a Peritus operator concern.</AlertDescription>
+            <AlertDescription>AI cost management is a Mithras platform operator concern.</AlertDescription>
           </Alert>
         </div>
       </MainLayout>
@@ -369,7 +369,7 @@ function BudgetEditor({ budget, isSaving, onSave }: { budget: AiCostBudget | und
         </div>
         <div>
           <Label htmlFor="notify-email">Notify email (optional)</Label>
-          <Input id="notify-email" type="email" placeholder="ops@peritusdigital.com.au" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input id="notify-email" type="email" placeholder="ops@mithras.com.au" value={email} onChange={(e) => setEmail(e.target.value)} />
           <p className="text-xs text-muted-foreground mt-1">If left blank, alerts go via the standard org_alert_recipients pipeline.</p>
         </div>
       </div>

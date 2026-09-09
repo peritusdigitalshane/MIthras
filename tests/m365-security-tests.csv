@@ -1,0 +1,88 @@
+test_id,feature,category,description,method,expected,actual,status,notes
+T001,M365 Connect,backend,m365-oauth-start returns 401 without auth,curl POST /functions/v1/m365-oauth-start no auth,401,401,PASS,
+T002,M365 Connect,data,Both prod tenants have consent_state=active,SQL count active rows in m365_tenants,2,2,PASS,
+T003,M365 Connect,data,Peritus tenant has UserAuthenticationMethod.Read.All scope,SQL boolean scope check on peritusdigital.com.au,1,1,PASS,Reconnected 2026-06-18
+T004,M365 Connect,data,CMWCollective tenant missing UserAuthenticationMethod.Read.All scope,SQL boolean scope check on shanes.com.au,0,0,PASS,Expected fail until CMW reconnects
+T005,M365 Connect,data,Both tenants polled without error,SQL count rows with NULL last_poll_error,2,2,PASS,
+T006,M365 Connect,backend,Daily cron mithras-m365-posture-daily registered,SQL count cron.job,1,1,PASS,Schedule 30 2 * * *
+T010,MFA Coverage,backend,m365-mfa-poll returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T011,MFA Coverage,backend,m365-mfa-poll returns 200 with cron secret,curl POST with x-cron-secret,200,200,PASS,
+T012,MFA Coverage,backend,MFA poll uses per_user_methods fallback for non-P1 Peritus tenant,response results Peritus via field,per_user_methods,per_user_methods,PASS,Confirmed via body
+T013,MFA Coverage,backend,MFA poll detects missing scope for CMW (requires_consent),response results CMW requires_consent flag,true,true,PASS,missing_scope=UserAuthenticationMethod.Read.All
+T014,MFA Coverage,data,Peritus MFA coverage table has rows after reconnect,SQL count m365_mfa_coverage,>0,36,PASS,
+T015,MFA Coverage,data,All 5 Peritus admins are MFA registered,SQL count admins with MFA,5,5,PASS,
+T016,MFA Coverage,data,Zero Peritus admins without MFA,SQL count admins without MFA,0,0,PASS,
+T017,MFA Coverage,data,get_m365_mfa_coverage_overview RPC returns 1 row,SQL count RPC rows,1,1,PASS,
+T018,MFA Coverage,backend,Cron mithras-m365-mfa-poll registered,SQL count cron.job,1,1,PASS,Schedule 33 4 * * *
+T019,MFA Coverage,ui,Tab renders MFA coverage data,MANUAL open /m365/shield MFA tab as Peritus admin,5 admins MFA'd 5 humans MFA'd 26 service no MFA visible,,MANUAL,Requires browser session
+T020,Privileged Audit,data,RPC get_m365_privileged_audit_summary returns Peritus admin counts,SQL RPC for Peritus org,total_admins=5 admins_no_mfa=0 global_admins=5,total_admins=5 admins_no_mfa=0 global_admins=5,PASS,
+T021,Privileged Audit,data,RPC get_m365_privileged_audit returns 5 admin rows,SQL count RPC rows,>0,5,PASS,
+T022,Privileged Audit,ui,Tab shows crown icons for admins,MANUAL open Privileged tab,5 admins with crown,,MANUAL,Requires browser session
+T030,OAuth Grants,backend,m365-oauth-poll returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T031,OAuth Grants,backend,m365-oauth-poll returns 200 with cron secret,curl POST with x-cron-secret,200,200,PASS,
+T032,OAuth Grants,data,OAuth grants table has 50 records,SQL count m365_oauth_grants,50,50,PASS,
+T033,OAuth Grants,data,>=6 high-risk grants flagged,SQL count where has_high_risk_scope,>=6,18,PASS,Exceeds threshold
+T034,OAuth Grants,data,Mithras ITDR grant present with high-risk flag,SQL boolean check,1,1,PASS,
+T035,OAuth Grants,backend,Cron mithras-m365-oauth-poll registered,SQL count cron.job,1,1,PASS,Schedule 13 4 * * *
+T036,OAuth Grants,ui,Tab shows grants with publisher and risk badges,MANUAL open OAuth tab,Shows grants with badges,,MANUAL,Requires browser session
+T040,Conditional Access,backend,m365-ca-poll returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T041,Conditional Access,backend,m365-ca-poll returns 200 with cron secret,curl POST with x-cron-secret,200,200,PASS,
+T042,Conditional Access,data,CA policies table is empty (no policies in tenant),SQL count m365_ca_policies,0,0,PASS,Correct empty state - no CA policies configured in either tenant
+T043,Conditional Access,backend,Cron mithras-m365-ca-poll registered,SQL count cron.job,1,1,PASS,Schedule 17 3 * * *
+T044,Conditional Access,ui,Tab shows no-policies-found empty state,MANUAL open Conditional Access tab,Clean empty state shown,,MANUAL,Requires browser session
+T050,Risky Users,backend,m365-risk-poll returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T051,Risky Users,backend,m365-risk-poll returns requires_premium for non-P1 tenant,curl POST with cron secret check results,requires_premium=true for both,requires_premium=true for both,PASS,Microsoft P1 gate confirmed
+T052,Risky Users,data,m365_signin_risk table is empty (P1-blocked),SQL count m365_signin_risk,0,0,PASS,Expected - Microsoft P1 gate
+T053,Risky Users,backend,Cron mithras-m365-risk-poll registered,SQL count cron.job,1,1,PASS,Schedule 4 19 34 49 * * * *
+T054,Risky Users,ui,Tab shows requires-Entra-P1 message cleanly,MANUAL open Risky Users tab,Shows P1 requirement banner,,MANUAL,Requires browser session
+T060,External Sharing,backend,m365-sharing-poll returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T061,External Sharing,backend,m365-sharing-poll returns 200 with cron secret,curl POST with x-cron-secret,200,200,PASS,Top-level try/catch safety net added 2026-06-19 to prevent raw 500 on cold start. Always returns structured body now.
+T062,External Sharing,data,Sharing items captured for both tenants,SQL count m365_shared_items,>0,196,PASS,Peritus 3 users 12 sites 178 items 30 external
+T063,External Sharing,data,Some items flagged anonymous link,SQL count anon,>0,30,PASS,
+T064,External Sharing,data,Some items flagged is_external,SQL count external,>0,30,PASS,
+T065,External Sharing,data,Some shares are organization-wide,SQL count link_scope=organization,>0,60,PASS,
+T066,External Sharing,data,Direct grants have granted_to_email populated,SQL count not-null,>0,91,PASS,
+T067,External Sharing,backend,Cron mithras-m365-sharing-poll registered,SQL count cron.job,1,1,PASS,Schedule 13 2 * * *
+T068,External Sharing,ui,Anonymous links labelled 'Anyone with the link',MANUAL open Sharing tab,Correct label,,MANUAL,Requires browser session - new copy shipped
+T069,External Sharing,ui,Org-wide shares labelled 'Everyone at your company',MANUAL open Sharing tab All filter,Correct label,,MANUAL,Requires browser session - new copy shipped
+T070,External Sharing,ui,Direct grants show recipient email,MANUAL open Sharing tab All filter,Recipient email shown,,MANUAL,Requires browser session
+T080,Lifecycle,backend,m365-lifecycle-leaver returns 401 without auth,curl POST no auth,401,401,PASS,
+T081,Lifecycle,data,lifecycle_workflows table empty until operator-defined,SQL count lifecycle_workflows,0,0,PASS,Operator-defined feature
+T082,Lifecycle,ui,Tab shows empty state with create workflow guidance,MANUAL open Lifecycle tab,Empty state with guidance,,MANUAL,Requires browser session
+T090,PIM-lite,backend,m365-pim-elevate returns 401 without auth,curl POST no auth,401,401,PASS,
+T091,PIM-lite,data,No active elevations (operator-triggered feature),SQL count pim_elevations,0,0,PASS,
+T092,PIM-lite,backend,Cron mithras-m365-pim-auto-revoke registered,SQL count cron.job,1,1,PASS,Schedule every 5 min
+T093,PIM-lite,ui,Tab shows elevation request form,MANUAL open PIM tab,Form present,,MANUAL,Requires browser session
+T100,Access Reviews,backend,m365-access-review-create returns 401 without auth,curl POST no auth,401,401,PASS,
+T101,Access Reviews,backend,m365-access-review-enforce returns 401 without auth,curl POST no auth,401,401,PASS,
+T102,Access Reviews,data,Access reviews table has 2 records,SQL count m365_access_reviews,2,2,PASS,
+T103,Access Reviews,ui,Tab shows access review list,MANUAL open Reviews tab,2 reviews visible,,MANUAL,Requires browser session
+T110,Breach Monitor,backend,m365-breach-setup returns 401 without auth,curl POST no auth,401,401,PASS,
+T111,Breach Monitor,backend,m365-breach-poll-hudson-rock returns 500 with config_missing when key absent,curl POST with cron secret,500 body=hudson_rock_api_key_not_configured,500 body=hudson_rock_api_key_not_configured,PASS,Honest config error
+T112,Breach Monitor,backend,m365-breach-poll-github returns 500 with config_missing when key absent,curl POST with cron secret,500 body=github_pat_not_configured,500 body=github_pat_not_configured,PASS,Honest config error
+T113,Breach Monitor,backend,m365-breach-poll (HIBP) returns 200 with empty results,curl POST with cron secret,200 polled=0,200 polled=0,PASS,No subscriptions have HIBP key - correct
+T114,Breach Monitor,data,Breach subscriptions auto-bootstrapped for both tenants,SQL count m365_breach_monitoring,2,2,PASS,
+T115,Breach Monitor,data,Both subscriptions have hudson_rock_enabled and github_enabled,SQL bool_and check,1,1,PASS,
+T116,Breach Monitor,data,No breach findings yet (no key configured),SQL count m365_breach_findings,0,0,PASS,Expected zero
+T117,Breach Monitor,data,get_m365_breach_overview RPC returns 13-column shape,SQL pg_get_function_result,13 columns,13 columns,PASS,domains_total domains_verified domains_with_api_key domains_polling_ok users_breached findings_total findings_unack findings_new_24h findings_new_30d findings_hibp findings_hudson_rock findings_github last_poll_at
+T118,Breach Monitor,backend,3 breach crons registered (HIBP Hudson Rock GitHub),SQL count cron.job,3,3,PASS,
+T119,Breach Monitor,backend,pwned-passwords-check helper returns 401 without auth,curl POST no auth,401,401,PASS,
+T120,Breach Monitor,ui,Tab shows 3 source cards with FREE badges,MANUAL open Breach tab,3 cards visible,,MANUAL,Requires browser session
+T130,Manual Scan-all,backend,m365-shield-scan-all returns 401 without auth,curl POST no auth,401,401,PASS,
+T131,Manual Scan-all,backend,m365-shield-scan-all returns 400 when org_id missing,curl POST with JWT and empty body,400,,MANUAL,Requires user JWT - test from browser console
+T132,Manual Scan-all,data,Scan history logged to activity_logs,SQL count activity_logs action='m365_shield_manual_scan',>0,6,PASS,
+T133,Manual Scan-all,data,Last scan details contain summary with 7 state keys,SQL inspect details->summary,Has ok/no_data/requires_premium/requires_consent/config_missing/failed/total,All 7 keys present (ok=1 no_data=3 requires_premium=1 requires_consent=1 config_missing=2 failed=0 total=8),PASS,
+T134,Manual Scan-all,ui,Button on M365 Shield header triggers scan,MANUAL click 'Scan all sources now',Toast plus result cards appear,,MANUAL,Requires browser session
+T140,Email Security,backend,m365-email-sweep returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T141,Email Security,backend,m365-email-action returns 401 without auth,curl POST no auth,401,401,PASS,
+T142,Email Security,backend,m365-email-release rejects empty body with 400 invalid_token,curl POST empty body,400 with invalid_token error,400 invalid_token,PASS,Function is public token-only by design (recipients click magic link); token IS the auth not JWT. 400 is the correct response to empty body.
+T143,Email Security,backend,Email sweep cron registered,SQL count cron.job mithras-email-security-sweep,1,1,PASS,Updated cron name from initial test
+T150,M365 Posture,backend,m365-poll-tenants returns 401 without cron secret,curl POST no auth,401,401,PASS,
+T151,M365 Posture,backend,Cron mithras-m365-posture-daily registered,SQL count cron.job,1,1,PASS,Same cron as T006
+T160,Cross-cutting,data,Platform settings hudson_rock_api_key NOT set,SQL count platform_settings,0,0,PASS,Expected missing - super-admin needs to set
+T161,Cross-cutting,data,Platform settings github_search_pat NOT set,SQL count platform_settings,0,0,PASS,Expected missing - super-admin needs to set
+T162,Cross-cutting,data,functions_base_url platform setting IS set,SQL count platform_settings,1,1,PASS,
+T163,Cross-cutting,backend,UserAuthenticationMethod.Read.All in READ_ONLY_SCOPES code,grep _shared/m365-graph.ts,1+ occurrence,1,PASS,
+T164,Cross-cutting,data,M365 Shield enabled for >=1 org,SQL count m365_shield_enabled=true,>=1,2,PASS,Peritus + CMWCollective
+T165,Cross-cutting,backend,Sign-in Map tab removed from UI,grep src/pages/M365Shield.tsx for GeoTab,0,0,PASS,Removed in latest commit
+T166,Cross-cutting,backend,m365-shield-scan-all does not include signin-geo poller,grep functions/m365-shield-scan-all,0,0,PASS,Removed in latest commit

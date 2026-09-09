@@ -14,7 +14,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-const NEXT_CHECK_IN_SECONDS = 60;
+// v0.7.6: dropped from 60 → 30. Agent honours server-pushed next_check_in
+// (range 5-900), so this propagates instantly to every fielded endpoint on
+// the next heartbeat — no agent reinstall required. Server impact is
+// trivial: a heartbeat is ~6KB request / ~3KB response with one DB write
+// and a count() against agent_commands. Doubling the rate for a 1000-
+// endpoint fleet adds ~33 req/sec at the edge function — well below the
+// per-function limit. Endpoint impact is the same JSON payload twice as
+// often; on a residential connection it's measured in single-digit kB/min.
+const NEXT_CHECK_IN_SECONDS = 30;
 
 type HeartbeatBody = {
     hostname?: string;
@@ -101,6 +109,23 @@ Deno.serve(async (request) => {
         return jsonResponse({ error: "agent_unknown_or_inactive" }, 401, origin);
     }
 
+    // A3 fix: gate on the parent org's is_active / stripe_status. When a
+    // subscription is cancelled or suspended the org row is flagged inactive
+    // by the stripe-webhook; without this check the endpoint would keep
+    // phoning home forever, costing us resources and giving the customer
+    // free protection.
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("is_active, stripe_status, organization_type")
+        .eq("id", endpoint.organization_id)
+        .maybeSingle();
+    if (!org || org.is_active === false) {
+        return jsonResponse({ error: "org_suspended", reason: "Subscription is not active. Contact your reseller." }, 403, origin);
+    }
+    if (org.organization_type === "home_user" && org.stripe_status && !["active", "trialing", "past_due"].includes(org.stripe_status)) {
+        return jsonResponse({ error: "subscription_inactive", reason: `Subscription ${org.stripe_status}. Resume billing to restore coverage.` }, 403, origin);
+    }
+
     const verification = await verifyHmacRequest(hmacReq, endpoint.agent_secret);
     if (!verification.ok) {
         return jsonResponse({ error: "hmac_invalid", reason: verification.reason }, 401, origin);
@@ -147,6 +172,42 @@ Deno.serve(async (request) => {
             });
         } catch (e) {
             console.error("agent_update_log insert failed", e);
+        }
+    }
+
+    // Continuous upgrade_agent auto-ack — runs whenever the agent reports
+    // a version. The agent-side "save pending results to disk, recover on
+    // startup" persistence is fragile across the SCM swap. When the
+    // endpoint reports it's running the command's target_version, the
+    // upgrade clearly succeeded; ack the command so the operator console
+    // doesn't show a successful upgrade as a 45-minute expiry failure.
+    if (body.agent_version) {
+        try {
+            const reportedVersion = String(body.agent_version);
+            const { data: pendingUpgrades } = await supabase
+                .from("agent_commands")
+                .select("id, params")
+                .eq("endpoint_id",  endpoint.id)
+                .eq("command_type", "upgrade_agent")
+                .in("status",       ["queued", "dispatched"]);
+            for (const cmd of (pendingUpgrades ?? []) as Array<{ id: string; params: { target_version?: string } | null }>) {
+                const target = cmd.params?.target_version;
+                if (target && target === reportedVersion) {
+                    await supabase
+                        .from("agent_commands")
+                        .update({
+                            status:        "succeeded",
+                            completed_at:  new Date().toISOString(),
+                            result:        { inferred_from: "agent_version_matches_target", reported_version: reportedVersion, target_version: target },
+                            error_message: null,
+                        })
+                        .eq("id",     cmd.id)
+                        .in("status", ["queued", "dispatched"]);
+                    console.log(`upgrade_agent ${cmd.id}: auto-ack — endpoint at target ${target}`);
+                }
+            }
+        } catch (e) {
+            console.error("upgrade_agent auto-ack failed", e);
         }
     }
 
@@ -678,39 +739,109 @@ Deno.serve(async (request) => {
                 completed_at:  new Date().toISOString(),
                 result,
                 error_message: ok ? null : errMsg,
-            }).eq("id", id).eq("endpoint_id", endpoint.id).select("command_type").maybeSingle();
+            }).eq("id", id).eq("endpoint_id", endpoint.id).select("command_type, params, organization_id").maybeSingle();
             if (crErr) console.error("command_results update", crErr);
 
             // Side effects per command type. install_mesh_agent /
             // uninstall_mesh_agent flip endpoints.mesh_agent_state so the
             // SOC console reflects the new transport state without polling.
             const cmdType = cmdRow?.command_type;
+            // Best-effort side effects; errors are logged so silent failures
+            // don't blackhole the SOC console's view of mesh-agent state.
+            // We don't re-throw because the command result is already
+            // persisted — partial failure here is recoverable on the next
+            // heartbeat or via the explicit mesh-state reconciler.
+            const logUpdateErr = (path: string, err: { message?: string } | null) => {
+                if (err) console.error(`endpoints.update(${path}) failed for ${endpoint.id}: ${err.message ?? err}`);
+            };
             if (cmdType === "install_mesh_agent") {
                 if (ok) {
-                    await supabase.from("endpoints").update({
+                    const { error } = await supabase.from("endpoints").update({
                         mesh_agent_state:       "installed",
                         mesh_agent_error:       null,
                         mesh_agent_installed_at: new Date().toISOString(),
                     }).eq("id", endpoint.id);
+                    logUpdateErr("install_mesh_agent:ok", error);
                 } else {
-                    await supabase.from("endpoints").update({
+                    const { error } = await supabase.from("endpoints").update({
                         mesh_agent_state: "failed",
                         mesh_agent_error: errMsg.slice(0, 1000),
                     }).eq("id", endpoint.id);
+                    logUpdateErr("install_mesh_agent:fail", error);
                 }
             } else if (cmdType === "uninstall_mesh_agent") {
                 if (ok) {
-                    await supabase.from("endpoints").update({
+                    const { error } = await supabase.from("endpoints").update({
                         mesh_agent_state:       "not_installed",
                         mesh_agent_error:       null,
                         mesh_node_id:           null,
                         mesh_agent_installed_at: null,
                     }).eq("id", endpoint.id);
+                    logUpdateErr("uninstall_mesh_agent:ok", error);
                 } else {
                     // Leave state alone on uninstall failure; operator can retry.
-                    await supabase.from("endpoints").update({
+                    const { error } = await supabase.from("endpoints").update({
                         mesh_agent_error: errMsg.slice(0, 1000),
                     }).eq("id", endpoint.id);
+                    logUpdateErr("uninstall_mesh_agent:fail", error);
+                }
+            } else if (cmdType === "install_updates" && ok) {
+                // Patch-device reconciliation. The agent returns:
+                //   result.installed: [{title, kb, hresult, outcome}, ...]
+                //   result.failed:    [{...}, ...]
+                //   result.reboot_required: bool
+                // The original command's params carry the CVEs that triggered
+                // the patch (single via `triggered_by_cve` for single-row
+                // action, array via `triggered_by_cves` for bulk).
+                //
+                // Reconciliation policy: flip every triggered CVE to
+                // `mitigated` IFF at least one KB was installed. We can't
+                // map CVE → specific KB cleanly without MSRC data, so this
+                // is intentionally optimistic. The nightly cve-auto-scan
+                // will reopen any CVE the install didn't actually fix on the
+                // next pass — bounded inaccuracy, not silent drift.
+                //
+                // Defence against a compromised agent secret: require at
+                // least one `installed` entry to look like a real KB id
+                // ("KB1234567"). A naïve `installed.length > 0` check
+                // accepted `[{}]` and was enough to silently mark every
+                // queued CVE as patched without anything actually happening
+                // — turning a stolen HMAC into a CVE suppression primitive.
+                // Both the kb field and the outcome code can still be
+                // fabricated, but raising the shape bar makes drive-by
+                // poisoning meaningfully harder; the nightly rescan re-opens
+                // anything that wasn't really fixed.
+                //
+                // On failure (entire command failed): leave findings alone
+                // so the operator can retry. The failure is already recorded
+                // on the agent_commands row.
+                const r = (result ?? {}) as Record<string, unknown>;
+                const installed = Array.isArray(r.installed) ? r.installed : [];
+                const looksReal = installed.some((entry) => {
+                    const e = entry as Record<string, unknown>;
+                    return typeof e?.kb === "string" && /KB\d{6,}/i.test(e.kb);
+                });
+                if (looksReal) {
+                    const params = ((cmdRow as Record<string, unknown> | null | undefined)?.params ?? {}) as Record<string, unknown>;
+                    const cves: string[] = [];
+                    if (typeof params.triggered_by_cve === "string") cves.push(params.triggered_by_cve);
+                    if (Array.isArray(params.triggered_by_cves)) {
+                        for (const c of params.triggered_by_cves) {
+                            if (typeof c === "string") cves.push(c);
+                        }
+                    }
+                    if (cves.length > 0) {
+                        const { error: vErr, count } = await supabase
+                            .from("vulnerability_findings")
+                            .update({ status: "mitigated", resolved_at: new Date().toISOString() }, { count: "exact" })
+                            .eq("endpoint_id", endpoint.id)
+                            .in("cve_id", cves)
+                            .eq("status", "open");
+                        logUpdateErr("install_updates:flip_vulns", vErr);
+                        if (!vErr) {
+                            console.log(`install_updates: marked ${count ?? 0} vulnerability_findings as mitigated for endpoint=${endpoint.id} cves=${cves.join(",")} installed_kbs=${installed.length}`);
+                        }
+                    }
                 }
             }
         }

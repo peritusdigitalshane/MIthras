@@ -59,10 +59,15 @@ export default function AiActivity() {
     const totalPages = Math.max(1, Math.ceil(total / 50));
 
     const exportCsv = () => {
+        // Model + cost columns are super-admin-only. Non-super-admin
+        // partner/operator users still get verdict, severity, and review
+        // status — enough for audit, no vendor leakage.
         const headers = [
             "occurred_at", "verdict", "confidence", "auto_closed", "escalated",
             "alert_title", "alert_severity", "alert_type",
-            "organization", "model", "cost_cents", "latency_ms",
+            "organization",
+            ...(isSuperAdmin ? ["model", "cost_cents"] : []),
+            "latency_ms",
             "reviewed_at", "review_action",
         ];
         const escape = (v: unknown) => {
@@ -74,7 +79,9 @@ export default function AiActivity() {
             lines.push([
                 r.created_at, r.verdict ?? "", r.confidence ?? "", r.auto_closed, r.escalated_to_investigation,
                 r.alerts?.title ?? "", r.alerts?.severity ?? "", r.alerts?.alert_type ?? "",
-                r.organizations?.name ?? "", r.model ?? "", r.cost_cents, r.latency_ms ?? "",
+                r.organizations?.name ?? "",
+                ...(isSuperAdmin ? [r.model ?? "", r.cost_cents] : []),
+                r.latency_ms ?? "",
                 r.reviewed_at ?? "", r.review_action ?? "",
             ].map(escape).join(","));
         }

@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SocChatPanel } from "@/components/soc/SocChatPanel";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,16 @@ interface MainLayoutProps {
 // MainLayout, which is the entire SOC console.
 export function MainLayout({ children }: MainLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { currentOrganization, isSuperAdmin } = useTenant();
+  // F2 fix: SOC chat is an operator/MSP affordance — customers and home
+  // users shouldn't see it. Super-admins keep it everywhere (including
+  // when impersonating).
+  const orgType = currentOrganization?.organization_type;
+  const showSocChat =
+    isSuperAdmin ||
+    orgType === "partner" ||
+    orgType === "distributor" ||
+    orgType == null; // pre-tenant routes
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar — hidden on mobile */}
@@ -38,8 +49,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <main className="p-4 sm:p-6">{children}</main>
       </div>
 
-      {/* Conversational interface to the AI SOC. Available from every page. */}
-      <SocChatPanel />
+      {/* Conversational interface to the AI SOC. Gated by org type — customers
+          and home users shouldn't see it. */}
+      {showSocChat && <SocChatPanel />}
     </div>
   );
 }

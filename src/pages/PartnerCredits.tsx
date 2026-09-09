@@ -37,6 +37,15 @@ export default function PartnerCredits() {
   const { data: requests, isLoading: reqLoading } = useCreditRequestsForReseller(orgId);
   const requestCredits = useRequestCredits();
   const cancelRequest  = useCancelCreditRequest();
+  // Resolve the actual distributor sitting above this reseller (or fall back
+  // to Mithras if none). Lets us write "Email Apex Cyber Distribution" instead
+  // of the vague "Email your distributor".
+  //
+  // Must stay above the `if (!orgId)` early return below: it used to sit
+  // after it, so the hook only ran for resellers. When orgId resolved from
+  // undefined to a value, React saw an extra hook and threw
+  // "Rendered more hooks than during the previous render".
+  const { data: distributor } = useResellerDistributor();
   const [reqOpen, setReqOpen] = useState(false);
   const [reqQty,  setReqQty]  = useState("");
   const [reqNotes, setReqNotes] = useState("");
@@ -79,10 +88,6 @@ export default function PartnerCredits() {
       ? Math.round(monthsRunwayExact * 30) / 30  // expressed as decimal months — UI also shows the day count
       : Math.round(monthsRunwayExact * 10) / 10;
   const daysRunway = monthlyBurn > 0 ? Math.floor(((balance ?? 0) * 30) / monthlyBurn) : null;
-  // Resolve the actual distributor sitting above this reseller (or fall back
-  // to Mithras if none). Lets us write "Email Apex Cyber Distribution" instead
-  // of the vague "Email your distributor".
-  const { data: distributor } = useResellerDistributor();
   const distributorName    = distributor?.name ?? "Mithras";
   const distributorEmail   = distributor?.billing_email ?? "channel@mithras.com.au";
 

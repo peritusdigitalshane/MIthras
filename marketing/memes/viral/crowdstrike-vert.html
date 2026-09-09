@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CrowdStrike vs Mithras — vertical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; background: #000; color: #fff; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  body { position: relative; }
+
+  .scene { position: absolute; inset: 0; opacity: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 100px 70px; }
+
+  /* === SCENE 1: 0-3s — HOOK === */
+  .s1 { animation: s1 3s linear 0s both; background: #000; gap: 30px; }
+  .s1 .date { font-family: 'JetBrains Mono', monospace; font-size: 200px; font-weight: 700; letter-spacing: -5px; }
+  .s1 .time { font-family: 'JetBrains Mono', monospace; font-size: 110px; color: rgba(255,255,255,0.55); }
+  .s1 .caret { color: #ff4040; animation: blink 0.6s steps(1) infinite; }
+  .s1 .label { font-size: 42px; font-weight: 700; letter-spacing: 8px; color: rgba(255,255,255,0.45); margin-top: 80px; text-transform: uppercase; text-align: center; }
+
+  /* === SCENE 2: 3-8s — BSOD === */
+  .s2 { animation: s2 5s linear 3s both; background: #0078D7; justify-content: flex-start; padding: 130px 90px; align-items: flex-start; gap: 40px; }
+  .s2 .sad { font-size: 300px; font-weight: 700; line-height: 0.9; }
+  .s2 .msg { font-size: 64px; font-weight: 500; line-height: 1.3; }
+  .s2 .progress { font-size: 48px; margin-top: 30px; color: rgba(255,255,255,0.95); }
+  .s2 .stop { font-family: 'JetBrains Mono', monospace; font-size: 38px; color: rgba(255,255,255,0.9); }
+  .s2 .stop .file { background: rgba(255,255,255,0.12); padding: 4px 12px; border-radius: 6px; }
+  .s2 .ts { font-family: 'JetBrains Mono', monospace; font-size: 30px; margin-top: 40px; color: rgba(255,255,255,0.75); }
+
+  /* === SCENE 3: 8-13s — COUNTERS === */
+  .s3 { animation: s3 5s linear 8s both; background: #000; gap: 80px; }
+  .s3 .label { font-size: 40px; font-weight: 700; letter-spacing: 6px; color: rgba(255,255,255,0.5); text-transform: uppercase; text-align: center; }
+  .s3 .number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 200px;
+    font-weight: 700;
+    letter-spacing: -5px;
+    line-height: 1;
+    color: #ff4040;
+    text-shadow: 0 0 80px rgba(255,64,64,0.5);
+    text-align: center;
+  }
+  .s3 .row { text-align: center; }
+  .s3 .num1 { animation: countAnim 1.6s ease-out 0.3s both; }
+  .s3 .num2 { animation: countAnim 1.6s ease-out 1.8s both; }
+
+  /* === SCENE 4: 13-17s — REVEAL === */
+  .s4 { animation: s4 4s linear 13s both; background: #000; gap: 50px; }
+  .s4 .tag { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #28d96b; text-transform: uppercase; animation: fadeUp 0.4s ease-out 0.0s both; }
+  .s4 h1 { font-size: 130px; font-weight: 900; letter-spacing: -4px; line-height: 0.98; text-align: center; max-width: 100%; animation: fadeUp 0.5s ease-out 0.2s both; }
+  .s4 h1 .acc { color: #28d96b; }
+  .s4 .cards { display: flex; flex-direction: column; gap: 24px; width: 80%; margin-top: 30px; }
+  .s4 .card { background: rgba(40,217,107,0.10); border: 2px solid rgba(40,217,107,0.4); border-radius: 18px; padding: 32px; text-align: center; }
+  .s4 .card:nth-child(1) { animation: cardIn 0.4s ease-out 0.8s both; }
+  .s4 .card:nth-child(2) { animation: cardIn 0.4s ease-out 1.1s both; }
+  .s4 .card:nth-child(3) { animation: cardIn 0.4s ease-out 1.4s both; }
+  .s4 .card .v { font-size: 64px; font-weight: 900; color: #28d96b; line-height: 1; }
+  .s4 .card .k { font-size: 26px; font-weight: 700; color: rgba(255,255,255,0.7); margin-top: 10px; letter-spacing: 2px; text-transform: uppercase; }
+
+  /* === SCENE 5: 17-20s — CTA === */
+  .s5 { animation: s5 3s linear 17s both; background: #000; gap: 40px; }
+  .s5::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(40,217,107,0.18), transparent 70%); }
+  .s5 .brand { font-size: 280px; font-weight: 900; letter-spacing: -8px; line-height: 1; animation: pop 0.6s ease-out 0.1s both; }
+  .s5 .tag { font-size: 52px; font-weight: 700; color: rgba(255,255,255,0.7); animation: fadeUp 0.5s ease-out 0.5s both; }
+  .s5 .cta { margin-top: 50px; padding: 30px 80px; background: #28d96b; color: #000; font-size: 56px; font-weight: 900; border-radius: 20px; animation: fadeUp 0.5s ease-out 1.0s both; }
+  .s5 .url { font-size: 40px; font-weight: 700; letter-spacing: 12px; color: #28d96b; margin-top: 60px; animation: fadeUp 0.5s ease-out 1.5s both; }
+
+  @keyframes s1 { 0% { opacity: 0; } 5% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s2 { 0% { opacity: 0; transform: scale(0.98); } 5% { opacity: 1; transform: scale(1); } 90% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.02); } }
+  @keyframes s3 { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s4 { 0% { opacity: 0; } 5% { opacity: 1; } 92% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes s5 { 0% { opacity: 0; } 5% { opacity: 1; } 100% { opacity: 1; } }
+  @keyframes countAnim { 0% { opacity: 0; transform: translateY(20px) scale(0.7); } 60% { opacity: 1; transform: translateY(0) scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pop { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+
+  <div class="scene s1">
+    <div class="date">19.07<span class="caret">_</span></div>
+    <div class="date" style="font-size:120px;color:rgba(255,255,255,0.85)">2024</div>
+    <div class="time">04:09 UTC</div>
+    <div class="label">a date IT pros<br/>will not forget</div>
+  </div>
+
+  <div class="scene s2">
+    <div class="sad">:(</div>
+    <div class="msg">Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.</div>
+    <div class="progress">0% complete</div>
+    <div class="stop">Stop code: <span class="file">csagent.sys</span></div>
+    <div class="ts">[ 8,500,000 endpoints worldwide ]</div>
+  </div>
+
+  <div class="scene s3">
+    <div class="row">
+      <div class="label">Windows machines down</div>
+      <div class="number num1">8,500,000</div>
+    </div>
+    <div class="row">
+      <div class="label">Estimated damages (USD)</div>
+      <div class="number num2">$5.4 BILLION</div>
+    </div>
+  </div>
+
+  <div class="scene s4">
+    <div class="tag">There is another way</div>
+    <h1>Your AV<br/>shouldn't be<br/>the <span class="acc">incident</span>.</h1>
+    <div class="cards">
+      <div class="card"><div class="v">NO</div><div class="k">Kernel driver</div></div>
+      <div class="card"><div class="v">100%</div><div class="k">Staged rollouts</div></div>
+      <div class="card"><div class="v">🇦🇺</div><div class="k">Australian-owned</div></div>
+    </div>
+  </div>
+
+  <div class="scene s5">
+    <div class="brand">MITHRAS</div>
+    <div class="tag">Endpoint security.<br/>Done right.</div>
+    <div class="cta">$11/seat.<br/>Everything in.</div>
+    <div class="url">MITHRAS.COM.AU</div>
+  </div>
+
+</body>
+</html>

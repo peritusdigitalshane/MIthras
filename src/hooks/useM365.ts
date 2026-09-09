@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useToast } from "@/hooks/use-toast";
 
 const FUNCTIONS_BASE = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, "");
 
@@ -186,8 +187,32 @@ export function useM365Alerts() {
     });
 }
 
+// Lightweight check: is the Azure app registration configured at the platform
+// level? Used by the M365 page to show an inline "configure Azure first"
+// banner so super-admins don't burn a click on a silent 503.
+export function useM365AzureConfigured() {
+    return useQuery({
+        queryKey: ["m365-azure-configured"],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from("platform_settings")
+                .select("key, value")
+                .in("key", ["m365_azure_client_id", "m365_azure_redirect_uri"]);
+            const rows = (data ?? []) as Array<{ key: string; value: string | null }>;
+            const byKey = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string | null>;
+            return {
+                hasClientId:    !!byKey.m365_azure_client_id?.trim(),
+                hasRedirectUri: !!byKey.m365_azure_redirect_uri?.trim(),
+                configured:     !!byKey.m365_azure_client_id?.trim() && !!byKey.m365_azure_redirect_uri?.trim(),
+            };
+        },
+        staleTime: 60_000,
+    });
+}
+
 export function useStartM365Connect() {
     const { currentOrganization } = useTenant();
+    const { toast } = useToast();
     return useMutation({
         mutationFn: async (args: { mode: "read_only" | "remediation"; m365TenantId?: string | null }) => {
             if (!currentOrganization?.id) throw new Error("No organisation selected");
@@ -205,6 +230,34 @@ export function useStartM365Connect() {
             return r as { consent_url: string };
         },
         onSuccess: (r) => { window.location.assign(r.consent_url); },
+        onError: (err: any) => {
+            // Surface the failure instead of silently rejecting. Most common
+            // shape we hit: 503 m365_integration_not_configured when the
+            // Azure app credentials haven't been entered yet. Send the user
+            // to where they can fix it.
+            const raw = String(err?.message ?? err ?? "");
+            if (raw.includes("m365_integration_not_configured")) {
+                toast({
+                    title: "Microsoft 365 isn't configured yet",
+                    description: "An admin needs to set the Azure app credentials at Admin → Platform settings before any tenant can be connected.",
+                    variant: "destructive",
+                });
+                return;
+            }
+            if (raw.includes("forbidden_admin_required")) {
+                toast({
+                    title: "You don't have admin rights on this org",
+                    description: "Switch to the tenant you administer or ask its owner to connect Microsoft 365.",
+                    variant: "destructive",
+                });
+                return;
+            }
+            toast({
+                title: "Couldn't start the Microsoft 365 connection",
+                description: raw || "Unknown error.",
+                variant: "destructive",
+            });
+        },
     });
 }
 

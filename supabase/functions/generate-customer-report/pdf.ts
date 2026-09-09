@@ -51,6 +51,9 @@ function safeText(t: string): string {
     // pdf-lib's default StandardFont (Helvetica) is WinAnsi only — characters
     // outside that range throw. Strip them to '?' so reports never fail on
     // exotic input (we don't accept rich text from customers anyway).
+    // Matching control characters is the entire purpose of this sanitiser:
+    // WinAnsi PDF encoding throws on anything outside this range.
+    // eslint-disable-next-line no-control-regex
     return t.replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, "?");
 }
 
@@ -322,7 +325,7 @@ export async function buildReportPdf(
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-    let ctx: Ctx = {
+    const ctx: Ctx = {
         pdf,
         page: pdf.addPage([PAGE_W, PAGE_H]),
         font, bold,
@@ -378,6 +381,31 @@ export async function buildReportPdf(
             status:   s(i.status),
         })),
     );
+
+    // Microsoft 365 Shield — only render when the customer has it enabled.
+    const m365 = (summary.m365_shield ?? {}) as Record<string, unknown>;
+    if (m365.enabled) {
+        sectionTitle(ctx, "Microsoft 365 Shield");
+        const mfaPct        = m365.mfa_coverage_pct == null ? "n/a" : `${m365.mfa_coverage_pct}%`;
+        const adminsAtRisk  = num(m365.admins_at_risk);
+        const breachUnack   = num(m365.breach_findings_unack);
+        const breachNew     = num(m365.breach_findings_new);
+        const oauthHighRisk = num(m365.oauth_high_risk);
+        const anonShares    = num(m365.anonymous_share_links);
+        kpiGrid(ctx, [
+            { label: "MFA coverage",                  value: mfaPct },
+            { label: "Admins without MFA",            value: adminsAtRisk.toLocaleString(),
+              tone: adminsAtRisk > 0 ? "alert" : "ok" },
+            { label: "Breach findings this period",   value: breachNew.toLocaleString(),
+              tone: breachNew > 0 ? "alert" : "ok" },
+            { label: "Breach findings unread",        value: breachUnack.toLocaleString(),
+              tone: breachUnack > 0 ? "alert" : "ok" },
+            { label: "High-risk OAuth apps",          value: oauthHighRisk.toLocaleString(),
+              tone: oauthHighRisk > 0 ? "alert" : "ok" },
+            { label: "Anonymous share links",         value: anonShares.toLocaleString(),
+              tone: anonShares > 0 ? "alert" : "ok" },
+        ]);
+    }
 
     sectionTitle(ctx, "Top software in fleet");
     const topSoftware = Array.isArray(summary.top_software) ? (summary.top_software as Record<string, unknown>[]) : [];

@@ -299,24 +299,65 @@ async function pollMailboxRulesForUser(
     return count;
 }
 
+// Resolve a service-principal object id to its human display name. Cached
+// per poll run so a tenant with 50 grants from the same SP doesn't fire 50
+// Graph requests. Cache key is the SP object id (the `clientId` field on
+// oauth2PermissionGrants).
+async function resolveSpDisplayName(
+    accessToken: string,
+    spObjectId: string,
+    cache: Map<string, string | null>,
+): Promise<string | null> {
+    if (!spObjectId) return null;
+    if (cache.has(spObjectId)) return cache.get(spObjectId)!;
+    try {
+        const sp = await graphGetJson<{ displayName?: string; appDisplayName?: string; publisherName?: string }>(
+            accessToken,
+            `/servicePrincipals/${encodeURIComponent(spObjectId)}?$select=displayName,appDisplayName,publisherName`,
+        );
+        const name = sp?.displayName ?? sp?.appDisplayName ?? null;
+        cache.set(spObjectId, name);
+        return name;
+    } catch (e) {
+        // 404 on SPs orphaned from a deleted app, 403 on tenants where the
+        // consent set doesn't include Application.Read.All — either way we
+        // don't want to abort the whole poll for a missing name.
+        console.error(`sp_resolve ${spObjectId}: ${e instanceof Error ? e.message : String(e)}`);
+        cache.set(spObjectId, null);
+        return null;
+    }
+}
+
 async function pollOAuthGrants(tenant: TenantRow, accessToken: string): Promise<number> {
     let total = 0;
     const now = new Date().toISOString();
+    const spNameCache = new Map<string, string | null>();
     try {
         for await (const page of graphPaged<Record<string, unknown>>(
             accessToken,
             "/oauth2PermissionGrants?$top=200", 5,
         )) {
             if (page.length === 0) continue;
+
+            // Resolve every unique clientId on this page in parallel before
+            // building the upsert payload. Capped concurrency via the page
+            // size (default 200), which is well inside Graph's per-second
+            // budget for a single tenant.
+            const uniqueClientIds = Array.from(new Set(
+                page.map(g => String(g.clientId ?? "")).filter(Boolean),
+            ));
+            await Promise.all(uniqueClientIds.map(id => resolveSpDisplayName(accessToken, id, spNameCache)));
+
             const rows = page.map((g) => {
                 const scope = (g.scope as string) ?? "";
                 const matched = highRiskScopesIn(scope);
+                const clientObjectId = String(g.clientId ?? "");
                 return {
                     m365_tenant_id:           tenant.id,
                     organization_id:          tenant.organization_id,
                     grant_id:                 String(g.id ?? ""),
-                    client_id:                String(g.clientId ?? ""),
-                    client_display_name:      null,            // fetched lazily by UI; saves N requests
+                    client_id:                clientObjectId,
+                    client_display_name:      spNameCache.get(clientObjectId) ?? null,
                     consent_type:             (g.consentType as string) ?? null,
                     principal_user_id:        (g.principalId as string) ?? null,
                     principal_upn:            null,
@@ -333,6 +374,19 @@ async function pollOAuthGrants(tenant: TenantRow, accessToken: string): Promise<
                 .upsert(rows, { onConflict: "m365_tenant_id,grant_id" });
             if (error) throw new Error("oauth_upsert:" + error.message);
             total += rows.length;
+        }
+
+        // Backfill any m365_alerts that were emitted with a GUID title before
+        // we started resolving display names. The detection trigger only
+        // fires on INSERT or on the false→true flip of has_high_risk_scope,
+        // so existing alerts keep their original title forever unless we
+        // rewrite them ourselves. Limit the rewrite to this tenant's org
+        // and exact-match titles to avoid touching anything else.
+        const backfill = await supabase.rpc("m365_backfill_oauth_alert_names", {
+            _organization_id: tenant.organization_id,
+        } as any);
+        if (backfill.error) {
+            console.error(`oauth backfill error: ${backfill.error.message}`);
         }
     } catch (e) {
         throw new Error(`oauth:${e instanceof Error ? e.message : String(e)}`);
@@ -643,27 +697,68 @@ Deno.serve(async (req) => {
         if (!ok) return jsonResponse({ error: "forbidden" }, 403, origin);
     }
 
-    // Build tenant list.
-    let tenants: TenantRow[];
-    if (targetTenantPk) {
-        const { data } = await supabase
-            .from("m365_tenants")
-            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
-            .eq("id", targetTenantPk).eq("consent_state", "active").maybeSingle();
-        if (!data) return jsonResponse({ error: "tenant_not_found_or_inactive" }, 404, origin);
-        tenants = [data as TenantRow];
-    } else {
-        const { data } = await supabase
-            .from("m365_tenants")
-            .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
-            .eq("consent_state", "active");
-        tenants = (data ?? []) as TenantRow[];
+    // v0.7.6: bulk-cron mutex. A single tenant takes ~5s of Graph + DB work
+    // and the function polls every active tenant sequentially. With N tenants
+    // a cron run can run 30-60s+; at a 5-minute cadence two ticks shouldn't
+    // overlap but a slow Graph response can push past. Without this guard,
+    // a second tick would re-poll the same set against the same last_poll_at
+    // watermark. Per-tenant user calls (targetTenantPk set) bypass the mutex
+    // so an operator can always investigate one tenant on demand even if a
+    // bulk run is in flight.
+    // TTL matches the cron cadence: while a run is in flight it blocks the
+    // next tick entirely (one-in-flight invariant). If a run truly hangs
+    // past 5 minutes the TTL backstop releases the lock so the next tick
+    // can pick up; we accept the one-cycle duplicate that follows over a
+    // permanently wedged poller.
+    const BULK_LOCK_NAME    = "m365-poll-tenants";
+    const BULK_LOCK_TTL_SEC = 300;
+    const isBulkRun = isCron && !targetTenantPk;
+    if (isBulkRun) {
+        const { data: gotLock, error: lockErr } = await supabase.rpc("try_acquire_platform_lock", {
+            _name: BULK_LOCK_NAME,
+            _ttl_seconds: BULK_LOCK_TTL_SEC,
+            _holder: `m365-poll-tenants@${new Date().toISOString()}`,
+        });
+        if (lockErr) {
+            console.error("lock acquire failed", lockErr);
+            return jsonResponse({ ok: false, error: "lock_acquire_failed" }, 500, origin);
+        }
+        if (gotLock === false) {
+            return jsonResponse({ ok: true, skipped: "another poll is in progress", lockHeld: true, polled: 0 }, 200, origin);
+        }
     }
 
-    const results = [];
-    for (const t of tenants) {
-        results.push(await pollTenant(t));
-    }
+    try {
+        // Build tenant list.
+        let tenants: TenantRow[];
+        if (targetTenantPk) {
+            const { data } = await supabase
+                .from("m365_tenants")
+                .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
+                .eq("id", targetTenantPk).eq("consent_state", "active").maybeSingle();
+            if (!data) return jsonResponse({ error: "tenant_not_found_or_inactive" }, 404, origin);
+            tenants = [data as TenantRow];
+        } else {
+            const { data } = await supabase
+                .from("m365_tenants")
+                .select("id,organization_id,tenant_id,tenant_domain,access_token,access_token_expires_at,refresh_token,scopes,remediation_enabled,last_poll_at,signin_audit_supported")
+                .eq("consent_state", "active");
+            tenants = (data ?? []) as TenantRow[];
+        }
 
-    return jsonResponse({ ok: true, polled: results.length, results }, 200, origin);
+        const results = [];
+        for (const t of tenants) {
+            results.push(await pollTenant(t));
+        }
+
+        return jsonResponse({ ok: true, polled: results.length, results }, 200, origin);
+    } finally {
+        if (isBulkRun) {
+            try {
+                await supabase.rpc("release_platform_lock", { _name: BULK_LOCK_NAME });
+            } catch (e) {
+                console.error("lock release failed (TTL will recover)", e);
+            }
+        }
+    }
 });

@@ -7,17 +7,23 @@ const Privacy = () => (
   <MarketingShell>
     <Seo
       title="Privacy Policy — Mithras Threat Defence"
-      description="How Peritus Digital collects, uses, and protects customer data when you use Mithras Threat Defence."
+      description="How Mithras Threat Defence collects, uses, and protects customer data."
       canonical="/privacy"
     />
     <article className="container mx-auto max-w-3xl px-6 py-16 prose prose-invert">
       <h1>Privacy Policy</h1>
       <p className="text-sm text-muted-foreground">Effective {EFFECTIVE_DATE}</p>
 
+      {/*
+        Legal entity placeholder. Replace "Mithras" below with the registered
+        operator's full Pty Ltd + ABN/ACN once finalised, e.g. "Mithras
+        Pty Ltd (ABN xx xxx xxx xxx)". Have a privacy lawyer sign off before
+        launch.
+      */}
       <p>
-        This Privacy Policy explains how Peritus Digital Pty Ltd (ACN forthcoming),
-        operator of Mithras Threat Defence ("Mithras", "we", "us"), handles personal
-        information collected through the Mithras platform.
+        This Privacy Policy explains how Mithras Threat Defence
+        (&quot;Mithras&quot;, &quot;we&quot;, &quot;us&quot;) handles personal information collected
+        through the platform.
       </p>
 
       <h2>1. Information we collect</h2>
@@ -49,9 +55,10 @@ const Privacy = () => (
 
       <h2>3. Where data is stored</h2>
       <p>
-        By default, all customer data is stored on infrastructure located in Australia.
-        Enterprise customers may request data residency in another region or an
-        on-premise deployment in their own infrastructure.
+        All customer data is stored on infrastructure located in Australia (Sydney).
+        Alternative data residency or on-premise deployment arrangements are not part
+        of the current service; qualifying enterprise engagements may discuss bespoke
+        arrangements with sales.
       </p>
 
       <h2>4. Security</h2>
@@ -75,7 +82,7 @@ const Privacy = () => (
       <p>
         You can request access to, correction of, or deletion of personal information we
         hold about you by emailing
-        <a href="mailto:privacy@peritusdigital.com.au"> privacy@peritusdigital.com.au</a>.
+        <a href="mailto:privacy@mithras.com.au"> privacy@mithras.com.au</a>.
         Australian users have the rights set out in the Privacy Act 1988 (Cth) and the
         Australian Privacy Principles.
       </p>
@@ -88,7 +95,7 @@ const Privacy = () => (
 
       <h2>8. Contact</h2>
       <p>
-        Questions or complaints: <a href="mailto:privacy@peritusdigital.com.au">privacy@peritusdigital.com.au</a>.
+        Questions or complaints: <a href="mailto:privacy@mithras.com.au">privacy@mithras.com.au</a>.
       </p>
     </article>
   </MarketingShell>

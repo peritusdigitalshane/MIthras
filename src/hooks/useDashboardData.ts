@@ -246,10 +246,22 @@ export function useEndpointThreats() {
             endpoints(hostname, organization_id)
           `)
           .in("endpoint_id", batch)
-          .order("created_at", { ascending: false });
+          // Order by initial_detection_time — that is when the endpoint
+          // actually saw the threat. created_at survives across re-detections
+          // because agent-api upserts on (endpoint_id, threat_id) which
+          // would otherwise bury a fresh detection beneath months-old rows.
+          .order("initial_detection_time", { ascending: false, nullsFirst: false });
         if (error) throw error;
         if (data) allThreats.push(...(data as EndpointThreat[]));
       }
+      // Defensive client-side sort — initial_detection_time can be null on
+      // very old rows, in which case fall back to created_at so they don't
+      // float to the top.
+      allThreats.sort((a, b) => {
+        const ta = new Date(a.initial_detection_time || a.created_at).getTime();
+        const tb = new Date(b.initial_detection_time || b.created_at).getTime();
+        return tb - ta;
+      });
       return allThreats;
     },
     refetchInterval: 30000,

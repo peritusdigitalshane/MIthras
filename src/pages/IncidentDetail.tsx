@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { formatDistanceToNow, format } from "date-fns";
 import {
   ArrowLeft, ShieldAlert, Sparkles, Bot, Activity, CheckCircle2,
-  Clock, AlertTriangle, Cpu, Loader2, FileText, Mail, Zap, Monitor,
+  Clock, AlertTriangle, Loader2, FileText, Mail, Zap, Monitor,
   ChevronRight, RotateCcw,
 } from "lucide-react";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -332,9 +332,9 @@ function SlaPill({ incident }: { incident: Incident }) {
 // ---------------------------------------------------------------------------
 
 function CommanderSummaryCard({ incident }: { incident: Incident }) {
-  const costUsd = incident.commander_cost_microcents
-    ? (incident.commander_cost_microcents / 1_000_000).toFixed(4)
-    : null;
+  // Brand line is intentionally "Mithras SOC Agent" — never expose the
+  // underlying model/cost on operator surfaces. Economics live on
+  // /admin/ai-costs and /admin/ai-activity.
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
       <CardHeader className="pb-3">
@@ -342,19 +342,8 @@ function CommanderSummaryCard({ incident }: { incident: Incident }) {
           <Sparkles className="h-4 w-4 text-primary" />
           AI Commander summary
         </CardTitle>
-        <CardDescription className="flex items-center gap-2 text-[11px] font-mono">
-          {incident.commander_model && (
-            <>
-              <Cpu className="h-3 w-3" />
-              <span>{incident.commander_model}</span>
-            </>
-          )}
-          {costUsd && (
-            <>
-              <span className="opacity-50">·</span>
-              <span>${costUsd}</span>
-            </>
-          )}
+        <CardDescription className="flex items-center gap-2 text-[11px]">
+          <span>Mithras SOC Agent</span>
           {incident.commander_last_action_at && (
             <>
               <span className="opacity-50">·</span>

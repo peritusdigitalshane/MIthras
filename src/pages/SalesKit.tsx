@@ -13,6 +13,9 @@ import {
   Download, Eye, AlertCircle, Sparkles, Warehouse, ShieldCheck, Wrench,
 } from "lucide-react";
 import { useTenant } from "@/contexts/TenantContext";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 
 // Each asset has a Markdown source served from the public folder (so it can
 // be deep-linked + cached). PDFs will arrive later — placeholder URLs for now.
@@ -202,9 +205,20 @@ export default function SalesKit({ tier }: Props) {
               {previewing?.title}
             </DialogTitle>
           </DialogHeader>
-          <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed text-foreground/90 border-t pt-4">
-            {contentLoading ? "Loading…" : content}
-          </pre>
+          {/* MAJOR fix: render markdown as styled prose instead of a raw <pre>
+              dump. Partners were reading raw "## heading" syntax in a code font
+              and assumed the page was broken. */}
+          <div className="border-t pt-4 max-h-[70vh] overflow-y-auto">
+            {contentLoading ? (
+              <div className="text-sm text-muted-foreground">Loading…</div>
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                  {content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </MainLayout>

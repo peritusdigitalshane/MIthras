@@ -36,7 +36,10 @@ export default function CustomerThreats() {
           endpoints!inner(hostname, organization_id)
         ` as any)
         .eq("endpoints.organization_id", orgId)
-        .order("created_at", { ascending: false })
+        // F1 fix: sort by detection time so re-detected threats float to
+        // the top. Sorting by created_at hid re-detections under months-old
+        // first-insert timestamps.
+        .order("initial_detection_time", { ascending: false, nullsFirst: false })
         .limit(200);
       if (error) throw error;
       return (data ?? []) as any[];
@@ -57,7 +60,7 @@ export default function CustomerThreats() {
           eyebrow="Customer portal"
           eyebrowIcon={<ShieldCheck className="h-3.5 w-3.5" />}
           title="My threats"
-          subtitle="Every detection Mithras has seen across your endpoints. Active threats are being actioned by your reseller's SOC — you don't need to respond unless they reach out."
+          subtitle="Every detection Mithras has seen across your endpoints. Active threats are handled automatically — your reseller will reach out if anything needs your attention."
           accent="emerald"
         />
 

@@ -26,7 +26,7 @@ CONFIG_FILE="${MITHRAS_CONFIG:-/usr/local/etc/mithras/config.json}"
 LOG_DIR="${MITHRAS_LOG_DIR:-/usr/local/var/log/mithras}"
 STATE_DIR="${MITHRAS_STATE_DIR:-/usr/local/var/mithras}"
 
-HEARTBEAT_INTERVAL=60
+HEARTBEAT_INTERVAL=30  # v0.7.6: default; server-pushed next_check_in overrides on first round-trip
 INVENTORY_INTERVAL=21600  # 6 hours
 AUTH_EVENT_LOOKBACK="5m"  # log show --last
 MAX_AUTH_EVENTS=50        # per heartbeat

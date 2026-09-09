@@ -69,7 +69,7 @@ This is what their first week should look like to close their first deal by Frid
 | Issue | First | If unresolved |
 |---|---|---|
 | Sales/positioning | Your distributor | channel@mithras.com.au |
-| Technical (agent, install, console) | docs.cmwcollective.com.au | support@mithras.com.au |
+| Technical (agent, install, console) | docs.mithras.com.au | support@mithras.com.au |
 | Billing / invoice dispute | Your distributor | billing@mithras.com.au |
 | Security incident in a customer | Your own SOC if you have one | soc@mithras.com.au |
 

@@ -22,16 +22,17 @@ const REMOVAL_SCRIPT = String.raw`#Requires -RunAsAdministrator
 .SYNOPSIS
     Removes the Mithras Threat Defence Agent from this machine.
 .DESCRIPTION
-    Stops the MithrasAgent service (and any leftover PeritusSecureAgent), kills
-    straggler agent + tray processes, removes scheduled tasks + Startup-folder
-    launchers, deletes both C:\ProgramData\Mithras and C:\ProgramData\PeritusSecure.
+    Stops the Mithras agent service (and any pre-rebrand variant from a
+    previous bundle), kills straggler agent + tray processes, removes
+    scheduled tasks and Startup-folder launchers, deletes both the current
+    and any pre-rebrand ProgramData directories.
 #>
 
 $ErrorActionPreference = "SilentlyContinue"
 
 Write-Host "=== Mithras Threat Defence Agent Removal ===" -ForegroundColor Cyan
 
-# 1. Stop + remove services (new MithrasAgent + legacy PeritusSecureAgent).
+# 1. Stop + remove services (current MithrasAgent + any pre-rebrand variant).
 Write-Host "[1/6] Stopping services..." -ForegroundColor Yellow
 foreach ($svc in 'MithrasAgent','PeritusSecureAgent') {
     if (Get-Service -Name $svc -ErrorAction SilentlyContinue) {
@@ -323,13 +324,13 @@ const AgentDownload = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* MAJOR fix: only Windows agents ship today. Showing dead Linux /
+                macOS / iOS / Android tabs to partners is a credibility own-goal —
+                they get hopeful, click in, and find a "coming soon" placeholder.
+                Hidden until the respective runtime actually exists. */}
             <Tabs defaultValue="windows" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="windows" className="gap-1.5"><MonitorSmartphone className="h-3.5 w-3.5" /> Windows</TabsTrigger>
-                <TabsTrigger value="linux" className="gap-1.5"><Server className="h-3.5 w-3.5" /> Linux</TabsTrigger>
-                <TabsTrigger value="macos" className="gap-1.5"><Apple className="h-3.5 w-3.5" /> macOS</TabsTrigger>
-                <TabsTrigger value="ios" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" /> iOS</TabsTrigger>
-                <TabsTrigger value="android" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" /> Android</TabsTrigger>
               </TabsList>
 
               {/* ─── Windows tab ─── */}
@@ -415,7 +416,7 @@ const AgentDownload = () => {
                   <Server className="h-4 w-4" />
                   <AlertTitle className="flex items-center gap-2">Linux agent <Badge variant="outline" className="text-[10px] uppercase tracking-wider bg-status-healthy/10 text-status-healthy border-status-healthy/30">v0.1 — beta</Badge></AlertTitle>
                   <AlertDescription className="text-xs space-y-1 mt-1">
-                    <p>Single Go binary running as a systemd service. Same HMAC-signed channel as the Windows agent. Heartbeats every 60s, software inventory hourly, auth events streamed from <code>journalctl</code>.</p>
+                    <p>Single Go binary running as a systemd service. Same HMAC-signed channel as the Windows agent. Heartbeats every 30s, software inventory hourly, auth events streamed from <code>journalctl</code>.</p>
                     <p>Supported: Ubuntu 22.04+, Debian 12+, RHEL 9+, Rocky 9+, AlmaLinux 9+, Amazon Linux 2023. x86_64 + arm64.</p>
                   </AlertDescription>
                 </Alert>
@@ -432,7 +433,7 @@ const AgentDownload = () => {
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div><strong className="text-foreground">Status:</strong> <code>systemctl status mithras-agent</code></div>
                       <div><strong className="text-foreground">Logs:</strong> <code>journalctl -u mithras-agent -f</code></div>
-                      <div><strong className="text-foreground">Config:</strong> <code>/etc/peritus/config.json</code></div>
+                      <div><strong className="text-foreground">Config:</strong> <code>/etc/mithras/config.json</code></div>
                       <div><strong className="text-foreground">Binary:</strong> <code>/usr/local/bin/mithras-agent</code></div>
                     </div>
                   </CardContent>
@@ -566,7 +567,7 @@ const AgentDownload = () => {
                 <div>
                   <p className="font-medium">Scheduled Task Created</p>
                   <p className="text-sm text-muted-foreground">
-                    A Windows scheduled task is automatically created to run every 60 seconds
+                    A Windows scheduled task is automatically created to run every 30 seconds
                   </p>
                 </div>
               </div>
@@ -632,7 +633,7 @@ const AgentDownload = () => {
               Remove Agent (PowerShell Script)
             </CardTitle>
             <CardDescription>
-              Run this script as Administrator to completely remove the Mithras agent (and any legacy PeritusSecure install) from an endpoint.
+              Run this script as Administrator to completely remove the Mithras agent (and any pre-rebrand variant) from an endpoint.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
